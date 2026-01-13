@@ -17,7 +17,9 @@ export default function LoginPage() {
         setLoading(true)
 
         // For demo purposes, allow a "backdoor" or mock login if auth is not configured
-        if ((email === 'admin@mastermovers.co.za' && password === 'admin') || (email === 'curt' && password === '1234')) {
+        if ((email === 'admin@mastermovers.co.za' && password === 'admin') ||
+            (email === 'curt' && password === '1234') ||
+            (email === 'curt@cloudsplash.co.za' && password === '1234')) {
             // Fake successful login
             setTimeout(() => {
                 navigate('/admin')
@@ -95,7 +97,7 @@ export default function LoginPage() {
                     </div>
 
                     <div className="text-center text-xs text-slate-400">
-                        Demo Credentials: admin@mastermovers.co.za / admin OR curt / 1234
+                        Demo Credentials: admin@mastermovers.co.za / admin <br /> OR curt@cloudsplash.co.za / 1234
                     </div>
                 </form>
             </div>

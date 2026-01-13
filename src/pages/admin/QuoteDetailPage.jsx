@@ -51,6 +51,8 @@ export default function QuoteDetailPage() {
     }
 
     const [sendingWa, setSendingWa] = useState(false)
+    const [showInput, setShowInput] = useState(false)
+    const [messageText, setMessageText] = useState('')
 
     // Get store action directly inside component or via hook if exported
     // Since useMoveStore is a hook, let's use it
@@ -97,127 +99,270 @@ export default function QuoteDetailPage() {
         }
     }
 
-    const handleStatusChange = async (e) => {
-        const newStatus = e.target.value
-        setUpdating(true)
-        try {
-            const { error } = await supabase
-                .from('quotes')
-                .update({ status: newStatus })
-                .eq('id', id)
-
-            if (error) throw error
-            setQuote({ ...quote, status: newStatus })
-
-            // Auto-trigger notification on specific status changes?
-            if (newStatus === 'booked') {
-                // handleSendUpdate('booking_confirmation') 
-                // Optional: Ask user normally
-            }
-        } catch (error) {
-            alert('Error updating status')
-        } finally {
-            setUpdating(false)
-        }
+    const getItemName = (id) => {
+        const item = catalog.find(i => i.id === id)
+        return item ? item.label : id
     }
 
-    if (loading) return <div className="p-8 text-center text-slate-500">Loading quote details...</div>
-    if (!quote) return <div className="p-8 text-center text-red-500">Quote not found.</div>
+    const getItemVolume = (id) => {
+        const item = catalog.find(i => i.id === id)
+        return item ? item.volume : 0
+    }
+
+    const downloadInventoryPDF = () => {
+        const doc = new jsPDF()
+
+        doc.setFontSize(20)
+        doc.text(`Inventory List - Quote #${quote.id.toString().substring(0, 6)}`, 20, 20)
+
+        doc.setFontSize(12)
+        doc.text(`Client: ${quote.client_name}`, 20, 30)
+        doc.text(`Date: ${new Date(quote.move_date).toLocaleDateString()}`, 20, 36)
+
+        let y = 50
+        doc.setFont(undefined, 'bold')
+        doc.text("Item Name", 20, y)
+        doc.text("Qty", 150, y)
+        doc.text("Vol (m3)", 170, y)
+        doc.line(20, y + 2, 190, y + 2)
+
+        y += 10
+        doc.setFont(undefined, 'normal')
+
+        let totalVol = 0
+        Object.entries(quote.items_json || {}).forEach(([itemId, qty]) => {
+            const name = getItemName(itemId)
+            const vol = getItemVolume(itemId) * qty
+            totalVol += vol
+
+            doc.text(name, 20, y)
+            doc.text(qty.toString(), 150, y)
+            doc.text(vol.toFixed(2), 170, y)
+            y += 8
+
+            if (y > 270) {
+                doc.addPage()
+                y = 20
+            }
+        })
+
+        doc.line(20, y, 190, y)
+        y += 10
+        doc.setFont(undefined, 'bold')
+        doc.text(`Total Volume: ${totalVol.toFixed(2)} m3`, 120, y)
+
+        doc.save(`Inventory_${quote.client_name}_${id}.pdf`)
+    }
+
+    if (loading) return <div className="p-8">Loading...</div>
+    if (!quote) return <div className="p-8">Quote not found</div>
+
+    const access = quote.access_details || {}
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-                <button onClick={() => navigate('/admin/quotes')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                    <ArrowLeft size={20} className="text-slate-600" />
-                </button>
+        <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+            <button onClick={() => navigate('/admin/quotes')} className="flex items-center text-slate-500 hover:text-slate-800 transition-colors">
+                <ArrowLeft size={20} className="mr-2" /> Back to Quotes
+            </button>
+
+            <div className="flex justify-between items-start">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Quote #{quote.id.substring(0, 6)}</h2>
+                    <h1 className="text-3xl font-bold text-slate-900">Quote #{quote.id.toString().substring(0, 6)}</h1>
                     <p className="text-slate-500">Created: {new Date(quote.created_at).toLocaleDateString()}</p>
                 </div>
-                <div className="ml-auto flex gap-3">
+
+                <div className="flex gap-2">
                     <select
-                        value={quote.status}
-                        onChange={handleStatusChange}
-                        disabled={updating}
-                        className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-slate-700 font-medium focus:ring-2 focus:ring-primary-500"
+                        className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm focus:ring-2 focus:ring-primary-500"
+                        defaultValue={quote.status}
                     >
                         <option value="new">New</option>
                         <option value="processing">Processing</option>
-                        <option value="on_hold">On Hold</option>
                         <option value="booked">Booked</option>
                         <option value="completed">Completed</option>
                     </select>
                 </div>
             </div>
 
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Visual Trip Summary */}
-                <div className="md:col-span-2 space-y-6">
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                            <MapPin size={18} className="text-primary-600" /> Trip Details
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                {/* LEFT COL - DETAILS */}
+                <div className="lg:col-span-2 space-y-6">
+
+                    {/* TRIP DETAILS */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+                            <MapPin size={20} className="text-primary-600" /> Trip Details
+                        </div>
+                        <div className="grid grid-cols-2 gap-8">
                             <div>
-                                <p className="text-xs text-slate-500 uppercase">Pickup</p>
+                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Pickup</label>
                                 <p className="font-medium text-slate-900 mt-1">{quote.pickup_address}</p>
                             </div>
                             <div>
-                                <p className="text-xs text-slate-500 uppercase">Dropoff</p>
+                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Dropoff</label>
                                 <p className="font-medium text-slate-900 mt-1">{quote.dropoff_address}</p>
                             </div>
                             <div>
-                                <p className="text-xs text-slate-500 uppercase">Distance</p>
+                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Distance</label>
                                 <p className="font-medium text-slate-900 mt-1">{quote.distance_km} km</p>
                             </div>
                             <div>
-                                <p className="text-xs text-slate-500 uppercase">Date</p>
+                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Date</label>
                                 <p className="font-medium text-slate-900 mt-1">{quote.move_date}</p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Inventory Snapshot */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                            <Box size={18} className="text-primary-600" /> Inventory ({quote.items_json ? Object.keys(quote.items_json).length : 0} items)
-                        </h3>
-                        {/* Simple list of items if json exists */}
-                        <div className="max-h-60 overflow-y-auto space-y-2 text-sm">
-                            {quote.items_json && Object.entries(quote.items_json).map(([itemId, qty]) => (
-                                <div key={itemId} className="flex justify-between border-b border-gray-50 pb-2">
-                                    <span className="text-slate-600">Item ID: {itemId} (x{qty})</span>
-                                </div>
-                            ))}
+                    {/* SITE ACCESS DETAILS - NEW */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+                            <Building size={20} className="text-primary-600" /> Site Access
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="bg-slate-50 p-4 rounded-lg">
+                                <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Pickup Location</h4>
+                                <ul className="space-y-2 text-sm text-slate-600">
+                                    <li className="flex justify-between">
+                                        <span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.origin?.type || 'N/A'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Stairs:</span> <span className="font-medium text-slate-900">{access.origin?.stairs ? 'Yes' : 'No'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Elevator:</span> <span className="font-medium text-slate-900">{access.origin?.elevator ? 'Yes' : 'No'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Long Carry:</span> <span className="font-medium text-slate-900">{access.origin?.longCarry ? '> 30m' : 'Standard'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.origin?.shuttle ? 'Required' : 'No'}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg">
+                                <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Dropoff Location</h4>
+                                <ul className="space-y-2 text-sm text-slate-600">
+                                    <li className="flex justify-between">
+                                        <span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.destination?.type || 'N/A'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Stairs:</span> <span className="font-medium text-slate-900">{access.destination?.stairs ? 'Yes' : 'No'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Elevator:</span> <span className="font-medium text-slate-900">{access.destination?.elevator ? 'Yes' : 'No'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Long Carry:</span> <span className="font-medium text-slate-900">{access.destination?.longCarry ? '> 30m' : 'Standard'}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.destination?.shuttle ? 'Required' : 'No'}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* INVENTORY LIST - NEW */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                                <Package size={20} className="text-primary-600" /> Inventory List
+                            </div>
+                            <button
+                                onClick={downloadInventoryPDF}
+                                className="text-sm flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                <Download size={16} /> Download PDF
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-500 border-b border-gray-100">
+                                        <th className="px-4 py-3 font-medium">Item Name</th>
+                                        <th className="px-4 py-3 font-medium w-24 text-center">Qty</th>
+                                        <th className="px-4 py-3 font-medium w-32 text-right">Vol (m³)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {Object.entries(quote.items_json || {}).map(([itemId, qty]) => (
+                                        <tr key={itemId} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 text-slate-900 font-medium">
+                                                {getItemName(itemId)}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-slate-600 bg-slate-50/50">
+                                                {qty}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-slate-600">
+                                                {(getItemVolume(itemId) * qty).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-slate-50 font-bold text-slate-900 border-t border-gray-200">
+                                        <td className="px-4 py-3">Totals</td>
+                                        <td className="px-4 py-3 text-center">
+                                            {Object.values(quote.items_json || {}).reduce((a, b) => a + b, 0)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {Object.entries(quote.items_json || {}).reduce((sum, [id, qty]) => sum + (getItemVolume(id) * qty), 0).toFixed(2)} m³
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                {/* Sidebar Actions */}
+                {/* RIGHT COL - ACTIONS & CLIENT */}
                 <div className="space-y-6">
-                    {/* Client Card */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex flex-col items-center text-center mb-6">
-                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-xl mb-3">
-                                {quote.client_name?.charAt(0)}
-                            </div>
-                            <h3 className="font-bold text-slate-900">{quote.client_name}</h3>
-                            <p className="text-sm text-slate-500">{quote.client_phone}</p>
-                            <p className="text-sm text-slate-500">{quote.client_email}</p>
+
+                    {/* CLIENT CARD */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 text-2xl font-bold mx-auto mb-4">
+                            {quote.client_name?.charAt(0).toUpperCase()}
                         </div>
+                        <h3 className="text-xl font-bold text-slate-900">{quote.client_name}</h3>
+                        <p className="text-slate-500 mb-1">{quote.client_phone}</p>
+                        <p className="text-slate-400 text-sm mb-6">{quote.client_email}</p>
 
                         <div className="space-y-3">
-                            <button
-                                onClick={() => handleSendUpdate('quote_update')}
-                                disabled={sendingWa}
-                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-70"
-                            >
-                                <MessageCircle size={18} />
-                                {sendingWa ? 'Sending...' : 'Send WhatsApp Update'}
-                            </button>
+                            {!showInput ? (
+                                <button
+                                    onClick={() => setShowInput(true)}
+                                    className="flex items-center justify-center w-full py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg font-medium transition-colors"
+                                >
+                                    <MessageCircle size={18} className="mr-2" /> Send WhatsApp Update
+                                </button>
+                            ) : (
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                                    <textarea
+                                        value={messageText}
+                                        onChange={(e) => setMessageText(e.target.value)}
+                                        placeholder="Type your message here..."
+                                        className="w-full text-sm p-2 border border-slate-300 rounded mb-2 focus:ring-2 focus:ring-[#25D366] focus:border-transparent outline-none resize-none h-24"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowInput(false)}
+                                            className="flex-1 py-1.5 text-slate-500 text-sm hover:bg-slate-200 rounded transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleSendUpdate(messageText)}
+                                            disabled={!messageText.trim() || sendingWa}
+                                            className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                                        >
+                                            {sendingWa ? <span className="animate-pulse">Sending...</span> : 'Send Now'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <a
                                 href={`mailto:${quote.client_email}`}
                                 className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"

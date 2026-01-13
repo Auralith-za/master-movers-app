@@ -1,6 +1,5 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import MainLayout from './layouts/MainLayout'
 import AdminLayout from './layouts/AdminLayout'
 import WebsiteLayout from './layouts/WebsiteLayout'
 import MoveWizard from './features/move-flow/MoveWizard'
@@ -15,6 +14,7 @@ import CancelPage from './pages/payment/CancelPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import QuotesPage from './pages/admin/QuotesPage'
 import QuoteDetailPage from './pages/admin/QuoteDetailPage'
+import LeadsPage from './pages/admin/LeadsPage'
 
 function App() {
   return (
@@ -33,8 +33,8 @@ function App() {
           {/* Add other site pages here later */}
         </Route>
 
-        {/* Quote Flow - Keep as is but maybe change path to /quote */}
-        <Route path="/quote" element={<MainLayout />}>
+        {/* Quote Flow - Use WebsiteLayout to show full header */}
+        <Route path="/quote" element={<WebsiteLayout />}>
           <Route index element={<MoveWizard />} />
           <Route path="*" element={<MoveWizard />} />
         </Route>
@@ -44,6 +44,7 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="quotes" element={<QuotesPage />} />
           <Route path="quotes/:id" element={<QuoteDetailPage />} />
+          <Route path="leads" element={<LeadsPage />} />
           {/* Add more admin routes here */}
         </Route>
       </Routes>

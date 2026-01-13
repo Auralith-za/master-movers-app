@@ -47,8 +47,8 @@ export default function Navbar() {
                                 key={link.path}
                                 to={link.path}
                                 className={`text-sm font-medium transition-colors hover:text-primary-500 ${isActive(link.path)
-                                        ? 'text-primary-500'
-                                        : (scrolled ? 'text-slate-600' : 'text-slate-100')
+                                    ? 'text-primary-500'
+                                    : (scrolled ? 'text-slate-600' : 'text-slate-100')
                                     }`}
                             >
                                 {link.name}
@@ -90,8 +90,8 @@ export default function Navbar() {
                                 to={link.path}
                                 onClick={() => setIsOpen(false)}
                                 className={`block px-3 py-3 rounded-lg text-base font-medium ${isActive(link.path)
-                                        ? 'bg-primary-50 text-primary-700'
-                                        : 'text-slate-600 hover:bg-slate-50'
+                                    ? 'bg-primary-50 text-primary-700'
+                                    : 'text-slate-600 hover:bg-slate-50'
                                     }`}
                             >
                                 {link.name}
@@ -102,7 +102,7 @@ export default function Navbar() {
                                 <User size={18} /> Admin Login
                             </Link>
                             <Link to="/quote" onClick={() => setIsOpen(false)}>
-                                <Button className="w-full justify-center">Get A Quote</Button>
+                                <Button className="w-full justify-center bg-orange-500 hover:bg-orange-600 text-white border-none">Get a Quote</Button>
                             </Link>
                         </div>
                     </div>

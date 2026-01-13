@@ -2,7 +2,8 @@ import React, { useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle, ArrowRight } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import { useMoveStore } from '../../features/inventory/store/moveStore'
+// ... existing imports
+import { event } from '../../lib/gtag'
 
 export default function SuccessPage() {
     const [searchParams] = useSearchParams()
@@ -12,7 +13,17 @@ export default function SuccessPage() {
     // The ID might come from the URL ?pf_payment_id=... or a custom ref param
     const reference = searchParams.get('m_payment_id') || 'REF-User'
 
+    // ... existing code ...
+
     useEffect(() => {
+        // Track Purchase
+        event({
+            action: 'conversion',
+            category: 'Sales',
+            label: 'Purchase',
+            value: 1 // You can pass actual value here if available in store/url
+        })
+
         // clear the local store once the booking is successful
         resetMove()
     }, [resetMove])

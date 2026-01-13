@@ -11,11 +11,15 @@ if (!supabaseUrl || !supabaseKey) {
 export const supabase = (supabaseUrl && supabaseKey)
     ? createClient(supabaseUrl, supabaseKey)
     : {
-        from: () => ({
-            select: () => Promise.resolve({ data: [], error: null }),
-            insert: () => ({
-                select: () => Promise.resolve({ data: [{ id: 'mock-id-123', status: 'new' }], error: null }),
-            }),
-            // Add other methods as needed for basic crash prevention
-        })
+        from: () => {
+            const chain = {
+                select: () => chain,
+                order: () => chain,
+                eq: () => chain,
+                single: () => Promise.resolve({ data: null, error: null }),
+                insert: () => chain,
+                then: (resolve) => resolve({ data: [], error: null }) // Allow await
+            }
+            return chain
+        }
     }

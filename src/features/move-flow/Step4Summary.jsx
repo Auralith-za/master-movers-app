@@ -7,6 +7,7 @@ import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin } from 'lucide-r
 import jsPDF from 'jspdf'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
+import { event } from '../../lib/gtag'
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -77,37 +78,53 @@ function Step4SummaryContent() {
         }
     }
 
-    const handleWhatsApp = async () => {
-        const phone = prompt("Please enter the number to send to:", moveDetails.contactPhone || '')
-        if (!phone) return
-
+    const handleCallBackRequest = async () => {
+        setIsSubmitting(true)
         try {
-            // Using a saved quote ID if available, otherwise mock something for now
-            // Ideally we pass the real quote ID. 
-            // For now we'll just trigger the test function.
-            // In a real app, you'd pass the actual quote ID from the URL or state after saving.
-            // But let's just send the details we have.
-            const { success, error, mock } = await useMoveStore.getState().sendWhatsAppNotification(
-                'TEST-QUOTE-ID',
-                phone,
-                'quote_summary',
-                [moveDetails.contactName, total.toFixed(2)] // Params for template
-            )
+            // Check if we need to save first or update existing
+            const alreadySaved = searchParams.get('saved') === 'true'
 
-            if (success) {
-                alert(mock ? 'WhatsApp Mock Success (Function not deployed live yet)' : 'WhatsApp sent successfully!')
-            } else {
-                alert('Failed to send WhatsApp: ' + (error?.message || 'Unknown error'))
+            if (alreadySaved) {
+                alert("We have received your request! A consultant will call you shortly.")
+                return
             }
-        } catch (e) {
-            console.error(e)
-            alert('Error sending WhatsApp')
+
+            // Track Conversion - Call Back Request
+            event({
+                action: 'conversion',
+                category: 'Lead',
+                label: 'Request Call Back',
+                value: 1
+            })
+
+            // Save new quote with call back flag
+            const result = await submitQuote({ request_call_back: true })
+
+            if (result.success) {
+                setSearchParams({ saved: 'true' })
+                alert("Request Sent! We will call you shortly to discuss your move.")
+            } else {
+                alert('Error sending request. Please try again.')
+            }
+        } catch (error) {
+            console.error("Call Back Error", error)
+            alert('Failed to send request')
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
     const handleGeneratePDF = () => {
         setIsGenerating(true)
         try {
+            // Track Conversion - PDF Download
+            event({
+                action: 'conversion',
+                category: 'Engagement',
+                label: 'Download Quote PDF',
+                value: 0
+            })
+
             const doc = new jsPDF()
 
             // Header
@@ -265,8 +282,14 @@ function Step4SummaryContent() {
                             <Button variant="secondary" onClick={handleGeneratePDF} isLoading={isGenerating}>
                                 <FileText size={16} className="mr-2" /> Download PDF
                             </Button>
-                            <Button variant="secondary" onClick={handleWhatsApp}>
-                                <Send size={16} className="mr-2" /> WhatsApp Me
+                            <Button variant="secondary" onClick={handleCallBackRequest} isLoading={isSubmitting}>
+                                <div className="flex items-center">
+                                    <span className="relative flex h-3 w-3 mr-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                    </span>
+                                    Request Call Back
+                                </div>
                             </Button>
                         </div>
                     </div>

@@ -60,7 +60,7 @@ export const useMoveStore = create(
             },
 
             // Async Actions
-            submitQuote: async () => {
+            submitQuote: async (extraPayload = {}) => {
                 const state = get()
                 const { inventory, moveDetails, accessDetails } = state
 
@@ -90,7 +90,8 @@ export const useMoveStore = create(
                         trip_breakdown: moveDetails.tripBreakdown || null,
                         total_volume: safeVolume,
                         total_price: safePrice,
-                        created_at: new Date().toISOString()
+                        created_at: new Date().toISOString(),
+                        ...extraPayload // Merge in any extra fields like request_call_back
                     }
 
                     console.log("Submitting Quote Payload:", payload)
