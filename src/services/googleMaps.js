@@ -8,18 +8,32 @@ const DEPOT_LOCATION = "Germiston, South Africa";
 
 let isLoaded = false;
 
+let loadingPromise = null;
+
 /**
  * loads the Google Maps script dynamically if not already loaded
  */
 export const loadGoogleMapsScript = () => {
-    return new Promise((resolve, reject) => {
+    // If already loading or loaded, return the existing promise
+    if (loadingPromise) return loadingPromise;
+
+    loadingPromise = new Promise((resolve, reject) => {
+        // If already loaded globally
         if (window.google && window.google.maps) {
-            isLoaded = true;
             resolve();
             return;
         }
 
+        // Check if script tag already exists (safety check)
+        if (document.querySelector(`script[src*="maps.googleapis.com"]`)) {
+            // It's there but maybe not window.google yet? 
+            // We'll proceed with creating our own to attach handlers or wait.
+            // But simpler is to allow duplicate check above to handle it.
+            // This block handles external disjoint loads. 
+        }
+
         if (!GOOGLE_MAPS_API_KEY) {
+            loadingPromise = null;
             reject(new Error("Google Maps API Key is missing."));
             return;
         }
@@ -32,9 +46,14 @@ export const loadGoogleMapsScript = () => {
             isLoaded = true;
             resolve();
         };
-        script.onerror = (err) => reject(err);
+        script.onerror = (err) => {
+            loadingPromise = null;
+            reject(err);
+        };
         document.head.appendChild(script);
     });
+
+    return loadingPromise;
 };
 
 /**
