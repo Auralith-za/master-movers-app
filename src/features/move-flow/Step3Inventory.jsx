@@ -5,12 +5,12 @@ import { INVENTORY_ITEMS, CATEGORIES } from '../inventory/data/mockItems'
 import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'
 import { Button } from '../../components/ui/Button'
-import { Search } from 'lucide-react'
+import { Search, Trash2 } from 'lucide-react'
 import { Input } from '../../components/ui/Input'
 
 export default function Step3Inventory() {
     const navigate = useNavigate()
-    const { inventory, addItem, removeItem } = useMoveStore()
+    const { inventory, addItem, removeItem, clearInventory } = useMoveStore()
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
 
@@ -47,8 +47,8 @@ export default function Step3Inventory() {
                                     key={cat}
                                     onClick={() => setActiveCategory(cat)}
                                     className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
-                                            ? 'bg-slate-900 text-white'
-                                            : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
+                                        ? 'bg-slate-900 text-white'
+                                        : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {cat}
@@ -86,6 +86,17 @@ export default function Step3Inventory() {
                         </Button>
                         <Button variant="ghost" onClick={() => navigate('/quote/access')}>
                             Back to Access
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                                if (window.confirm('Are you sure you want to clear all inventory items?')) {
+                                    clearInventory()
+                                }
+                            }}
+                        >
+                            <Trash2 size={16} className="mr-2" /> Reset Inventory
                         </Button>
                     </div>
                 </div>

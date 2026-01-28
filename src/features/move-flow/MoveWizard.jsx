@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
@@ -7,21 +7,26 @@ import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
 import Step4Summary from './Step4Summary'
 
-const STEPS = [
-    { id: 'details', label: 'Details', path: '/quote' },
-    { id: 'access', label: 'Site Access', path: '/quote/access' },
-    { id: 'inventory', label: 'Inventory', path: '/quote/inventory' },
-    { id: 'summary', label: 'Summary', path: '/quote/summary' },
-]
-
 export default function MoveWizard() {
     const location = useLocation()
     const navigate = useNavigate()
 
-    const currentStepIndex = STEPS.findIndex(s => s.path === location.pathname) || 0
+    // Determine if we're in test mode based on current path
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : '/quote';
+
+    const STEPS = useMemo(() => [
+        { id: 'details', label: 'Details', path: basePath },
+        { id: 'access', label: 'Site Access', path: `${basePath}/access` },
+        { id: 'inventory', label: 'Inventory', path: `${basePath}/inventory` },
+        { id: 'summary', label: 'Summary', path: `${basePath}/summary` },
+    ], [basePath]);
+
+    const currentStepIndex = STEPS.findIndex(s => s.path === location.pathname) !== -1
+        ? STEPS.findIndex(s => s.path === location.pathname)
+        : 0;
 
     return (
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto pb-20">
             {/* Stepper Header */}
             <div className="mb-8 max-w-4xl mx-auto text-center md:text-left">
                 <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Plan Your Move</h1>

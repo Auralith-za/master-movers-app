@@ -37,7 +37,7 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
 
                 {/* Transaction Details */}
                 <input type="hidden" name="m_payment_id" value={quote.id || 'TEST-ID'} />
-                <input type="hidden" name="amount" value={quote.total_price} />
+                <input type="hidden" name="amount" value={Number(quote.total_price).toFixed(2)} />
                 <input type="hidden" name="item_name" value={`Move: ${quote.pickup_address} to ${quote.dropoff_address}`} />
 
                 {/* Client Details (Optional but good for pre-populating) */}
@@ -51,7 +51,7 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
                 className="w-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all text-lg"
                 onClick={handlePayClick}
             >
-                Pay Now (R {quote.total_price})
+                Pay Now (R {Number(quote.total_price).toFixed(2)})
             </Button>
 
             <p className="text-center text-xs text-slate-400 mt-3 flex items-center justify-center gap-1">

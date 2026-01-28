@@ -6,7 +6,7 @@ export default function Footer() {
     return (
         <footer className="bg-slate-900 text-slate-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
                     {/* Brand */}
                     <div>
                         <div className="flex items-center gap-2 mb-4">
@@ -48,21 +48,36 @@ export default function Footer() {
                         </ul>
                     </div>
 
+                    {/* Locations */}
+                    <div>
+                        <h3 className="text-white font-semibold mb-4">Locations We Serve</h3>
+                        <ul className="space-y-2 text-sm">
+                            <li>
+                                <Link
+                                    to="/locations/movers-durban"
+                                    className="hover:text-primary-400 transition-colors"
+                                >
+                                    Movers Durban
+                                </Link>
+                            </li>
+                        </ul>
+                    </div>
+
                     {/* Contact */}
                     <div>
                         <h3 className="text-white font-semibold mb-4">Contact Us</h3>
                         <ul className="space-y-4 text-sm">
                             <li className="flex items-start gap-3">
-                                <MapPin size={18} className="text-primary-500 mt-0.5" />
-                                <span>123 Logistics Way,<br />Germiston, 1401</span>
+                                <MapPin size={18} className="text-primary-500 mt-0.5 shrink-0" />
+                                <span>17 Indianapolis Blvd,<br />Raceway Industrial Park,<br />Gosforth Park, Germiston</span>
                             </li>
                             <li className="flex items-center gap-3">
-                                <Phone size={18} className="text-primary-500" />
-                                <span>+27 11 123 4567</span>
+                                <Phone size={18} className="text-primary-500 shrink-0" />
+                                <span>+27 11 493 7569</span>
                             </li>
                             <li className="flex items-center gap-3">
-                                <Mail size={18} className="text-primary-500" />
-                                <span>hello@mastermovers.co.za</span>
+                                <Mail size={18} className="text-primary-500 shrink-0" />
+                                <span>sales1@mastermoversjhb.co.za</span>
                             </li>
                         </ul>
                     </div>

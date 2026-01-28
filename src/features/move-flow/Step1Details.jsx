@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles } from 'lucide-react'
+import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
+import { calculateTripDistances } from '../../services/googleMaps'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2 } from 'lucide-react'
 
 export default function Step1Details() {
     const navigate = useNavigate()
@@ -11,28 +13,31 @@ export default function Step1Details() {
 
     const handleChange = (e) => {
         const { name, value } = e.target
-        // If changing distance manually, clear outdated breakdown
-        if (name === 'distanceKm') {
-            setMoveDetails({ [name]: value, tripBreakdown: null })
-        } else {
-            setMoveDetails({ [name]: value })
+        setMoveDetails({ [name]: value })
+    }
+
+    // Auto-calculate distance in background when both addresses are filled
+    React.useEffect(() => {
+        if (moveDetails.pickupAddress && moveDetails.dropoffAddress) {
+            // Silently calculate in background without showing loading state
+            calculateTripDistances(
+                moveDetails.pickupAddress,
+                moveDetails.dropoffAddress
+            )
+                .then(({ breakdown, totalDistance }) => {
+                    setMoveDetails({
+                        distanceKm: breakdown.pickupToDropoff,
+                        tripBreakdown: breakdown,
+                        totalBillableDistance: totalDistance
+                    })
+                })
+                .catch((error) => {
+                    console.error("Background calculation error:", error)
+                    // Fail silently - user can still proceed
+                })
         }
-    }
+    }, [moveDetails.pickupAddress, moveDetails.dropoffAddress])
 
-    const simulateRoute = () => {
-        // Mock logic to simulate API return
-        const userDist = parseFloat(moveDetails.distanceKm) || 25
-        const depotToPickup = Math.floor(Math.random() * (45 - 15) + 15)
-        const dropoffToDepot = Math.floor(Math.random() * (45 - 15) + 15)
-
-        setMoveDetails({
-            tripBreakdown: {
-                depotToPickup,
-                pickupToDropoff: userDist,
-                dropoffToDepot
-            }
-        })
-    }
 
     const handleSubmit = (e) => {
         e.preventDefault()
@@ -52,7 +57,7 @@ export default function Step1Details() {
                             Where are you moving?
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Input
+                            <AddressAutocomplete
                                 label="Pickup Address"
                                 name="pickupAddress"
                                 placeholder="e.g. 123 Main St, Sandton"
@@ -60,7 +65,7 @@ export default function Step1Details() {
                                 onChange={handleChange}
                                 required
                             />
-                            <Input
+                            <AddressAutocomplete
                                 label="Dropoff Address"
                                 name="dropoffAddress"
                                 placeholder="e.g. 456 Beach Rd, Cape Town"
@@ -70,58 +75,7 @@ export default function Step1Details() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Enhanced Distance Section */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="text-sm font-medium text-slate-700">Estimated Distance</label>
-                                    <button
-                                        type="button"
-                                        onClick={simulateRoute}
-                                        className="text-xs flex items-center gap-1 text-primary-600 hover:text-primary-700 font-bold bg-primary-50 px-2 py-1 rounded transition-colors"
-                                    >
-                                        <Sparkles size={14} />
-                                        Simulate Route
-                                    </button>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        name="distanceKm"
-                                        placeholder="0"
-                                        value={moveDetails.distanceKm}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all"
-                                        required
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">km</span>
-                                </div>
-
-                                {moveDetails.tripBreakdown && (
-                                    <div className="mt-3 text-xs space-y-1 text-slate-500 animate-in slide-in-from-top-2">
-                                        <div className="flex justify-between">
-                                            <span>Depot (Germiston) ➝ Pickup:</span>
-                                            <span>{moveDetails.tripBreakdown.depotToPickup} km</span>
-                                        </div>
-                                        <div className="flex justify-between text-slate-700 font-medium">
-                                            <span>Pickup ➝ Dropoff (Your Move):</span>
-                                            <span>{moveDetails.tripBreakdown.pickupToDropoff} km</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Dropoff ➝ Depot (Germiston):</span>
-                                            <span>{moveDetails.tripBreakdown.dropoffToDepot} km</span>
-                                        </div>
-                                        <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-2 mt-2">
-                                            <span>Total Billable Distance:</span>
-                                            <span>
-                                                {moveDetails.tripBreakdown.depotToPickup +
-                                                    moveDetails.tripBreakdown.pickupToDropoff +
-                                                    moveDetails.tripBreakdown.dropoffToDepot} km
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                        <div className="grid grid-cols-1 gap-6">
                             <Input
                                 label="Preferred Move Date"
                                 name="moveDate"
@@ -130,6 +84,19 @@ export default function Step1Details() {
                                 onChange={handleChange}
                                 required
                             />
+
+                            {/* Discount Notice Card */}
+                            <div className="mt-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4 flex items-start gap-3">
+                                <div className="bg-white p-2 rounded-lg shadow-sm text-indigo-600 shrink-0">
+                                    <Sparkles size={18} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-indigo-900 text-sm">Save 10% on your move</h4>
+                                    <p className="text-xs text-indigo-700 mt-0.5">
+                                        Book your move between the <span className="font-bold border-b border-indigo-300">5th and 24th</span> of any month to automatically qualify for our Mid-Month Madness discount.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

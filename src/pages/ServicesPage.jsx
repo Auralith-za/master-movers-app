@@ -42,14 +42,23 @@ export default function ServicesPage() {
     ]
 
     return (
-        <div className="bg-slate-50 min-h-screen py-24">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                    <h1 className="text-4xl font-bold text-slate-900 mb-4">Our Services</h1>
-                    <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+        <div className="bg-slate-50 min-h-screen">
+            {/* Hero Section */}
+            <div className="relative isolate overflow-hidden bg-slate-900 py-24 sm:py-32">
+                <img
+                    src="/images/hero_services.jpg"
+                    alt="Services Hero"
+                    className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
+                />
+                <div className="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+                    <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">Our Services</h1>
+                    <p className="mt-6 text-lg leading-8 text-slate-300 max-w-2xl mx-auto">
                         Comprehensive moving solutions tailored to your unique needs. From small apartments to large corporate offices, we handle it all.
                     </p>
                 </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {services.map((service, index) => (

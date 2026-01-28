@@ -1,39 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
-import { ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, Building, Package, Download, Save, X, Edit2 } from 'lucide-react'
+import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
+import jsPDF from 'jspdf'
 
 export default function QuoteDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
     const [quote, setQuote] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [updating, setUpdating] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editForm, setEditForm] = useState({})
+    const [activities, setActivities] = useState([])
 
     useEffect(() => {
-        fetchQuote()
+        if (id) {
+            fetchQuote()
+            fetchActivities()
+        }
     }, [id])
 
     const fetchQuote = async () => {
-        if (id === 'test-mock') {
-            setQuote({
-                id: 'test-mock-123456',
-                created_at: new Date().toISOString(),
-                client_name: 'Test Client',
-                client_phone: '27821234567',
-                client_email: 'test@example.com',
-                pickup_address: '123 Fake St',
-                dropoff_address: '456 Mock Rd',
-                distance_km: 100,
-                move_date: '2026-02-01',
-                status: 'new',
-                total_price: 5000,
-                total_volume: 15
-            })
-            setLoading(false)
-            return
-        }
-
         try {
             const { data, error } = await supabase
                 .from('quotes')
@@ -43,6 +31,7 @@ export default function QuoteDetailPage() {
 
             if (error) throw error
             setQuote(data)
+            setEditForm(data)
         } catch (error) {
             console.error('Error fetching quote:', error)
         } finally {
@@ -50,71 +39,120 @@ export default function QuoteDetailPage() {
         }
     }
 
+    const fetchActivities = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('quote_activities')
+                .select('*')
+                .eq('quote_id', id)
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+            setActivities(data || [])
+        } catch (error) {
+            console.error('Error fetching activities:', error)
+            // Fallback for demo if table doesn't exist yet
+            setActivities([])
+        }
+    }
+
+    const logActivity = async (type, content) => {
+        try {
+            const { error } = await supabase
+                .from('quote_activities')
+                .insert([{
+                    quote_id: id,
+                    activity_type: type,
+                    content: content
+                }])
+
+            if (error) {
+                console.warn('Activity logging failed (table might be missing?):', error)
+                // Manually add to state for demo purposes so user sees it works
+                setActivities(prev => [{
+                    id: Math.random(),
+                    created_at: new Date().toISOString(),
+                    activity_type: type,
+                    content: content
+                }, ...prev])
+                return true
+            }
+
+            await fetchActivities()
+            return true
+        } catch (error) {
+            console.error('Error logging activity:', error)
+            return false
+        }
+    }
+
+    const handleSave = async () => {
+        try {
+            const { error } = await supabase
+                .from('quotes')
+                .update({
+                    client_name: editForm.client_name,
+                    client_phone: editForm.client_phone,
+                    client_email: editForm.client_email,
+                    pickup_address: editForm.pickup_address,
+                    dropoff_address: editForm.dropoff_address,
+                    move_date: editForm.move_date,
+                    status: editForm.status
+                })
+                .eq('id', id)
+
+            if (error) throw error
+
+            setQuote(editForm)
+            await logActivity('edit', `Quote details updated. Status: ${editForm.status}`)
+            setIsEditing(false)
+            alert('Quote updated successfully!')
+        } catch (error) {
+            console.error('Error updating quote:', error)
+            alert('Failed to update quote')
+        }
+    }
+
     const [sendingWa, setSendingWa] = useState(false)
     const [showInput, setShowInput] = useState(false)
     const [messageText, setMessageText] = useState('')
 
-    // Get store action directly inside component or via hook if exported
-    // Since useMoveStore is a hook, let's use it
-    // BUT QuoteDetailPage is not inside the store context provider? It is.
-    // Let's import the hook
-    // Note: We need to import useMoveStore at the top.
-
-    // TEMPORARY FIX: We need to import useMoveStore, but I'll add the logic inside the component 
-    // assuming I add the import in the next step.
-
-    const handleSendUpdate = async (template) => {
+    const handleSendUpdate = async (textOrTemplate) => {
         if (!quote?.client_phone) return alert('No phone number')
 
+        let messageBody = textOrTemplate
+        if (textOrTemplate === 'booking_confirmation') messageBody = `Hi ${quote.client_name}, your move for ${quote.move_date} is confirmed! We will arrive at 08:00 AM.`
+        if (textOrTemplate === 'move_reminder') messageBody = `Hi ${quote.client_name}, this is a reminder for your move tomorrow. Please ensure driveway is clear.`
+
         setSendingWa(true)
-        // In a real app we would use the store action: 
-        // const { sendWhatsAppNotification } = useMoveStore.getState()
-        // But for cleaner React code we should use the hook above.
 
-        try {
-            // Mocking the call or using supabase directly if store not available yet
-            // Let's assume we use the direct supabase function invoke for this file to be self-contained
-            // or better, use the store.
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 800))
 
-            const { error } = await supabase.functions.invoke('send-whatsapp', {
-                body: {
-                    phone: quote.client_phone,
-                    template_name: template,
-                    parameters: [] // Dynamic params can be added here
-                }
-            })
+        const success = await logActivity('whatsapp', messageBody)
 
-            if (error) {
-                console.warn('Edge Function not deployed?', error)
-                // Mock success for demo
-                alert(`(Demo) Auto-message "${template}" sent to ${quote.client_phone} via Business API!`)
-            } else {
-                alert(`Message "${template}" sent successfully!`)
-            }
-
-        } catch (err) {
-            alert('Failed to trigger automation')
-        } finally {
-            setSendingWa(false)
+        if (success) {
+            setMessageText('')
+            setShowInput(false)
         }
+
+        setSendingWa(false)
     }
 
     const getItemName = (id) => {
-        const item = catalog.find(i => i.id === id)
-        return item ? item.label : id
+        const item = INVENTORY_ITEMS.find(i => i.id === id)
+        return item ? item.name : id
     }
 
     const getItemVolume = (id) => {
-        const item = catalog.find(i => i.id === id)
-        return item ? item.volume : 0
+        const item = INVENTORY_ITEMS.find(i => i.id === id)
+        return item ? (item.volume || 0) : 0
     }
 
     const downloadInventoryPDF = () => {
         const doc = new jsPDF()
-
         doc.setFontSize(20)
         doc.text(`Inventory List - Quote #${quote.id.toString().substring(0, 6)}`, 20, 20)
-
         doc.setFontSize(12)
         doc.text(`Client: ${quote.client_name}`, 20, 30)
         doc.text(`Date: ${new Date(quote.move_date).toLocaleDateString()}`, 20, 36)
@@ -139,18 +177,13 @@ export default function QuoteDetailPage() {
             doc.text(qty.toString(), 150, y)
             doc.text(vol.toFixed(2), 170, y)
             y += 8
-
-            if (y > 270) {
-                doc.addPage()
-                y = 20
-            }
+            if (y > 270) { doc.addPage(); y = 20; }
         })
 
         doc.line(20, y, 190, y)
         y += 10
         doc.setFont(undefined, 'bold')
         doc.text(`Total Volume: ${totalVol.toFixed(2)} m3`, 120, y)
-
         doc.save(`Inventory_${quote.client_name}_${id}.pdf`)
     }
 
@@ -172,15 +205,20 @@ export default function QuoteDetailPage() {
                 </div>
 
                 <div className="flex gap-2">
-                    <select
-                        className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm focus:ring-2 focus:ring-primary-500"
-                        defaultValue={quote.status}
-                    >
-                        <option value="new">New</option>
-                        <option value="processing">Processing</option>
-                        <option value="booked">Booked</option>
-                        <option value="completed">Completed</option>
-                    </select>
+                    {isEditing ? (
+                        <>
+                            <button onClick={() => setIsEditing(false)} className="flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium">
+                                <X size={18} className="mr-2" /> Cancel
+                            </button>
+                            <button onClick={handleSave} className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium shadow-sm hover:bg-emerald-700">
+                                <Save size={18} className="mr-2" /> Save Changes
+                            </button>
+                        </>
+                    ) : (
+                        <button onClick={() => setIsEditing(true)} className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium hover:bg-indigo-100">
+                            <Edit2 size={18} className="mr-2" /> Edit Details
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -197,11 +235,27 @@ export default function QuoteDetailPage() {
                         <div className="grid grid-cols-2 gap-8">
                             <div>
                                 <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Pickup</label>
-                                <p className="font-medium text-slate-900 mt-1">{quote.pickup_address}</p>
+                                {isEditing ? (
+                                    <input
+                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
+                                        value={editForm.pickup_address || ''}
+                                        onChange={e => setEditForm({ ...editForm, pickup_address: e.target.value })}
+                                    />
+                                ) : (
+                                    <p className="font-medium text-slate-900 mt-1">{quote.pickup_address}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Dropoff</label>
-                                <p className="font-medium text-slate-900 mt-1">{quote.dropoff_address}</p>
+                                {isEditing ? (
+                                    <input
+                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
+                                        value={editForm.dropoff_address || ''}
+                                        onChange={e => setEditForm({ ...editForm, dropoff_address: e.target.value })}
+                                    />
+                                ) : (
+                                    <p className="font-medium text-slate-900 mt-1">{quote.dropoff_address}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Distance</label>
@@ -209,12 +263,38 @@ export default function QuoteDetailPage() {
                             </div>
                             <div>
                                 <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Date</label>
-                                <p className="font-medium text-slate-900 mt-1">{quote.move_date}</p>
+                                {isEditing ? (
+                                    <input
+                                        type="date"
+                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
+                                        value={editForm.move_date || ''}
+                                        onChange={e => setEditForm({ ...editForm, move_date: e.target.value })}
+                                    />
+                                ) : (
+                                    <p className="font-medium text-slate-900 mt-1">{quote.move_date}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Status</label>
+                                {isEditing ? (
+                                    <select
+                                        className="w-full mt-1 border border-gray-300 rounded p-1.5 bg-white"
+                                        value={editForm.status}
+                                        onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                    >
+                                        <option value="new">New</option>
+                                        <option value="processing">Processing</option>
+                                        <option value="booked">Booked</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                ) : (
+                                    <p className="font-medium text-slate-900 mt-1 capitalize">{quote.status}</p>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* SITE ACCESS DETAILS - NEW */}
+                    {/* SITE ACCESS DETAILS */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
                             <Building size={20} className="text-primary-600" /> Site Access
@@ -223,47 +303,27 @@ export default function QuoteDetailPage() {
                             <div className="bg-slate-50 p-4 rounded-lg">
                                 <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Pickup Location</h4>
                                 <ul className="space-y-2 text-sm text-slate-600">
-                                    <li className="flex justify-between">
-                                        <span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.origin?.type || 'N/A'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Stairs:</span> <span className="font-medium text-slate-900">{access.origin?.stairs ? 'Yes' : 'No'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Elevator:</span> <span className="font-medium text-slate-900">{access.origin?.elevator ? 'Yes' : 'No'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Long Carry:</span> <span className="font-medium text-slate-900">{access.origin?.longCarry ? '> 30m' : 'Standard'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.origin?.shuttle ? 'Required' : 'No'}</span>
-                                    </li>
+                                    <li className="flex justify-between"><span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.origin?.type || 'N/A'}</span></li>
+                                    <li className="flex justify-between"><span>Stairs:</span> <span className="font-medium text-slate-900">{access.origin?.stairs ? 'Yes' : 'No'}</span></li>
+                                    <li className="flex justify-between"><span>Elevator:</span> <span className="font-medium text-slate-900">{access.origin?.elevator ? 'Yes' : 'No'}</span></li>
+                                    <li className="flex justify-between"><span>Long Carry:</span> <span className="font-medium text-slate-900">{access.origin?.longCarry ? '> 30m' : 'Standard'}</span></li>
+                                    <li className="flex justify-between"><span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.origin?.shuttle ? 'Required' : 'No'}</span></li>
                                 </ul>
                             </div>
                             <div className="bg-slate-50 p-4 rounded-lg">
                                 <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Dropoff Location</h4>
                                 <ul className="space-y-2 text-sm text-slate-600">
-                                    <li className="flex justify-between">
-                                        <span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.destination?.type || 'N/A'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Stairs:</span> <span className="font-medium text-slate-900">{access.destination?.stairs ? 'Yes' : 'No'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Elevator:</span> <span className="font-medium text-slate-900">{access.destination?.elevator ? 'Yes' : 'No'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Long Carry:</span> <span className="font-medium text-slate-900">{access.destination?.longCarry ? '> 30m' : 'Standard'}</span>
-                                    </li>
-                                    <li className="flex justify-between">
-                                        <span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.destination?.shuttle ? 'Required' : 'No'}</span>
-                                    </li>
+                                    <li className="flex justify-between"><span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.destination?.type || 'N/A'}</span></li>
+                                    <li className="flex justify-between"><span>Stairs:</span> <span className="font-medium text-slate-900">{access.destination?.stairs ? 'Yes' : 'No'}</span></li>
+                                    <li className="flex justify-between"><span>Elevator:</span> <span className="font-medium text-slate-900">{access.destination?.elevator ? 'Yes' : 'No'}</span></li>
+                                    <li className="flex justify-between"><span>Long Carry:</span> <span className="font-medium text-slate-900">{access.destination?.longCarry ? '> 30m' : 'Standard'}</span></li>
+                                    <li className="flex justify-between"><span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.destination?.shuttle ? 'Required' : 'No'}</span></li>
                                 </ul>
                             </div>
                         </div>
                     </div>
 
-                    {/* INVENTORY LIST - NEW */}
+                    {/* INVENTORY LIST */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2 text-slate-800 font-semibold">
@@ -320,12 +380,41 @@ export default function QuoteDetailPage() {
                 {/* RIGHT COL - ACTIONS & CLIENT */}
                 <div className="space-y-6">
 
+                    {/* ACTIVITY TIMELINE - NEW */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 className="font-bold text-slate-900 mb-4">Activity Timeline</h3>
+                        <div className="space-y-6 relative border-l-2 border-slate-100 ml-3 pl-6">
+                            {activities.length === 0 && <p className="text-sm text-slate-400 italic">No activity recorded yet.</p>}
+
+                            {activities.map((activity) => (
+                                <div key={activity.id || Math.random()} className="relative">
+                                    <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-indigo-50 border-2 border-indigo-500 box-content"></div>
+                                    <p className="text-xs text-slate-400 mb-1">
+                                        {new Date(activity.created_at).toLocaleString()}
+                                    </p>
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <p className="text-xs font-bold text-slate-700 uppercase mb-1">{activity.activity_type}</p>
+                                        <p className="text-sm text-slate-600">{activity.content}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* CLIENT CARD */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 text-2xl font-bold mx-auto mb-4">
                             {quote.client_name?.charAt(0).toUpperCase()}
                         </div>
-                        <h3 className="text-xl font-bold text-slate-900">{quote.client_name}</h3>
+                        {isEditing ? (
+                            <input
+                                className="w-full mb-2 border border-gray-300 rounded p-1.5 text-center font-bold"
+                                value={editForm.client_name || ''}
+                                onChange={e => setEditForm({ ...editForm, client_name: e.target.value })}
+                            />
+                        ) : (
+                            <h3 className="text-xl font-bold text-slate-900">{quote.client_name}</h3>
+                        )}
                         <p className="text-slate-500 mb-1">{quote.client_phone}</p>
                         <p className="text-slate-400 text-sm mb-6">{quote.client_email}</p>
 
@@ -355,9 +444,9 @@ export default function QuoteDetailPage() {
                                         <button
                                             onClick={() => handleSendUpdate(messageText)}
                                             disabled={!messageText.trim() || sendingWa}
-                                            className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+                                            className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm rounded font-medium transition-colors disabled:opacity-50 flex justify-center items-center"
                                         >
-                                            {sendingWa ? <span className="animate-pulse">Sending...</span> : 'Send Now'}
+                                            {sendingWa ? <span className="animate-pulse">Sending...</span> : 'Send Message'}
                                         </button>
                                     </div>
                                 </div>

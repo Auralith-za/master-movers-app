@@ -6,68 +6,103 @@ import Label from '../components/ui/Label'
 
 export default function ContactPage() {
     return (
-        <div className="bg-white min-h-screen py-24">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white min-h-screen">
+            {/* Hero Section */}
+            <div className="relative isolate overflow-hidden bg-slate-900 py-24 sm:py-32 mb-12">
+                <img
+                    src="/images/hero_contact.jpg"
+                    alt="Contact Hero"
+                    className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
+                />
+                <div className="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+                    <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">Get in Touch</h1>
+                    <p className="mt-6 text-lg leading-8 text-slate-300 max-w-2xl mx-auto">
+                        Have questions about your move? Our team is here to help. Reach out to us via phone, email, or visit one of our branches.
+                    </p>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                     {/* Contact Info */}
                     <div>
-                        <h1 className="text-4xl font-bold text-slate-900 mb-6">Get in Touch</h1>
-                        <p className="text-lg text-slate-500 mb-10">
-                            Have questions about your move? Our team is here to help. Reach out to us via phone, email, or visit one of our branches.
-                        </p>
+                        <h2 className="text-3xl font-bold text-slate-900 mb-10">Contact Information</h2>
 
-                        <div className="space-y-8">
+                        <div className="space-y-10">
+                            {/* Johannesburg */}
                             <div className="flex items-start gap-4">
-                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg">
+                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg shrink-0">
                                     <MapPin size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-900">Head Office (Johannesburg)</h3>
-                                    <p className="text-slate-500 mt-1">
-                                        123 Logistics Way, Prologis Park<br />
-                                        Germiston, 1401
+                                    <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">JOHANNESBURG (Head Office)</h3>
+                                    <p className="text-sm font-semibold text-slate-700">Master Movers Johannesburg</p>
+                                    <p className="text-slate-500 text-sm mt-1 leading-relaxed">
+                                        17 Indianapolis Boulevard<br />
+                                        Raceway Industrial Park<br />
+                                        Gosforth Park, Germiston
                                     </p>
+                                    <div className="mt-3 space-y-2 text-sm">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Phone size={16} className="text-primary-500" />
+                                            <span>+27 11 493 7569</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Mail size={16} className="text-primary-500" />
+                                            <a href="mailto:sales1@mastermoversjhb.co.za" className="hover:text-primary-600">sales1@mastermoversjhb.co.za</a>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
+                            {/* Cape Town */}
                             <div className="flex items-start gap-4">
-                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg">
-                                    <Phone size={24} />
+                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg shrink-0">
+                                    <MapPin size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-900">Phone Support</h3>
-                                    <p className="text-slate-500 mt-1">
-                                        +27 11 123 4567<br />
-                                        <span className="text-xs">Mon-Fri: 08:00 - 17:00</span>
+                                    <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">CAPE TOWN</h3>
+                                    <p className="text-sm font-semibold text-slate-700">Master Movers Cape Town</p>
+                                    <p className="text-slate-500 text-sm mt-1 leading-relaxed">
+                                        Unit 1 Bosal Park, 77 Bofors Circle<br />
+                                        Epping Industria, Western Cape
                                     </p>
+                                    <div className="mt-3 space-y-2 text-sm">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Phone size={16} className="text-primary-500" />
+                                            <span>+27 21 534 1582</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Mail size={16} className="text-primary-500" />
+                                            <a href="mailto:sales@mastermoverscpt.co.za" className="hover:text-primary-600">sales@mastermoverscpt.co.za</a>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
+                            {/* Durban */}
                             <div className="flex items-start gap-4">
-                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg">
-                                    <Mail size={24} />
+                                <div className="p-3 bg-primary-50 text-primary-600 rounded-lg shrink-0">
+                                    <MapPin size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-900">Email</h3>
-                                    <p className="text-slate-500 mt-1">
-                                        hello@mastermovers.co.za<br />
-                                        quotes@mastermovers.co.za
+                                    <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">DURBAN</h3>
+                                    <p className="text-sm font-semibold text-slate-700">Master Movers Kwazulu Natal</p>
+                                    <p className="text-slate-500 text-sm mt-1 leading-relaxed">
+                                        Units 5 & 6 Raddical Park<br />
+                                        3 Gourly Road, Ballito, 4420
                                     </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-12 p-6 bg-slate-50 rounded-xl">
-                            <h3 className="font-bold text-slate-900 mb-2">Regional Branches</h3>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span className="font-semibold block text-slate-700">Cape Town</span>
-                                    <span className="text-slate-500">Unit 5, Airport City</span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold block text-slate-700">Durban</span>
-                                    <span className="text-slate-500">Riverhorse Valley</span>
+                                    <div className="mt-3 space-y-2 text-sm">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Phone size={16} className="text-primary-500" />
+                                            <span>+27 31 700 8380</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Mail size={16} className="text-primary-500" />
+                                            <a href="mailto:sales@mastermoversdbn.co.za" className="hover:text-primary-600">sales@mastermoversdbn.co.za</a>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

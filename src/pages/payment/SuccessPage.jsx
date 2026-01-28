@@ -15,47 +15,63 @@ export default function SuccessPage() {
 
     // ... existing code ...
 
+    const [showConfetti, setShowConfetti] = React.useState(true)
+
     useEffect(() => {
         // Track Purchase
         event({
             action: 'conversion',
             category: 'Sales',
             label: 'Purchase',
-            value: 1 // You can pass actual value here if available in store/url
+            value: 1
         })
 
         // clear the local store once the booking is successful
         resetMove()
+
+        // Hide confetti after 5s
+        const timer = setTimeout(() => setShowConfetti(false), 5000)
+        return () => clearTimeout(timer)
     }, [resetMove])
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-xl text-center">
-                <div className="mx-auto h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mb-6">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+            {/* Confetti Placeholder (CSS animation) */}
+            {showConfetti && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden flex justify-center">
+                    <div className="w-full h-full absolute top-0 left-0 bg-[url('https://cdn.jsdelivr.net/gh/loonywizard/js-confetti@master/demo/images/ribbons.png')] opacity-20 animate-pulse"></div>
+                </div>
+            )}
+
+            <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-xl text-center relative z-10 animate-in zoom-in-95 duration-500">
+                <div className="mx-auto h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mb-6 animate-in hover:scale-105 transition-transform duration-300">
                     <CheckCircle className="h-12 w-12 text-green-600" />
                 </div>
 
                 <h2 className="text-3xl font-extrabold text-slate-900 mb-2">
                     Payment Successful!
                 </h2>
-                <p className="text-slate-500 mb-8">
-                    Your move has been successfully booked. We have sent a confirmation email to you.
+                <div className="w-16 h-1 bg-green-500 mx-auto rounded-full mb-6"></div>
+
+                <p className="text-slate-500 mb-8 text-lg">
+                    Thank you! Your move has been secured. <br />
+                    We've sent a confirmation email with all the details.
                 </p>
 
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-8">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Reference Number</p>
-                    <p className="text-lg font-mono font-bold text-slate-700">{reference}</p>
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 mb-8">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">Booking Reference</p>
+                    <p className="text-2xl font-mono font-bold text-slate-800 tracking-wider">{reference}</p>
                 </div>
 
                 <div className="space-y-3">
                     <Link to="/">
                         <Button className="w-full justify-center" size="lg">
-                            Return to Home
+                            Return to Home <ArrowRight className="ml-2" size={18} />
                         </Button>
                     </Link>
                     <Link to="/contact-us">
-                        <Button variant="ghost" className="w-full justify-center">
-                            Contact Support
+                        <Button variant="ghost" className="w-full justify-center text-slate-500 hover:text-slate-700">
+                            Need Help? Contact Support
                         </Button>
                     </Link>
                 </div>

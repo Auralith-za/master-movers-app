@@ -3,11 +3,33 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
-import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin } from 'lucide-react'
+import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles } from 'lucide-react'
 import jsPDF from 'jspdf'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
 import { event } from '../../lib/gtag'
+import { ChevronDown, ChevronUp, Plus, Minus } from 'lucide-react'
+
+const SERVICE_KEYS = [
+    { key: 'crateConstruction', label: 'Crate Construction' },
+    { key: 'documentationFee', label: 'Documentation Charge' },
+    { key: 'fuelSurcharge', label: 'Fuel Surcharge' },
+    { key: 'hoisting', label: 'Hoisting' },
+    { key: 'longCarry', label: 'Long Carry Surcharges' },
+    { key: 'petTransport', label: 'Pet Transport / Kenneling' },
+    { key: 'warehouseStorage', label: 'Warehouse Storage P/M' },
+    { key: 'miscellaneous', label: 'Miscellaneous Charge' },
+    { key: 'handling', label: 'Handling Charge' },
+    { key: 'vehicleTransport', label: 'Vehicle Transport' },
+    { key: 'reDelivery', label: 'Re-Delivery Charge' },
+    { key: 'preSuppliedCartons', label: 'Pre-Supplied Cartons' },
+    { key: 'preSuppliedMaterials', label: 'Pre-Supplied Materials' },
+    { key: 'shuttleSurcharge', label: 'Shuttle Vehicle Surcharges' },
+    { key: 'specialWrapping', label: 'Special Wrapping' },
+    { key: 'suppliedPackedCartons', label: 'Supplied and Packed Cartons' },
+    { key: 'plasticSleeves', label: 'Plastic Sleeves' },
+    { key: 'weekendSurcharge', label: 'Saturday/Sunday Charge' }
+]
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -45,22 +67,40 @@ class ErrorBoundary extends React.Component {
 
 function Step4SummaryContent() {
     const navigate = useNavigate()
-    const { moveDetails, accessDetails, inventory, submitQuote } = useMoveStore()
+    const { moveDetails, accessDetails, inventory, submitQuote, manualServiceCharges, updateManualServiceCharge } = useMoveStore()
     const [searchParams, setSearchParams] = useSearchParams()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [showServices, setShowServices] = useState(false)
 
     // Calculate Totals
-    const { totalVolume, total, vat, subTotal, breakdown } = useMemo(() => {
+    // Calculate Totals
+    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown } = useMemo(() => {
         try {
-            return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS)
+            return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
         } catch (e) {
             console.error("Calculation Error:", e)
-            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0 } }
+            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0 } }
         }
-    }, [inventory, moveDetails, accessDetails])
+    }, [inventory, moveDetails, accessDetails, manualServiceCharges])
+
+    // Notify about discount
+    // We use a ref to prevent spamming the alert
+    const alertedRef = React.useRef(false)
+    React.useEffect(() => {
+        if (discount > 0 && !alertedRef.current) {
+            alert("✨ Great News! ✨\n\nYour move falls between the 5th and 24th, so you've qualified for our Mid-Month Madness discount!\n\nA 10% discount has been applied to your quote.")
+            alertedRef.current = true
+        }
+    }, [discount])
 
     const handleProceed = async () => {
+        // Minimum Charge Rule
+        if (subTotal < 3025) {
+            alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R 3025.00 + VAT (R ${(3025 * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
+            return
+        }
+
         setIsSubmitting(true)
         try {
             const result = await submitQuote()
@@ -68,7 +108,8 @@ function Step4SummaryContent() {
             if (result.success) {
                 setSearchParams({ saved: 'true' })
             } else {
-                alert('Error submitting quote. Please try again.')
+                console.error("Submission failed:", result.error)
+                alert(`Request Failed: ${result.error?.message || JSON.stringify(result.error) || 'Unknown error'}`)
             }
         } catch (error) {
             console.error("Submission Error", error)
@@ -77,6 +118,16 @@ function Step4SummaryContent() {
             setIsSubmitting(false)
         }
     }
+
+    // Auto-scroll to payment options when saved
+    React.useEffect(() => {
+        if (searchParams.get('saved') === 'true') {
+            const paymentSection = document.getElementById('payment-options')
+            if (paymentSection) {
+                paymentSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+        }
+    }, [searchParams])
 
     const handleCallBackRequest = async () => {
         setIsSubmitting(true)
@@ -104,7 +155,7 @@ function Step4SummaryContent() {
                 setSearchParams({ saved: 'true' })
                 alert("Request Sent! We will call you shortly to discuss your move.")
             } else {
-                alert('Error sending request. Please try again.')
+                alert('Error sending request. Please try again: ' + (result.error?.message || JSON.stringify(result.error)))
             }
         } catch (error) {
             console.error("Call Back Error", error)
@@ -165,10 +216,33 @@ function Step4SummaryContent() {
                 y += 6
             }
 
-            addRow('Base Fare', breakdown.base)
-            addRow('Distance Charge', breakdown.transport)
-            addRow('Volume Charge', breakdown.volume)
+            if (breakdown.isSharedLoad) {
+                addRow('Transport & Volume (Shared Load)', breakdown.transport)
+            } else {
+                addRow('Base Fare', breakdown.base)
+                addRow('Distance Charge', breakdown.transport)
+                addRow('Volume Charge', breakdown.volume)
+            }
             addRow('Access Fees', breakdown.access)
+
+            if (breakdown.serviceCharges > 0) {
+                // List individual manual services if present
+                let hasListedServices = false
+                SERVICE_KEYS.forEach(({ key, label }) => {
+                    const val = manualServiceCharges[key]
+                    if (val && Number(val) > 0) {
+                        addRow(label, Number(val))
+                        hasListedServices = true
+                    }
+                })
+
+                // Fallback catch-all if we have a total but no manual keys (e.g. auto fees only)
+                // Note: auto fees are now in manualServiceCharges OR calculated.
+                // If we didn't list anything above, list the total.
+                if (!hasListedServices) {
+                    addRow('Service Charges', breakdown.serviceCharges)
+                }
+            }
 
             y += 4
             doc.line(20, y, 190, y)
@@ -221,17 +295,72 @@ function Step4SummaryContent() {
                             <span className="font-medium">{totalVolume.toFixed(2)} m³</span>
                         </div>
                         <div className="flex justify-between py-2 border-b border-gray-100">
+                            <span className="text-slate-600">Vehicle Selected</span>
+                            <span className="font-medium text-primary-600">{breakdown.vehicleType || 'Standard'}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-slate-600">Billable Distance</span>
                             <span className="font-medium">{breakdown.distance ? breakdown.distance.toFixed(0) : (moveDetails.distanceKm || 0)} km</span>
                         </div>
                         <div className="flex justify-between py-2 border-b border-gray-100">
-                            <span className="text-slate-600">Transport & Labour</span>
+                            <span className="text-slate-600">
+                                {breakdown.isSharedLoad ? 'Transport (Shared Load)' : 'Transport & Labour'}
+                            </span>
                             <span className="font-medium">R {(breakdown.base + breakdown.transport + breakdown.volume).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-slate-600">Access Fees</span>
                             <span className="font-medium text-orange-600">+ R {breakdown.access.toFixed(2)}</span>
                         </div>
+                        {breakdown.serviceCharges > 0 && (
+                            <div className="flex justify-between py-2 border-b border-gray-100">
+                                <span className="text-slate-600">
+                                    Service Charges
+                                    {breakdown.weekendSurcharge > 0 && <span className="text-xs text-orange-600 ml-1">(incl. weekend)</span>}
+                                </span>
+                                <span className="font-medium text-blue-600">+ R {breakdown.serviceCharges.toFixed(2)}</span>
+                            </div>
+                        )}
+
+                        {/* Service Charges Editor */}
+                        <div className="border-t border-gray-100 pt-4">
+                            <button
+                                onClick={() => setShowServices(!showServices)}
+                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-primary-600 transition-colors w-full"
+                            >
+                                {showServices ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                {showServices ? 'Hide Service Charges' : 'Adjust Service Charges (Testing)'}
+                            </button>
+
+                            {showServices && (
+                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg animate-in fade-in slide-in-from-top-2">
+                                    {SERVICE_KEYS.map(({ key, label }) => (
+                                        <div key={key} className="flex flex-col gap-1">
+                                            <label className="text-xs text-slate-500">{label}</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={manualServiceCharges[key] || ''}
+                                                    onChange={(e) => updateManualServiceCharge(key, e.target.value)}
+                                                    className="w-full pl-6 pr-3 py-1 text-sm border border-gray-200 rounded focus:border-primary-500 outline-none bg-white"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {discount > 0 && (
+                            <div className="flex justify-between py-2 border-b border-gray-100 bg-green-50 px-2 -mx-2 rounded">
+                                <span className="text-green-700 font-medium flex items-center gap-2">
+                                    <Sparkles size={14} /> {discountType}
+                                </span>
+                                <span className="font-bold text-green-700">- R {discount.toFixed(2)}</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-6 bg-gray-50 space-y-3">
@@ -246,7 +375,7 @@ function Step4SummaryContent() {
                                 <CreditCard size={18} className="opacity-70 group-hover:opacity-100 transition-opacity" />
                             </Button>
                         ) : (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                            <div id="payment-options" className="space-y-4 animate-in fade-in slide-in-from-top-2 scroll-mt-24">
                                 <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm flex items-center mb-2">
                                     <CheckCircle size={16} className="mr-2" />
                                     Quote Saved! Reference: {moveDetails.contactName?.split(' ')[0]}-{Math.floor(Math.random() * 1000)}
