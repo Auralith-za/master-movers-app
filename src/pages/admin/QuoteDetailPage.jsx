@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
-import { ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, Building, Package, Download, Save, X, Edit2 } from 'lucide-react'
+import { 
+    ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, 
+    Building, Package, Download, Save, X, Edit2, AlertCircle, 
+    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
-import jsPDF from 'jspdf'
+import { calculateQuote } from '../../features/inventory/store/moveStore'
+import { generateProfessionalQuote } from '../../services/pdfService'
+import clsx from 'clsx'
 
 export default function QuoteDetailPage() {
     const { id } = useParams()
@@ -13,6 +20,8 @@ export default function QuoteDetailPage() {
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState({})
     const [activities, setActivities] = useState([])
+    const [searchQuery, setSearchQuery] = useState('')
+    const [newNote, setNewNote] = useState('')
 
     useEffect(() => {
         if (id) {
@@ -31,7 +40,13 @@ export default function QuoteDetailPage() {
 
             if (error) throw error
             setQuote(data)
-            setEditForm(data)
+            
+            // Fix items_json if it's nested or legacy
+            const rawItems = data.items_json?.items || data.items_json || {}
+            setEditForm({
+                ...data,
+                items_json: rawItems
+            })
         } catch (error) {
             console.error('Error fetching quote:', error)
         } finally {
@@ -51,7 +66,6 @@ export default function QuoteDetailPage() {
             setActivities(data || [])
         } catch (error) {
             console.error('Error fetching activities:', error)
-            // Fallback for demo if table doesn't exist yet
             setActivities([])
         }
     }
@@ -67,8 +81,6 @@ export default function QuoteDetailPage() {
                 }])
 
             if (error) {
-                console.warn('Activity logging failed (table might be missing?):', error)
-                // Manually add to state for demo purposes so user sees it works
                 setActivities(prev => [{
                     id: Math.random(),
                     created_at: new Date().toISOString(),
@@ -86,8 +98,65 @@ export default function QuoteDetailPage() {
         }
     }
 
+    const handleSaveNote = async () => {
+        if (!newNote.trim()) return
+        const success = await logActivity('note', newNote)
+        if (success) setNewNote('')
+    }
+
+    // Re-calculate live price during editing
+    const recalculatedData = useMemo(() => {
+        if (!isEditing) return null
+        
+        // Prepare data for calculateQuote
+        const inventory = {}
+        Object.entries(editForm.items_json || {}).forEach(([itemId, qty]) => {
+            const [id, variation] = itemId.split('_')
+            const item = INVENTORY_ITEMS.find(i => i.id === id)
+            if (item) {
+                inventory[itemId] = {
+                    ...item,
+                    quantity: Number(qty),
+                    id: itemId // keep the full key
+                }
+            }
+        })
+
+        const moveDetails = {
+            pickupCity: editForm.pickup_address,
+            dropoffCity: editForm.dropoff_address,
+            distanceKm: editForm.distance_km,
+            moveDate: editForm.move_date,
+            packagingOption: editForm.packaging_option || 'none'
+        }
+
+        const accessDetails = editForm.access_details || {}
+        
+        return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS)
+    }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, isEditing])
+
+    const handleUpdateQuantity = (itemId, newQty) => {
+        const updatedItems = { ...editForm.items_json }
+        if (newQty <= 0) {
+            delete updatedItems[itemId]
+        } else {
+            updatedItems[itemId] = newQty
+        }
+        setEditForm({ ...editForm, items_json: updatedItems })
+    }
+
+    const handleAddItem = (item) => {
+        const updatedItems = { ...editForm.items_json }
+        updatedItems[item.id] = (updatedItems[item.id] || 0) + 1
+        setEditForm({ ...editForm, items_json: updatedItems })
+        setSearchQuery('')
+    }
+
     const handleSave = async () => {
         try {
+            const finalPrice = recalculatedData?.total || editForm.total_price
+            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume
+
             const { error } = await supabase
                 .from('quotes')
                 .update({
@@ -97,14 +166,20 @@ export default function QuoteDetailPage() {
                     pickup_address: editForm.pickup_address,
                     dropoff_address: editForm.dropoff_address,
                     move_date: editForm.move_date,
-                    status: editForm.status
+                    status: editForm.status,
+                    rejection_reason: editForm.rejection_reason,
+                    team_notes: editForm.team_notes,
+                    items_json: editForm.items_json,
+                    total_price: finalPrice,
+                    total_volume: finalVolume,
+                    customer_comments: editForm.customer_comments
                 })
                 .eq('id', id)
 
             if (error) throw error
 
-            setQuote(editForm)
-            await logActivity('edit', `Quote details updated. Status: ${editForm.status}`)
+            setQuote({ ...editForm, total_price: finalPrice, total_volume: finalVolume })
+            await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toFixed(2)}`)
             setIsEditing(false)
             alert('Quote updated successfully!')
         } catch (error) {
@@ -113,375 +188,419 @@ export default function QuoteDetailPage() {
         }
     }
 
-    const [sendingWa, setSendingWa] = useState(false)
-    const [showInput, setShowInput] = useState(false)
-    const [messageText, setMessageText] = useState('')
-
-    const handleSendUpdate = async (textOrTemplate) => {
-        if (!quote?.client_phone) return alert('No phone number')
-
-        let messageBody = textOrTemplate
-        if (textOrTemplate === 'booking_confirmation') messageBody = `Hi ${quote.client_name}, your move for ${quote.move_date} is confirmed! We will arrive at 08:00 AM.`
-        if (textOrTemplate === 'move_reminder') messageBody = `Hi ${quote.client_name}, this is a reminder for your move tomorrow. Please ensure driveway is clear.`
-
-        setSendingWa(true)
-
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 800))
-
-        const success = await logActivity('whatsapp', messageBody)
-
-        if (success) {
-            setMessageText('')
-            setShowInput(false)
-        }
-
-        setSendingWa(false)
-    }
-
-    const getItemName = (id) => {
-        const item = INVENTORY_ITEMS.find(i => i.id === id)
-        return item ? item.name : id
-    }
-
-    const getItemVolume = (id) => {
-        const item = INVENTORY_ITEMS.find(i => i.id === id)
-        return item ? (item.volume || 0) : 0
-    }
-
-    const downloadInventoryPDF = () => {
-        const doc = new jsPDF()
-        doc.setFontSize(20)
-        doc.text(`Inventory List - Quote #${quote.id.toString().substring(0, 6)}`, 20, 20)
-        doc.setFontSize(12)
-        doc.text(`Client: ${quote.client_name}`, 20, 30)
-        doc.text(`Date: ${new Date(quote.move_date).toLocaleDateString()}`, 20, 36)
-
-        let y = 50
-        doc.setFont(undefined, 'bold')
-        doc.text("Item Name", 20, y)
-        doc.text("Qty", 150, y)
-        doc.text("Vol (m3)", 170, y)
-        doc.line(20, y + 2, 190, y + 2)
-
-        y += 10
-        doc.setFont(undefined, 'normal')
-
-        let totalVol = 0
-        Object.entries(quote.items_json || {}).forEach(([itemId, qty]) => {
-            const name = getItemName(itemId)
-            const vol = getItemVolume(itemId) * qty
-            totalVol += vol
-
-            doc.text(name, 20, y)
-            doc.text(qty.toString(), 150, y)
-            doc.text(vol.toFixed(2), 170, y)
-            y += 8
-            if (y > 270) { doc.addPage(); y = 20; }
+    const handleResendQuote = async () => {
+        if (!confirm('Regenerate and resend quote to client?')) return
+        
+        const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+        const reviewLink = `${window.location.origin}/quote/review/${id}`
+        
+        generateProfessionalQuote({
+            quoteId: quote.id,
+            clientName: quote.client_name,
+            clientEmail: quote.client_email,
+            clientPhone: quote.client_phone,
+            pickupAddress: quote.pickup_address,
+            dropoffAddress: quote.dropoff_address,
+            moveDate: quote.move_date,
+            inventory: inventoryForPdf,
+            total: quote.total_price,
+            vat: (quote.total_price || 0) * 0.15 / 1.15,
+            subTotal: (quote.total_price || 0) / 1.15,
+            inventoryItems: INVENTORY_ITEMS
         })
 
-        doc.line(20, y, 190, y)
-        y += 10
-        doc.setFont(undefined, 'bold')
-        doc.text(`Total Volume: ${totalVol.toFixed(2)} m3`, 120, y)
-        doc.save(`Inventory_${quote.client_name}_${id}.pdf`)
+        await logActivity('system', `Quote PDF resubmitted to client. Payment Link: ${reviewLink}`)
+        alert('Quote resent successfully!')
     }
 
-    if (loading) return <div className="p-8">Loading...</div>
-    if (!quote) return <div className="p-8">Quote not found</div>
+    const copyPaymentLink = () => {
+        const link = `${window.location.origin}/quote/review/${id}`
+        navigator.clipboard.writeText(link)
+        alert('Payment link copied to clipboard!')
+    }
 
-    const access = quote.access_details || {}
+    const filteredItems = useMemo(() => {
+        if (!searchQuery) return []
+        return INVENTORY_ITEMS.filter(i => 
+            i.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ).slice(0, 5)
+    }, [searchQuery])
+
+    const downloadInventoryPDF = () => {
+        const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+
+        generateProfessionalQuote({
+            quoteId: quote.id,
+            clientName: quote.client_name,
+            clientEmail: quote.client_email,
+            clientPhone: quote.client_phone,
+            pickupAddress: quote.pickup_address,
+            dropoffAddress: quote.dropoff_address,
+            moveDate: quote.move_date,
+            inventory: inventoryForPdf,
+            total: quote.total_price,
+            vat: (quote.total_price || 0) * 0.15 / 1.15,
+            subTotal: (quote.total_price || 0) / 1.15,
+            inventoryItems: INVENTORY_ITEMS
+        })
+    }
+
+    if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>
+    if (!quote) return <div className="p-8 text-center"><p className="text-red-500">Quote not found</p></div>
+
+    const displayInventory = isEditing ? editForm.items_json : (quote.items_json?.items || quote.items_json || {})
+    const isManualEditable = quote.status === 'lead' || quote.status === 'new' || quote.status === 'processing'
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-            <button onClick={() => navigate('/admin/quotes')} className="flex items-center text-slate-500 hover:text-slate-800 transition-colors">
-                <ArrowLeft size={20} className="mr-2" /> Back to Quotes
-            </button>
+        <div className="space-y-6 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto px-4">
+            <div className="flex items-center justify-between">
+                <button onClick={() => navigate('/admin/quotes')} className="flex items-center text-slate-500 hover:text-slate-800 transition-colors">
+                    <ArrowLeft size={20} className="mr-2" /> Back to Quotes
+                </button>
+                <div className="flex gap-2">
+                    <button onClick={handleResendQuote} className="flex items-center px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800">
+                        <Send size={18} className="mr-2" /> Resend Quote
+                    </button>
+                </div>
+            </div>
 
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Quote #{quote.id.toString().substring(0, 6)}</h1>
-                    <p className="text-slate-500">Created: {new Date(quote.created_at).toLocaleDateString()}</p>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-slate-900">Quote #{quote.id.toString().substring(0, 6)}</h1>
+                        <span className={clsx(
+                            "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
+                            quote.status === 'booked' ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"
+                        )}>
+                            {quote.status}
+                        </span>
+                        {quote.terms_accepted && (
+                            <span className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+                                <ShieldCheck size={12} /> Terms Accepted
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-slate-500 mt-1">Submission via: <span className="font-semibold text-slate-700 uppercase">{quote.items_json?.submission_type || 'QuoteWizard'}</span></p>
                 </div>
 
                 <div className="flex gap-2">
                     {isEditing ? (
                         <>
                             <button onClick={() => setIsEditing(false)} className="flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium">
-                                <X size={18} className="mr-2" /> Cancel
+                                <X size={18} className="mr-2" /> Discard
                             </button>
                             <button onClick={handleSave} className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium shadow-sm hover:bg-emerald-700">
-                                <Save size={18} className="mr-2" /> Save Changes
+                                <Save size={18} className="mr-2" /> Save Quote
                             </button>
                         </>
                     ) : (
-                        <button onClick={() => setIsEditing(true)} className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium hover:bg-indigo-100">
-                            <Edit2 size={18} className="mr-2" /> Edit Details
-                        </button>
+                        isManualEditable ? (
+                            <button onClick={() => setIsEditing(true)} className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium hover:bg-indigo-100">
+                                <Edit2 size={18} className="mr-2" /> Edit Quote
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-400 rounded-lg font-medium cursor-not-allowed">
+                                <Lock size={18} /> Quote Locked
+                            </div>
+                        )
                     )}
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* LEFT COL - DETAILS */}
+                {/* LEFT COL - DETAILS & INVENTORY */}
                 <div className="lg:col-span-2 space-y-6">
 
-                    {/* TRIP DETAILS */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
-                            <MapPin size={20} className="text-primary-600" /> Trip Details
+                    {/* DUAL COMMENTS SECTION */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <MessageCircle size={18} className="text-red-500" /> Customer Comments (Front)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                                    value={editForm.customer_comments || ''}
+                                    onChange={e => setEditForm({...editForm, customer_comments: e.target.value})}
+                                    placeholder="Comments visible to client..."
+                                />
+                            ) : (
+                                <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-100 italic">
+                                    {quote.customer_comments || "No comments from client."}
+                                </p>
+                            )}
                         </div>
-                        <div className="grid grid-cols-2 gap-8">
-                            <div>
-                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Pickup</label>
-                                {isEditing ? (
-                                    <input
-                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
-                                        value={editForm.pickup_address || ''}
-                                        onChange={e => setEditForm({ ...editForm, pickup_address: e.target.value })}
-                                    />
-                                ) : (
-                                    <p className="font-medium text-slate-900 mt-1">{quote.pickup_address}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Dropoff</label>
-                                {isEditing ? (
-                                    <input
-                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
-                                        value={editForm.dropoff_address || ''}
-                                        onChange={e => setEditForm({ ...editForm, dropoff_address: e.target.value })}
-                                    />
-                                ) : (
-                                    <p className="font-medium text-slate-900 mt-1">{quote.dropoff_address}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Distance</label>
-                                <p className="font-medium text-slate-900 mt-1">{quote.distance_km} km</p>
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Date</label>
-                                {isEditing ? (
-                                    <input
-                                        type="date"
-                                        className="w-full mt-1 border border-gray-300 rounded p-1.5"
-                                        value={editForm.move_date || ''}
-                                        onChange={e => setEditForm({ ...editForm, move_date: e.target.value })}
-                                    />
-                                ) : (
-                                    <p className="font-medium text-slate-900 mt-1">{quote.move_date}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Status</label>
-                                {isEditing ? (
-                                    <select
-                                        className="w-full mt-1 border border-gray-300 rounded p-1.5 bg-white"
-                                        value={editForm.status}
-                                        onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                                    >
-                                        <option value="new">New</option>
-                                        <option value="processing">Processing</option>
-                                        <option value="booked">Booked</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                ) : (
-                                    <p className="font-medium text-slate-900 mt-1 capitalize">{quote.status}</p>
-                                )}
-                            </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <Lock size={18} className="text-indigo-500" /> Internal Team Notes (Back)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    value={editForm.team_notes || ''}
+                                    onChange={e => setEditForm({...editForm, team_notes: e.target.value})}
+                                    placeholder="Internal notes ONLY..."
+                                />
+                            ) : (
+                                <p className="text-sm text-slate-600 bg-indigo-50/30 p-4 rounded-lg border border-indigo-100">
+                                    {quote.team_notes || "No internal notes yet."}
+                                </p>
+                            )}
                         </div>
                     </div>
 
-                    {/* SITE ACCESS DETAILS */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
-                            <Building size={20} className="text-primary-600" /> Site Access
+                    {/* INVENTORY EDITOR */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <Package size={20} className="text-primary-600" /> Inventory Breakdown
+                            </h3>
+                            {isEditing && (
+                                <div className="relative">
+                                    <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500">
+                                        <Plus size={16} className="text-slate-400" />
+                                        <input 
+                                            placeholder="Add item..." 
+                                            className="bg-transparent border-none outline-none text-sm w-40"
+                                            value={searchQuery}
+                                            onChange={e => setSearchQuery(e.target.value)}
+                                        />
+                                    </div>
+                                    {filteredItems.length > 0 && (
+                                        <div className="absolute right-0 top-full mt-1 w-64 bg-white shadow-xl border border-gray-100 rounded-lg z-50 p-1 overflow-hidden">
+                                            {filteredItems.map(item => (
+                                                <button 
+                                                    key={item.id}
+                                                    onClick={() => handleAddItem(item)}
+                                                    className="w-full text-left p-2 hover:bg-slate-50 text-sm rounded transition-colors"
+                                                >
+                                                    {item.name} ({item.volume}ft³)
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="bg-slate-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Pickup Location</h4>
-                                <ul className="space-y-2 text-sm text-slate-600">
-                                    <li className="flex justify-between"><span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.origin?.type || 'N/A'}</span></li>
-                                    <li className="flex justify-between"><span>Stairs:</span> <span className="font-medium text-slate-900">{access.origin?.stairs ? 'Yes' : 'No'}</span></li>
-                                    <li className="flex justify-between"><span>Elevator:</span> <span className="font-medium text-slate-900">{access.origin?.elevator ? 'Yes' : 'No'}</span></li>
-                                    <li className="flex justify-between"><span>Long Carry:</span> <span className="font-medium text-slate-900">{access.origin?.longCarry ? '> 30m' : 'Standard'}</span></li>
-                                    <li className="flex justify-between"><span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.origin?.shuttle ? 'Required' : 'No'}</span></li>
-                                </ul>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Dropoff Location</h4>
-                                <ul className="space-y-2 text-sm text-slate-600">
-                                    <li className="flex justify-between"><span>Type:</span> <span className="font-medium text-slate-900 capitalize">{access.destination?.type || 'N/A'}</span></li>
-                                    <li className="flex justify-between"><span>Stairs:</span> <span className="font-medium text-slate-900">{access.destination?.stairs ? 'Yes' : 'No'}</span></li>
-                                    <li className="flex justify-between"><span>Elevator:</span> <span className="font-medium text-slate-900">{access.destination?.elevator ? 'Yes' : 'No'}</span></li>
-                                    <li className="flex justify-between"><span>Long Carry:</span> <span className="font-medium text-slate-900">{access.destination?.longCarry ? '> 30m' : 'Standard'}</span></li>
-                                    <li className="flex justify-between"><span>Shuttle Truck:</span> <span className="font-medium text-slate-900">{access.destination?.shuttle ? 'Required' : 'No'}</span></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* INVENTORY LIST */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2 text-slate-800 font-semibold">
-                                <Package size={20} className="text-primary-600" /> Inventory List
-                            </div>
-                            <button
-                                onClick={downloadInventoryPDF}
-                                className="text-sm flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                                <Download size={16} /> Download PDF
-                            </button>
-                        </div>
-
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead>
-                                    <tr className="bg-slate-50 text-slate-500 border-b border-gray-100">
-                                        <th className="px-4 py-3 font-medium">Item Name</th>
-                                        <th className="px-4 py-3 font-medium w-24 text-center">Qty</th>
-                                        <th className="px-4 py-3 font-medium w-32 text-right">Vol (m³)</th>
+                                    <tr className="bg-slate-50 text-slate-500">
+                                        <th className="px-6 py-3 font-medium">Item Name</th>
+                                        <th className="px-6 py-3 font-medium w-32 text-center">Quantity</th>
+                                        <th className="px-6 py-3 font-medium w-24 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {Object.entries(quote.items_json || {}).map(([itemId, qty]) => (
-                                        <tr key={itemId} className="hover:bg-slate-50">
-                                            <td className="px-4 py-3 text-slate-900 font-medium">
-                                                {getItemName(itemId)}
-                                            </td>
-                                            <td className="px-4 py-3 text-center text-slate-600 bg-slate-50/50">
-                                                {qty}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-600">
-                                                {(getItemVolume(itemId) * qty).toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {Object.entries(displayInventory).map(([itemId, qty]) => {
+                                        const [id] = itemId.split('_')
+                                        const item = INVENTORY_ITEMS.find(i => i.id === id)
+                                        return (
+                                            <tr key={itemId} className="hover:bg-slate-50/50">
+                                                <td className="px-6 py-4 flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-lg">{item?.image || '📦'}</div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900">{item?.name || itemId}</p>
+                                                        <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {isEditing ? (
+                                                        <div className="flex items-center justify-center gap-3">
+                                                            <button onClick={() => handleUpdateQuantity(itemId, qty - 1)} className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                                                <Trash2 size={14} className={qty === 1 ? "text-red-500" : ""} />
+                                                            </button>
+                                                            <span className="font-bold min-w-[20px] text-center">{qty}</span>
+                                                            <button onClick={() => handleUpdateQuantity(itemId, qty + 1)} className="p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
+                                                                <Plus size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center font-bold text-slate-900">{qty}</div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {isEditing && (
+                                                        <button onClick={() => handleUpdateQuantity(itemId, 0)} className="text-red-400 hover:text-red-600 p-1">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
-                                <tfoot>
-                                    <tr className="bg-slate-50 font-bold text-slate-900 border-t border-gray-200">
-                                        <td className="px-4 py-3">Totals</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {Object.values(quote.items_json || {}).reduce((a, b) => a + b, 0)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {Object.entries(quote.items_json || {}).reduce((sum, [id, qty]) => sum + (getItemVolume(id) * qty), 0).toFixed(2)} m³
-                                        </td>
-                                    </tr>
-                                </tfoot>
                             </table>
+                        </div>
+                    </div>
+
+                    {/* ADDRESSES & TRIP */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                            <MapPin size={20} className="text-primary-600" /> Logistics Details
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pickup Address</label>
+                                    {isEditing ? (
+                                        <input 
+                                            className="w-full text-sm border-b border-gray-300 focus:border-indigo-500 outline-none pb-1"
+                                            value={editForm.pickup_address || ''}
+                                            onChange={e => setEditForm({...editForm, pickup_address: e.target.value})}
+                                        />
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote.pickup_address}</p>
+                                    )}
+                                </div>
+                                <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
+                                    <Calendar size={14} className="text-slate-400" />
+                                    {isEditing ? (
+                                        <input 
+                                            type="date"
+                                            className="text-sm font-medium border-none outline-none bg-indigo-50 rounded px-2"
+                                            value={editForm.move_date || ''}
+                                            onChange={e => setEditForm({...editForm, move_date: e.target.value})}
+                                        />
+                                    ) : (
+                                        <p className="text-sm font-bold text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Dropoff Address</label>
+                                    {isEditing ? (
+                                        <input 
+                                            className="w-full text-sm border-b border-gray-300 focus:border-indigo-500 outline-none pb-1"
+                                            value={editForm.dropoff_address || ''}
+                                            onChange={e => setEditForm({...editForm, dropoff_address: e.target.value})}
+                                        />
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote.dropoff_address}</p>
+                                    )}
+                                </div>
+                                <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
+                                    <Truck size={14} className="text-slate-400" />
+                                    <p className="text-sm font-bold text-slate-800">{quote.distance_km} km total trip</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT COL - ACTIONS & CLIENT */}
+                {/* RIGHT COL - PRICING & TIMELINE */}
                 <div className="space-y-6">
 
-                    {/* ACTIVITY TIMELINE - NEW */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-slate-900 mb-4">Activity Timeline</h3>
-                        <div className="space-y-6 relative border-l-2 border-slate-100 ml-3 pl-6">
-                            {activities.length === 0 && <p className="text-sm text-slate-400 italic">No activity recorded yet.</p>}
-
-                            {activities.map((activity) => (
-                                <div key={activity.id || Math.random()} className="relative">
-                                    <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-indigo-50 border-2 border-indigo-500 box-content"></div>
-                                    <p className="text-xs text-slate-400 mb-1">
-                                        {new Date(activity.created_at).toLocaleString()}
-                                    </p>
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                        <p className="text-xs font-bold text-slate-700 uppercase mb-1">{activity.activity_type}</p>
-                                        <p className="text-sm text-slate-600">{activity.content}</p>
-                                    </div>
+                    {/* PRICING CARD */}
+                    <div className="bg-slate-900 text-white rounded-2xl shadow-xl p-8 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary-600/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-primary-600/20 transition-all duration-700" />
+                        
+                        <div className="relative z-10">
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-4xl font-black text-white">R {(isEditing ? recalculatedData?.total : quote.total_price)?.toLocaleString()}</span>
+                                {isEditing && recalculatedData?.total !== quote.total_price && (
+                                    <span className="text-emerald-400 text-xs font-bold animate-pulse">Recalculating...</span>
+                                )}
+                            </div>
+                            
+                            <div className="mt-8 space-y-3 pt-6 border-t border-white/10">
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Inventory Volume</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? recalculatedData?.totalVolume : quote.total_volume)?.toFixed(2)} m³</span>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* CLIENT CARD */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 text-2xl font-bold mx-auto mb-4">
-                            {quote.client_name?.charAt(0).toUpperCase()}
-                        </div>
-                        {isEditing ? (
-                            <input
-                                className="w-full mb-2 border border-gray-300 rounded p-1.5 text-center font-bold"
-                                value={editForm.client_name || ''}
-                                onChange={e => setEditForm({ ...editForm, client_name: e.target.value })}
-                            />
-                        ) : (
-                            <h3 className="text-xl font-bold text-slate-900">{quote.client_name}</h3>
-                        )}
-                        <p className="text-slate-500 mb-1">{quote.client_phone}</p>
-                        <p className="text-slate-400 text-sm mb-6">{quote.client_email}</p>
-
-                        <div className="space-y-3">
-                            {!showInput ? (
-                                <button
-                                    onClick={() => setShowInput(true)}
-                                    className="flex items-center justify-center w-full py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg font-medium transition-colors"
-                                >
-                                    <MessageCircle size={18} className="mr-2" /> Send WhatsApp Update
-                                </button>
-                            ) : (
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2">
-                                    <textarea
-                                        value={messageText}
-                                        onChange={(e) => setMessageText(e.target.value)}
-                                        placeholder="Type your message here..."
-                                        className="w-full text-sm p-2 border border-slate-300 rounded mb-2 focus:ring-2 focus:ring-[#25D366] focus:border-transparent outline-none resize-none h-24"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setShowInput(false)}
-                                            className="flex-1 py-1.5 text-slate-500 text-sm hover:bg-slate-200 rounded transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={() => handleSendUpdate(messageText)}
-                                            disabled={!messageText.trim() || sendingWa}
-                                            className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm rounded font-medium transition-colors disabled:opacity-50 flex justify-center items-center"
-                                        >
-                                            {sendingWa ? <span className="animate-pulse">Sending...</span> : 'Send Message'}
-                                        </button>
-                                    </div>
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Vat Included (15%)</span>
+                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? recalculatedData?.vat : (quote.total_price * 0.15 / 1.15)) || 0).toLocaleString()}</span>
                                 </div>
-                            )}
-
-                            <a
-                                href={`mailto:${quote.client_email}`}
-                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
-                            >
-                                <Mail size={18} /> Email Client
-                            </a>
-                        </div>
-
-                        {/* Quick Templates */}
-                        <div className="mt-6 border-t border-gray-100 pt-4">
-                            <p className="text-xs font-semibold text-slate-400 uppercase mb-3">Quick Actions</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => handleSendUpdate('booking_confirmation')} className="text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded border border-gray-200">
-                                    Confirm Booking
-                                </button>
-                                <button onClick={() => handleSendUpdate('move_reminder')} className="text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded border border-gray-200">
-                                    Move Reminder
-                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Value Card */}
-                    <div className="bg-slate-900 text-white rounded-xl shadow-lg p-6">
-                        <h3 className="text-slate-400 text-sm font-medium mb-1">Total Value</h3>
-                        <div className="text-3xl font-bold text-primary-500">
-                            R {quote.total_price?.toFixed(2) || '0.00'}
+                    {/* PAYMENT LINK CARD */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-red-50 rounded-bl-full -mr-8 -mt-8" />
+                        <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <CreditCard size={18} className="text-red-500" /> Payment & Review
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-6">Share this link with the client so they can review the quote, accept terms/sign, and pay online.</p>
+                        
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={copyPaymentLink}
+                                className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-all"
+                            >
+                                <Copy size={14} /> Copy Link
+                            </button>
+                            <a 
+                                href={`${window.location.origin}/quote/review/${id}`} 
+                                target="_blank"
+                                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200"
+                                title="Preview Link"
+                            >
+                                <ExternalLink size={16} />
+                            </a>
                         </div>
-                        <div className="mt-4 pt-4 border-t border-slate-700 text-sm text-slate-400">
-                            Vol: {quote.total_volume?.toFixed(2)} m³
+                    </div>
+
+                    {/* CLIENT CARD */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl font-black">
+                                {quote.client_name?.charAt(0)}
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-900 tracking-tight">{quote.client_name}</h4>
+                                <p className="text-[11px] text-slate-400 font-bold uppercase">{quote.client_email}</p>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <a href={`tel:${quote.client_phone}`} className="flex items-center justify-center gap-2 w-full py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition-all">
+                                <MessageCircle size={16} /> WhatsApp Client
+                            </a>
+                        </div>
+                    </div>
+
+                    {/* ACTIVITY TIMELINE SECTION */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                            <History size={18} className="text-indigo-600" /> Timeline & Logs
+                        </h3>
+
+                        {/* Quick Manual Note */}
+                        <div className="mb-8">
+                            <div className="flex gap-2">
+                                <input 
+                                    className="flex-1 text-sm bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="Add manual note..."
+                                    value={newNote}
+                                    onChange={e => setNewNote(e.target.value)}
+                                    onKeyPress={e => e.key === 'Enter' && handleSaveNote()}
+                                />
+                                <button 
+                                    onClick={handleSaveNote}
+                                    disabled={!newNote.trim()}
+                                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                                >
+                                    <Save size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6 relative border-l border-slate-100 ml-2 pl-6">
+                            {activities.length === 0 && <p className="text-xs text-slate-400 italic">No historical logs.</p>}
+                            {activities.map((act) => (
+                                <div key={act.id} className="relative">
+                                    <div className="absolute -left-[30px] top-1.5 w-2 h-2 rounded-full bg-indigo-200 border border-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.3)]" />
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(act.created_at).toLocaleString()}</p>
+                                    <div className="mt-1 bg-slate-50 border border-slate-100 p-3 rounded-lg">
+                                        <p className="text-xs font-bold text-indigo-700 uppercase mb-1 tracking-tighter opacity-70">{act.activity_type}</p>
+                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">{act.content}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

@@ -10,8 +10,8 @@ export default function HeritageMoversPage() {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-800 to-slate-900 opacity-90" />
                     <img
-                        src="https://images.unsplash.com/photo-1544604856-747d96a79836?q=80&w=2000&auto=format&fit=crop"
-                        alt="Vintage Furniture"
+                        src="https://images.unsplash.com/photo-1540555377402-463284000305?auto=format&fit=crop&q=80&w=2000"
+                        alt="Antique Piano Handling"
                         className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
                     />
                 </div>

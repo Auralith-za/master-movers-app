@@ -23,6 +23,7 @@ import CommercialStoragePage from './pages/services/storage/CommercialStoragePag
 import CapeTownStoragePage from './pages/services/storage/CapeTownStoragePage'
 import DurbanStoragePage from './pages/services/storage/DurbanStoragePage'
 import JohannesburgStoragePage from './pages/services/storage/JohannesburgStoragePage'
+import AboutUsPage from './pages/AboutUsPage'
 import BlogPage from './pages/BlogPage'
 import CarMovingPage from './pages/services/CarMovingPage'
 import HomeCleaningPage from './pages/services/HomeCleaningPage'
@@ -31,6 +32,8 @@ import HeritageMoversPage from './pages/services/HeritageMoversPage'
 import PetMovingPage from './pages/services/PetMovingPage'
 import SupabaseTest from './pages/debug/SupabaseTest'
 import MoversDurban from './pages/locations/MoversDurban'
+import NewLandingPage from './pages/NewLandingPage'
+import QuoteReviewPage from './pages/QuoteReviewPage'
 
 function App() {
   return (
@@ -38,7 +41,8 @@ function App() {
       <Routes>
         {/* Website Routes */}
         <Route element={<WebsiteLayout />}>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<NewLandingPage />} />
+          <Route path="/new-home" element={<NewLandingPage />} />
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/services/commercial-movers" element={<CommercialMoversPage />} />
           <Route path="/services/residential-movers" element={<ResidentialMoversPage />} />
@@ -57,6 +61,7 @@ function App() {
 
           <Route path="/debug/supabase" element={<SupabaseTest />} />
 
+          <Route path="/about" element={<AboutUsPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/contact-us" element={<ContactPage />} />
           <Route path="/packing-materials" element={<PackingMaterialsPage />} />
@@ -65,6 +70,7 @@ function App() {
           <Route path="/payment/success" element={<SuccessPage />} />
           <Route path="/payment/cancel" element={<CancelPage />} />
           <Route path="/locations/movers-durban" element={<MoversDurban />} />
+          <Route path="/quote/review/:id" element={<QuoteReviewPage />} />
           {/* Add other site pages here later */}
         </Route>
 
@@ -82,7 +88,8 @@ function App() {
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<Navigate to="leads" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="quotes" element={<QuotesPage />} />
           <Route path="quotes/:id" element={<QuoteDetailPage />} />
           <Route path="leads" element={<LeadsPage />} />

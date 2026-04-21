@@ -4,178 +4,226 @@ import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Label } from '../../components/ui/Label'
 import { Input } from '../../components/ui/Input'
-import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, CalendarClock } from 'lucide-react'
+import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus } from 'lucide-react'
 import clsx from 'clsx'
 
 const PROPERTY_TYPES = [
     { id: 'house', label: 'House', icon: Home },
-    { id: 'flat', label: 'Flat/Apartment', icon: Building2 },
+    { id: 'flat', label: 'Apartment', icon: Building2 },
     { id: 'townhouse', label: 'Townhouse', icon: Home },
     { id: 'office', label: 'Office', icon: Building2 },
 ]
 
-const DISTANCE_OPTIONS = [
-    { value: '<10m', label: 'Less than 10m' },
-    { value: '10-30m', label: '10 - 30 meters' },
-    { value: '>30m', label: 'More than 30m (Long Carry)' },
-]
-
 const PARKING_OPTIONS = [
     { value: 'driveway', label: 'Driveway' },
+    { value: 'panhandle', label: 'Panhandle Driveway' },
+    { value: 'shuttle', label: 'Shuttle Required' },
     { value: 'street', label: 'Street Parking' },
     { value: 'secure_complex', label: 'Secure Complex (Inside)' },
     { value: 'loading_bay', label: 'Loading Bay' },
 ]
 
+const Tooltip = ({ text }) => (
+    <div className="group relative inline-block">
+        <HelpCircle size={14} className="text-slate-400 cursor-help hover:text-red-500 transition-colors" />
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl z-50">
+            {text}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
+        </div>
+    </div>
+)
+
 export default function Step2Access() {
     const navigate = useNavigate()
-    const { accessDetails, setAccessDetails } = useMoveStore()
+    const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails } = useMoveStore()
 
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
     }
 
     const handleSpecialCondition = (location, condition) => {
+        const currentConditions = accessDetails?.[location]?.specialConditions || {}
         setAccessDetails(location, {
             specialConditions: {
-                ...accessDetails[location].specialConditions,
-                [condition]: !accessDetails[location].specialConditions?.[condition]
+                ...currentConditions,
+                [condition]: !currentConditions[condition]
             }
         })
     }
 
-    const handleTimingUpdate = (field, value) => {
-        // We use a special 'timing' key which our store handles
-        setAccessDetails('timing', { [field]: value })
-    }
-
     const renderLocationForm = (locationType) => {
-        const data = accessDetails[locationType]
+        const data = accessDetails?.[locationType] || {
+            type: 'house',
+            floorLevel: 0,
+            elevator: false,
+            stairs: false,
+            specialConditions: {},
+            parkingType: 'driveway',
+            notes: ''
+        }
         const label = locationType === 'origin' ? 'Pickup Location' : 'Dropoff Location'
-        const colorClass = locationType === 'origin' ? 'border-l-4 border-l-primary-500' : 'border-l-4 border-l-orange-500'
+        const colorClass = locationType === 'origin' ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-slate-900'
+
+        const showFloorFields = data.type === 'flat' || data.type === 'office'
+        const isHouse = data.type === 'house'
+        const isTownhouse = data.type === 'townhouse'
 
         return (
             <div className={`space-y-6 bg-slate-50 p-6 rounded-xl border border-slate-200 ${colorClass}`}>
-                <div className="flex items-center gap-2 mb-2">
-                    <div className={`p-2 rounded-lg ${locationType === 'origin' ? 'bg-primary-100 text-primary-700' : 'bg-orange-100 text-orange-700'}`}>
-                        <Truck size={20} />
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-lg ${locationType === 'origin' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-700'}`}>
+                            <Truck size={20} />
+                        </div>
+                        <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm">{label}</h4>
                     </div>
-                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-sm">{label}</h4>
+                    <Tooltip text="Select the property type to see specific access options for this location." />
                 </div>
 
-                {/* row 1: Type & Floor */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Property Type</Label>
-                        <select
-                            value={data.type}
-                            onChange={(e) => handleUpdate(locationType, 'type', e.target.value)}
-                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
-                        >
-                            {PROPERTY_TYPES.map(t => (
-                                <option key={t.id} value={t.id}>{t.label}</option>
-                            ))}
-                        </select>
+                {/* Property Type Selection */}
+                <div className="space-y-2">
+                    <Label className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Property Type</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {PROPERTY_TYPES.map(t => (
+                            <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => handleUpdate(locationType, 'type', t.id)}
+                                className={clsx(
+                                    "px-3 py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all",
+                                    data.type === t.id 
+                                        ? "bg-white border-red-600 shadow-lg text-red-600" 
+                                        : "bg-white border-gray-100 text-slate-400 opacity-60 hover:opacity-100"
+                                )}
+                            >
+                                <t.icon size={18} />
+                                <span className="text-[10px] font-black uppercase tracking-tighter">{t.label}</span>
+                            </button>
+                        ))}
                     </div>
+                </div>
 
-                    <div className="space-y-2">
-                        <Label>Floor Level</Label>
-                        <div className="flex gap-4">
-                            <Input
-                                type="number"
-                                min="0"
-                                placeholder="0 (Ground)"
-                                value={data.floorLevel}
-                                onChange={(e) => handleUpdate(locationType, 'floorLevel', parseInt(e.target.value) || 0)}
-                                className="w-full"
-                            />
+                {/* Vertical & Parking Access */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {showFloorFields && (
+                        <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100">
+                            <Label className="text-xs font-bold flex items-center gap-2">
+                                Vertical Access <Tooltip text="Floor level and lift access info." />
+                            </Label>
                             <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.elevator}
-                                        onChange={(e) => handleUpdate(locationType, 'elevator', e.target.checked)}
-                                        className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                                <div className="flex-1">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Floor</p>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={data.floorLevel}
+                                        onChange={(e) => handleUpdate(locationType, 'floorLevel', parseInt(e.target.value) || 0)}
+                                        className="h-9 text-sm"
                                     />
-                                    <span className="text-sm text-slate-700">Elevator?</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.stairs}
-                                        onChange={(e) => handleUpdate(locationType, 'stairs', e.target.checked)}
-                                        className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                                    />
-                                    <span className="text-sm text-slate-700">Stairs?</span>
-                                </label>
+                                </div>
+                                <div className="flex flex-col gap-2 pt-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.elevator}
+                                            onChange={(e) => handleUpdate(locationType, 'elevator', e.target.checked)}
+                                            className="w-4 h-4 text-red-600 rounded border-gray-300"
+                                        />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Elevator</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.stairs}
+                                            onChange={(e) => handleUpdate(locationType, 'stairs', e.target.checked)}
+                                            className="w-4 h-4 text-red-600 rounded border-gray-300"
+                                        />
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Stairs</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                {/* row 2: Distance & Parking */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Distance to Entrance</Label>
-                        <select
-                            value={data.distanceFromDoor}
-                            onChange={(e) => handleUpdate(locationType, 'distanceFromDoor', e.target.value)}
-                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
-                        >
-                            {DISTANCE_OPTIONS.map(o => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Parking Availability</Label>
+                    <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100 h-full">
+                        <Label className="text-xs font-bold flex items-center gap-2">
+                            Vehicle Access <Tooltip text="Select the most accurate parking situation at this address." />
+                        </Label>
                         <select
                             value={data.parkingType}
                             onChange={(e) => handleUpdate(locationType, 'parkingType', e.target.value)}
-                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
+                            className="w-full p-2.5 bg-slate-50 border border-gray-100 rounded-lg text-sm font-medium outline-none"
                         >
                             {PARKING_OPTIONS.map(o => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
                         </select>
+                         <p className="text-[9px] text-slate-400 font-medium">Shuttle / Panhandle required? Select above.</p>
                     </div>
                 </div>
 
-                {/* row 3: Special Conditions */}
+                {/* Special Conditions */}
                 <div className="pt-4 border-t border-slate-200">
-                    <Label className="mb-3 block text-slate-900 font-semibold flex items-center gap-2">
-                        <AlertTriangle size={16} className="text-amber-500" />
-                        Access Challenges
+                    <Label className="mb-3 block text-slate-900 font-bold flex items-center gap-2 uppercase tracking-widest text-[10px]">
+                        <AlertTriangle size={14} className="text-red-600" />
+                        Access & Site Challenges
                     </Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                         <ConditionCheckbox
-                            label="Narrow Doors/Passages"
+                            label="Narrow Areas"
+                            tooltip="Tight corners, narrow passages, or doorways less than 80cm wide."
                             checked={data.specialConditions?.narrowPassage}
                             onChange={() => handleSpecialCondition(locationType, 'narrowPassage')}
                         />
                         <ConditionCheckbox
-                            label="Low Ceilings"
-                            checked={data.specialConditions?.lowCeiling}
-                            onChange={() => handleSpecialCondition(locationType, 'lowCeiling')}
+                            label="Hoisting"
+                            tooltip="Required for oversized items that won't fit through doors or lifts (e.g. Balcony lift)."
+                            checked={data.specialConditions?.hoisting}
+                            onChange={() => handleSpecialCondition(locationType, 'hoisting')}
                         />
                         <ConditionCheckbox
-                            label="Steep Driveway"
-                            checked={data.specialConditions?.steepDriveway}
-                            onChange={() => handleSpecialCondition(locationType, 'steepDriveway')}
+                            label="Pan Handle"
+                            tooltip="A long, narrow driveway where truck turning might be limited."
+                            checked={data.specialConditions?.panhandle}
+                            onChange={() => handleSpecialCondition(locationType, 'panhandle')}
                         />
+                        {isTownhouse && (
+                            <ConditionCheckbox
+                                label="Weight Limits"
+                                tooltip="Complex has weight limits for trucks (e.g. 5-ton limit), requiring a smaller shuttle vehicle."
+                                checked={data.specialConditions?.weightRestriction}
+                                onChange={() => handleSpecialCondition(locationType, 'weightRestriction')}
+                            />
+                        )}
+                        {isTownhouse && (
+                             <>
+                             <ConditionCheckbox
+                                 label="Elevator"
+                                 tooltip="Goods lift or passenger lift available."
+                                 checked={data.elevator}
+                                 onChange={() => handleUpdate(locationType, 'elevator', !data.elevator)}
+                             />
+                             <ConditionCheckbox
+                                 label="Stairs"
+                                 tooltip="Multiple flights of stairs required for entry."
+                                 checked={data.stairs}
+                                 onChange={() => handleUpdate(locationType, 'stairs', !data.stairs)}
+                             />
+                         </>
+                        )}
                         <ConditionCheckbox
-                            label="Security Gate / Boom"
+                            label="Security Gate"
+                            tooltip="Complex requires formal security clearance or gate booking."
                             checked={data.specialConditions?.securityGate}
                             onChange={() => handleSpecialCondition(locationType, 'securityGate')}
                         />
                     </div>
 
                     <textarea
-                        placeholder="Any other access details? (e.g. spiral staircase, bad road condition...)"
+                        placeholder="Additional instructions? (e.g. 'Bad road', 'Contact security at gate'...)"
                         value={data.notes || ''}
                         onChange={(e) => handleUpdate(locationType, 'notes', e.target.value)}
-                        className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none min-h-[80px]"
+                        className="w-full p-4 text-sm border-2 border-slate-100 rounded-xl focus:border-red-600 outline-none min-h-[80px] transition-all bg-white"
                     />
                 </div>
             </div>
@@ -185,14 +233,14 @@ export default function Step2Access() {
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 md:p-8 space-y-8">
+                <div className="p-6 md:p-8 space-y-10">
 
                     <div className="flex sm:flex-row flex-col sm:items-center justify-between gap-4 border-b border-gray-100 pb-6">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-900">Access Questionnaire</h3>
-                            <p className="text-slate-500 text-sm mt-1">Help us plan the logistics for a smooth move.</p>
+                            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight leading-none mb-1">Site Access</h3>
+                            <p className="text-slate-500 text-sm">Fine-tune the logistics for a perfect move day.</p>
                         </div>
-                        <div className="bg-primary-50 text-primary-700 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide self-start">
+                        <div className="bg-red-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest self-start">
                             Step 2 of 4
                         </div>
                     </div>
@@ -202,58 +250,143 @@ export default function Step2Access() {
                         {renderLocationForm('destination')}
                     </div>
 
-                    {/* Global Timing Section */}
-                    <div className="bg-slate-900 rounded-xl p-6 text-white">
-                        <div className="flex items-center gap-2 mb-4">
-                            <CalendarClock className="text-primary-400" />
-                            <h4 className="font-bold text-lg">Timing & Restrictions</h4>
+                    {/* Packaging Services Section */}
+                    <div className="pt-8 border-t border-gray-100">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="p-2 rounded-lg bg-red-50 text-red-600">
+                                <Sparkles size={24} />
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Packaging Services</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">Preferred Time</label>
-                                <select
-                                    className="w-full bg-slate-800 border-slate-700 rounded-lg text-white p-2.5 focus:ring-primary-500 focus:border-primary-500 invalid:text-gray-500"
-                                    value={accessDetails.timing?.preferredTime}
-                                    onChange={(e) => handleTimingUpdate('preferredTime', e.target.value)}
-                                >
-                                    <option value="morning">Morning (08:00 - 12:00)</option>
-                                    <option value="afternoon">Afternoon (12:00 - 16:00)</option>
-                                    <option value="flexible">Flexible</option>
-                                </select>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <PackagingOptionCard
+                                id="none"
+                                title="No Packaging"
+                                description="I will handle all packing and boxes myself."
+                                icon={Home}
+                                selected={moveDetails.packagingOption === 'none'}
+                                onClick={() => setPackagingOption('none')}
+                            />
+                            <PackagingOptionCard
+                                id="boxes_only"
+                                title="Sending Boxes Only"
+                                description="We deliver ST 7 & Linen boxes for you to pack."
+                                icon={Truck}
+                                selected={moveDetails.packagingOption === 'boxes_only'}
+                                onClick={() => setPackagingOption('boxes_only')}
+                            />
+                            <PackagingOptionCard
+                                id="boxes_and_packing"
+                                title="Boxes + Packing"
+                                description="Our professional crew packs everything for you."
+                                icon={Shield}
+                                selected={moveDetails.packagingOption === 'boxes_and_packing'}
+                                onClick={() => setPackagingOption('boxes_and_packing')}
+                            />
+                        </div>
 
-                            <div className="flex items-center">
-                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition-colors w-full">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-primary-500 focus:ring-offset-slate-900"
-                                        checked={accessDetails.timing?.weekendNeeded}
-                                        onChange={(e) => handleTimingUpdate('weekendNeeded', e.target.checked)}
-                                    />
-                                    <span>Weekend / After Hours?</span>
-                                </label>
-                            </div>
+                        {moveDetails.packagingOption !== 'none' && (
+                            <div className="mt-8 p-8 bg-slate-50 rounded-3xl border border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-red-600 rounded-full" />
+                                    Quantity Required
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">ST 7 Boxes (R{moveDetails.packagingOption === 'boxes_only' ? '59.50' : '146.00'} ea)</label>
+                                            <Tooltip text="Standard medium box for general household items." />
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button 
+                                                onClick={() => setMoveDetails({ st7Boxes: Math.max(0, (moveDetails.st7Boxes || 0) - 1) })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                            >
+                                                <Minus size={20} />
+                                            </button>
+                                            <div className="flex-1 bg-white border border-slate-200 rounded-xl h-12 flex items-center justify-center font-black text-xl text-slate-900 shadow-sm">
+                                                {moveDetails.st7Boxes || 0}
+                                            </div>
+                                            <button 
+                                                onClick={() => setMoveDetails({ st7Boxes: (moveDetails.st7Boxes || 0) + 1 })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                            >
+                                                <Plus size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <div className="flex items-center">
-                                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition-colors w-full">
-                                    <input
-                                        type="checkbox"
-                                        className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-primary-500 focus:ring-offset-slate-900"
-                                        checked={accessDetails.timing?.securityBookingRequired}
-                                        onChange={(e) => handleTimingUpdate('securityBookingRequired', e.target.checked)}
-                                    />
-                                    <span>Security Booking Required?</span>
-                                </label>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Linen Boxes (R{moveDetails.packagingOption === 'boxes_only' ? '146.00' : '175.00'} ea)</label>
+                                            <Tooltip text="Large boxes for bedding, pillows, and hanging clothes." />
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button 
+                                                onClick={() => setMoveDetails({ linenBoxes: Math.max(0, (moveDetails.linenBoxes || 0) - 1) })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                            >
+                                                <Minus size={20} />
+                                            </button>
+                                            <div className="flex-1 bg-white border border-slate-200 rounded-xl h-12 flex items-center justify-center font-black text-xl text-slate-900 shadow-sm">
+                                                {moveDetails.linenBoxes || 0}
+                                            </div>
+                                            <button 
+                                                onClick={() => setMoveDetails({ linenBoxes: (moveDetails.linenBoxes || 0) + 1 })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                            >
+                                                <Plus size={20} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex items-center gap-2 text-slate-500 bg-white/50 p-3 rounded-xl border border-slate-100">
+                                    <Truck size={14} className="text-red-600" />
+                                    <p className="text-[10px] font-bold uppercase tracking-tight">Delivery Fee of R220.00 will be included in the total.</p>
+                                </div>
                             </div>
+                        )}
+                    </div>
+
+                    {/* Insurance Section */}
+                    <div className="pt-8 border-t border-gray-100">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                                <Shield size={24} />
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Move Protection</h3>
+                        </div>
+
+                        <div 
+                            className={clsx(
+                                "p-8 rounded-3xl border-2 transition-all cursor-pointer flex flex-col md:flex-row items-center gap-8",
+                                moveDetails.insuranceEnabled ? "bg-emerald-50 border-emerald-500 shadow-lg shadow-emerald-500/10" : "bg-white border-slate-100 hover:border-emerald-200"
+                            )}
+                            onClick={() => setMoveDetails({ insuranceEnabled: !moveDetails.insuranceEnabled })}
+                        >
+                            <div className="flex-1 text-center md:text-left">
+                                <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                                    <h4 className="font-black text-slate-900 uppercase tracking-tight text-xl">Add MasterCare Insurance</h4>
+                                    <Tooltip text="Full Replacement Value cover. Recommended for all moves." />
+                                </div>
+                                <p className="text-base text-slate-500 max-w-md">Comprehensive protection for breakages, damage, or loss during transit.</p>
+                                <p className="text-xs text-emerald-600 font-black uppercase mt-4 tracking-widest px-3 py-1 bg-emerald-100/50 w-fit rounded-full">✨ Premium confirmed after inventory review</p>
+                            </div>
+                            <button type="button" className={clsx(
+                                "px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm transition-all shadow-xl",
+                                moveDetails.insuranceEnabled ? "bg-emerald-600 text-white shadow-emerald-600/30" : "bg-slate-900 text-white hover:bg-slate-800"
+                            )}>
+                                {moveDetails.insuranceEnabled ? "Protection Added" : "Add Protection"}
+                            </button>
                         </div>
                     </div>
 
                 </div>
 
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-between items-center">
-                    <Button variant="ghost" onClick={() => navigate('/quote')}>Back to Details</Button>
-                    <Button size="lg" onClick={() => navigate('/quote/inventory')}>
+                <div className="bg-gray-50 px-8 py-6 border-t border-gray-100 flex justify-between items-center">
+                    <Button variant="ghost" className="font-bold text-slate-400 hover:text-red-600" onClick={() => navigate('/quote')}>Back</Button>
+                    <Button size="lg" className="bg-red-600 hover:bg-red-700 px-12 py-7 uppercase tracking-widest font-black text-sm shadow-xl shadow-red-600/20" onClick={() => navigate('/quote/inventory')}>
                         Next: Inventory <Truck className="ml-2" size={18} />
                     </Button>
                 </div>
@@ -262,24 +395,50 @@ export default function Step2Access() {
     )
 }
 
-function ConditionCheckbox({ label, checked, onChange }) {
+
+function ConditionCheckbox({ label, tooltip, checked, onChange }) {
     return (
         <label className={clsx(
-            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:bg-slate-50",
-            checked ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"
+            "flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all hover:bg-white min-h-[64px]",
+            checked ? "bg-white border-red-500 shadow-md" : "bg-white/50 border-slate-100"
         )}>
-            <input
-                type="checkbox"
-                checked={checked || false}
-                onChange={onChange}
-                className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500"
-            />
-            <span className={clsx("text-sm font-medium", checked ? "text-amber-900" : "text-slate-600")}>
-                {label}
-            </span>
+            <div className="flex items-center gap-3">
+                <input
+                    type="checkbox"
+                    checked={checked || false}
+                    onChange={onChange}
+                    className="w-4 h-4 text-red-600 rounded border-gray-300"
+                />
+                <span className={clsx("text-[11px] font-black uppercase tracking-tighter", checked ? "text-red-900" : "text-slate-400")}>
+                    {label}
+                </span>
+            </div>
+            {tooltip && <Tooltip text={tooltip} />}
         </label>
     )
 }
 
-
-
+function PackagingOptionCard({ title, description, icon: Icon, selected, onClick }) {
+    return (
+        <div 
+            onClick={onClick}
+            className={clsx(
+                "p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 group flex flex-col gap-4",
+                selected 
+                    ? "bg-red-50 border-red-600 shadow-lg shadow-red-600/5 scale-[1.02]" 
+                    : "bg-white border-slate-100 hover:border-slate-200"
+            )}
+        >
+            <div className={clsx(
+                "p-3 rounded-xl w-fit transition-colors",
+                selected ? "bg-red-600 text-white shadow-lg shadow-red-600/20" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+            )}>
+                <Icon size={24} />
+            </div>
+            <div>
+                <h4 className={clsx("font-black uppercase tracking-tight", selected ? "text-red-900" : "text-slate-900")}>{title}</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed font-medium">{description}</p>
+            </div>
+        </div>
+    )
+}

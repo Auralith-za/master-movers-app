@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Phone, Mail, CheckCircle, Clock } from 'lucide-react'
+import { Phone, Mail, CheckCircle, Clock, ExternalLink } from 'lucide-react'
 
 export default function LeadsPage() {
     const [leads, setLeads] = useState([])
@@ -12,15 +12,21 @@ export default function LeadsPage() {
 
     const fetchLeads = async () => {
         try {
-            // Fetch quotes where request_call_back is TRUE
+            // Fetch all quotes to be safe against missing columns in the DB
             const { data, error } = await supabase
                 .from('quotes')
                 .select('*')
-                .eq('request_call_back', true)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
-            setLeads(data || [])
+
+            // Filter for leads client-side to handle missing columns gracefully
+            const processedLeads = (data || []).filter(quote =>
+                quote.status === 'lead' ||
+                quote.request_call_back === true ||
+                quote.items_json?.request_call_back === true
+            )
+            setLeads(processedLeads)
         } catch (error) {
             console.error('Error fetching leads:', error)
         } finally {
@@ -104,6 +110,27 @@ export default function LeadsPage() {
                                     Moving from <strong>{lead.pickup_address?.split(',')[0]}</strong> <br />
                                     to <strong>{lead.dropoff_address?.split(',')[0]}</strong>
                                 </div>
+
+                                {lead.customer_comments && (
+                                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 italic">
+                                        "{lead.customer_comments}"
+                                    </div>
+                                )}
+
+                                {lead.team_notes && (
+                                    <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-1">
+                                        <Clock size={10} className="mt-0.5" /> {lead.team_notes}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mb-4">
+                                <button 
+                                    onClick={() => window.location.href = `/admin/quotes/${lead.id}`}
+                                    className="w-full py-1.5 text-xs font-bold text-primary-600 bg-primary-50 rounded border border-primary-100 hover:bg-primary-100 flex items-center justify-center gap-1"
+                                >
+                                    <ExternalLink size={12} /> View Full Quote
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">

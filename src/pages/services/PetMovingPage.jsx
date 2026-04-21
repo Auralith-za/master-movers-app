@@ -10,8 +10,8 @@ export default function PetMovingPage() {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-green-900 to-slate-900 opacity-90" />
                     <img
-                        src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=2000&auto=format&fit=crop"
-                        alt="Happy Dogs"
+                        src="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&q=80&w=2000"
+                        alt="Happy Dog Traveling"
                         className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
                     />
                 </div>

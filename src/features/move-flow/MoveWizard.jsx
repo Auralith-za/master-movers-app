@@ -32,29 +32,54 @@ export default function MoveWizard() {
                 <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Plan Your Move</h1>
                 <p className="text-slate-500">Get an instant quote in 4 easy steps.</p>
 
-                {/* Progress Bar */}
-                <div className="mt-6 relative">
-                    <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${((currentStepIndex + 1) / STEPS.length) * 100}%` }}
-                            className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary-600 transition-all duration-500"
-                        />
-                    </div>
+                {/* Modern Stepper */}
+                <div className="mt-8 relative px-4">
+                    {/* Background Line */}
+                    <div className="absolute top-4 left-0 w-full h-1 bg-gray-100 rounded-full" />
 
-                    <div className="flex justify-between text-xs font-medium text-slate-500 uppercase tracking-wider">
-                        {STEPS.map((step, idx) => (
-                            <div
-                                key={step.id}
-                                className={clsx(
-                                    "cursor-pointer transition-colors hover:text-primary-600 flex flex-col items-center md:items-start",
-                                    idx <= currentStepIndex ? "text-primary-600 font-bold" : "text-gray-400"
-                                )}
-                                onClick={() => navigate(step.path)}
-                            >
-                                <span>{step.label}</span>
-                            </div>
-                        ))}
+                    {/* Active Progress Line */}
+                    <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }}
+                        className="absolute top-4 left-0 h-1 bg-red-600 rounded-full shadow-[0_0_10px_rgba(225,29,72,0.3)] z-10"
+                        transition={{ duration: 0.6, ease: "circOut" }}
+                    />
+
+                    <div className="relative z-20 flex justify-between">
+                        {STEPS.map((step, idx) => {
+                            const isCompleted = idx < currentStepIndex;
+                            const isActive = idx === currentStepIndex;
+
+                            return (
+                                <div
+                                    key={step.id}
+                                    className="flex flex-col items-center group cursor-pointer"
+                                    onClick={() => navigate(step.path)}
+                                >
+                                    {/* Dot / Indicator */}
+                                    <div className={clsx(
+                                        "w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-300 mb-2 font-bold text-xs",
+                                        isCompleted ? "bg-red-600 border-red-600 text-white shadow-lg shadow-red-600/20" :
+                                            isActive ? "bg-white border-red-600 text-red-600 shadow-xl" :
+                                                "bg-white border-gray-200 text-gray-400"
+                                    )}>
+                                        {isCompleted ? (
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (idx + 1)}
+                                    </div>
+
+                                    {/* Label */}
+                                    <span className={clsx(
+                                        "text-[10px] uppercase tracking-widest font-black transition-all duration-300 md:block hidden",
+                                        isActive ? "text-slate-900 opacity-100" : "text-slate-400 opacity-50 group-hover:opacity-100"
+                                    )}>
+                                        {step.label}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -72,7 +97,7 @@ export default function MoveWizard() {
                         <Route index element={<Step1Details />} />
                         <Route path="access" element={<Step2Access />} />
                         <Route path="inventory" element={<Step3Inventory />} />
-                        <Route path="summary" element={<Step4Summary />} />
+                        <Route path="summary" element={<Step4Summary submissionType={basePath === '/quote-test' ? 'test' : 'standard'} />} />
                     </Routes>
                 </motion.div>
             </AnimatePresence>

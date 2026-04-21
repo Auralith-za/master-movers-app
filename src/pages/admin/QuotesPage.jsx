@@ -32,16 +32,22 @@ export default function QuotesPage() {
         switch (status) {
             case 'new': return 'bg-blue-50 text-blue-700 ring-blue-600/20'
             case 'processing': return 'bg-purple-50 text-purple-700 ring-purple-600/20'
-            case 'booked': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+            case 'pending_payment': return 'bg-amber-50 text-amber-700 ring-amber-600/20'
+            case 'booked':
+            case 'paid':
+            case 'booked_paid': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
             case 'on_hold': return 'bg-orange-50 text-orange-700 ring-orange-600/20'
+            case 'rejected': return 'bg-red-50 text-red-700 ring-red-600/10'
+            case 'lead': return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
             default: return 'bg-slate-50 text-slate-700 ring-slate-600/20'
         }
     }
 
     const filteredQuotes = quotes.filter(quote => {
         if (filter === 'all') return true
-        if (filter === 'pending') return quote.status === 'new' || quote.status === 'draft'
-        if (filter === 'processing') return quote.status === 'processing' || quote.status === 'paid'
+        if (filter === 'pending') return quote.status === 'new' || quote.status === 'draft' || quote.status === 'processing' || quote.status === 'pending_payment' || quote.status === 'lead'
+        if (filter === 'paid') return quote.status === 'booked' || quote.status === 'paid' || quote.status === 'booked_paid'
+        if (filter === 'rejected') return quote.status === 'rejected'
         return true
     })
 
@@ -90,13 +96,19 @@ export default function QuotesPage() {
                     onClick={() => setFilter('pending')}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${filter === 'pending' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    Pending / Unpaid
+                    Pending / Pipeline
                 </button>
                 <button
-                    onClick={() => setFilter('processing')}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${filter === 'processing' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setFilter('paid')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${filter === 'paid' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    Processing / Paid
+                    Booked / Paid
+                </button>
+                <button
+                    onClick={() => setFilter('rejected')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${filter === 'rejected' ? 'border-red-500 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Rejected
                 </button>
             </div>
 
@@ -110,6 +122,7 @@ export default function QuotesPage() {
                             <th className="px-6 py-4 font-semibold">Route</th>
                             <th className="px-6 py-4 font-semibold">Date</th>
                             <th className="px-6 py-4 font-semibold">Value</th>
+                            {filter === 'rejected' && <th className="px-6 py-4 font-semibold">Rejection Reason</th>}
                             <th className="px-6 py-4 font-semibold">Status</th>
                             <th className="px-6 py-4 font-semibold text-right">Actions</th>
                         </tr>
@@ -135,6 +148,11 @@ export default function QuotesPage() {
                                     <td className="px-6 py-4 font-medium text-slate-900">
                                         {quote.total_price ? `R ${Number(quote.total_price).toFixed(2)}` : '-'}
                                     </td>
+                                    {filter === 'rejected' && (
+                                        <td className="px-6 py-4 text-sm text-red-600 font-medium italic">
+                                            {quote.rejection_reason || quote.items_json?.rejection_reason || 'No reason provided'}
+                                        </td>
+                                    )}
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ring-1 ring-inset ${getStatusColor(quote.status)}`}>
                                             {quote.status.toUpperCase()}

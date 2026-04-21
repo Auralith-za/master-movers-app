@@ -10,21 +10,25 @@ export default function PayflexCheckout({ quote }) {
     }
 
     return (
-        <div className="w-full mt-3">
-            <div className="border border-indigo-100 bg-indigo-50/50 rounded-xl p-4 mb-3">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-slate-900 border-b border-indigo-200 pb-0.5">Pay in 4 Installments</span>
-                    <span className="text-indigo-600 font-bold text-sm">Interest Free</span>
+        <div className="w-full">
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 text-center">
+                <div className="flex flex-col items-center gap-2 mb-4">
+                    <span className="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                        Payflex Installments
+                    </span>
+                    <h4 className="text-2xl font-black text-slate-900 italic uppercase">
+                        4 x R{(quote.total_price / 4).toFixed(2)}
+                    </h4>
+                    <p className="text-xs text-slate-500 font-medium">Interest-free. Pay over 6 weeks.</p>
                 </div>
-                <p className="text-xs text-slate-600 mb-3">
-                    4 x R{(quote.total_price / 4).toFixed(2)}
-                </p>
+
                 <Button
-                    variant="primary"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+                    variant="ghost"
+                    size="lg"
+                    className="w-full bg-[#1A1A1A] hover:bg-slate-900 text-white shadow-xl shadow-indigo-100 font-black uppercase tracking-widest py-6"
                     onClick={handlePayflexClick}
                 >
-                    Pay with Payflex
+                    Checkout with Payflex
                 </Button>
             </div>
         </div>

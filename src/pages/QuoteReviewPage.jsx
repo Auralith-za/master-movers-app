@@ -1,0 +1,254 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
+import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard } from 'lucide-react';
+import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
+import TermsModal from '../components/TermsModal';
+import PayFastCheckout from '../features/payment/PayFastCheckout';
+import PayflexCheckout from '../features/payment/PayflexCheckout';
+
+export default function QuoteReviewPage() {
+    const { id } = useParams();
+    const [quote, setQuote] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isTermsOpen, setIsTermsOpen] = useState(false);
+    const [accepted, setAccepted] = useState(false);
+    const [signatureData, setSignatureData] = useState(null);
+
+    useEffect(() => {
+        fetchQuote();
+    }, [id]);
+
+    const fetchQuote = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('quotes')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+            setQuote(data);
+            if (data.terms_accepted) {
+                setAccepted(true);
+                setSignatureData(data.signature_json);
+            }
+        } catch (error) {
+            console.error('Error fetching quote:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAcceptTerms = async (sig) => {
+        try {
+            const { error } = await supabase
+                .from('quotes')
+                .update({
+                    terms_accepted: true,
+                    signature_json: sig,
+                    status: 'pending_payment'
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            setAccepted(true);
+            setSignatureData(sig);
+            setIsTermsOpen(false);
+            
+            // Log activity internally
+            await supabase.from('quote_activities').insert([{
+                quote_id: id,
+                activity_type: 'system',
+                content: `Client accepted and signed terms. Signature: ${sig.name}`
+            }]);
+
+        } catch (error) {
+            console.error('Error accepting terms:', error);
+            alert('Failed to save acceptance. Please try again.');
+        }
+    };
+
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        </div>
+    );
+
+    if (!quote) return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-800">Quote Not Found</h1>
+                <p className="text-slate-500 mt-2">The link you followed may be expired or invalid.</p>
+            </div>
+        </div>
+    );
+
+    const inventory = quote.items_json?.items || quote.items_json || {};
+
+    return (
+        <div className="min-h-screen bg-slate-50 pb-20">
+            <div className="bg-slate-900 overflow-hidden relative">
+                <div className="max-w-4xl mx-auto px-6 py-16 text-white relative z-10">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block">Official Quote</span>
+                            <h1 className="text-4xl font-black tracking-tight">Review Your Move</h1>
+                            <p className="text-slate-400 mt-2">Reference: <span className="text-white font-bold tracking-wider">#{quote.id.toString().substring(0, 8).toUpperCase()}</span></p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-4xl font-black text-red-500">R {quote.total_price?.toLocaleString()}</div>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total Amount Incl. VAT</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-4xl mx-auto px-6 -mt-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* Main Details */}
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* Route Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                <Truck size={20} className="text-red-500" /> Logistics Information
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pickup Address</label>
+                                        <p className="text-slate-900 font-bold leading-snug mt-1">{quote.pickup_address}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                        <Calendar size={16} />
+                                        <span>Scheduled for: <strong className="text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</strong></span>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dropoff Address</label>
+                                        <p className="text-slate-900 font-bold leading-snug mt-1">{quote.dropoff_address}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                        <Truck size={16} />
+                                        <span>Distance: <strong className="text-slate-800">{quote.distance_km} km</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Inventory Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                <Package size={20} className="text-red-500" /> Quoted Inventory List
+                            </h2>
+                            <div className="space-y-3">
+                                {Object.entries(inventory).map(([idKey, qty]) => {
+                                    const [id, variation] = idKey.split('_');
+                                    const item = INVENTORY_ITEMS.find(i => i.id === id);
+                                    return (
+                                        <div key={idKey} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-lg">{item?.image || '📦'}</div>
+                                                <span className="text-sm font-bold text-slate-700">{item?.name || idKey} {variation ? <span className="text-slate-400 font-normal">({variation})</span> : ''}</span>
+                                            </div>
+                                            <span className="text-slate-900 font-black">x{qty}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Column */}
+                    <div className="space-y-6">
+                        
+                        {/* Status Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+                            {!accepted ? (
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <ShieldCheck size={32} />
+                                    </div>
+                                    <h3 className="font-black text-slate-900 uppercase tracking-tight">Accept Terms</h3>
+                                    <p className="text-slate-500 text-xs mt-2 leading-relaxed">Please review and accept our contract terms and insurance policy to proceed.</p>
+                                    <button 
+                                        onClick={() => setIsTermsOpen(true)}
+                                        className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-red-700 transition-all shadow-xl shadow-red-600/20"
+                                    >
+                                        Sign & Accept
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle size={32} />
+                                    </div>
+                                    <h3 className="font-black text-slate-900 uppercase tracking-tight">Terms Accepted</h3>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase mt-2">Electronically Signed By</p>
+                                    <p className="font-serif text-lg text-slate-800 italic mt-1 font-bold">{signatureData?.name}</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">{new Date(signatureData?.date).toLocaleString()}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Payment Card */}
+                        <div className={clsx(
+                            "bg-white rounded-2xl shadow-sm border border-slate-100 p-8 transition-all duration-500",
+                            !accepted ? "opacity-40 grayscale pointer-events-none" : "opacity-100"
+                        )}>
+                            <div className="flex items-center gap-2 mb-6">
+                                <CreditCard className="text-indigo-600" size={20} />
+                                <h3 className="font-black text-slate-900 uppercase tracking-tight">Secure Payment</h3>
+                            </div>
+                            
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block px-1">Credit Card / EFT</label>
+                                    <PayFastCheckout 
+                                        quote={{
+                                            id: quote.id,
+                                            total_price: quote.total_price,
+                                            client_name: quote.client_name,
+                                            client_email: quote.client_email,
+                                            pickup_address: quote.pickup_address,
+                                            dropoff_address: quote.dropoff_address
+                                        }}
+                                    />
+                                </div>
+                                <div className="pt-6 border-t border-slate-50">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block px-1">Buy Now, Pay Later</label>
+                                    <PayflexCheckout 
+                                        quote={{
+                                            id: quote.id,
+                                            total_price: quote.total_price
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Support Card */}
+                        <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100">
+                            <p className="text-xs text-slate-500 font-medium">Need help with this quote?</p>
+                            <a href="tel:+27110000000" className="text-slate-900 font-black mt-1 block">+27 11 000 0000</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <TermsModal 
+                isOpen={isTermsOpen} 
+                onClose={() => setIsTermsOpen(false)}
+                onAccept={handleAcceptTerms}
+            />
+        </div>
+    );
+}
+
+function clsx(...classes) {
+    return classes.filter(Boolean).join(' ');
+}

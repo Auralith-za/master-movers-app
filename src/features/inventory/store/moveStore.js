@@ -1,7 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../../../lib/supabaseClient'
-import { SORTED_VEHICLE_RATES } from '../data/vehicleRates'
+import { 
+    CITY_CODES, 
+    NATIONAL_RATES, 
+    LOCAL_VEHICLE_RATES, 
+    ADDITIONAL_COSTS, 
+    PACKAGING_RATES, 
+    PRICING_CONSTANTS, 
+    getCityCode 
+} from '../data/pricingRates'
 
 export const useMoveStore = create(
     persist(
@@ -13,12 +21,23 @@ export const useMoveStore = create(
                 distanceKm: 0,
                 moveDate: '',
                 contactName: '',
+                surname: '',
                 contactPhone: '',
                 contactEmail: '',
+                generalNotes: '',
+                packagingOption: 'none',
+                st7Boxes: 0,
+                linenBoxes: 0,
+                insuranceEnabled: false
             },
+            lastSavedQuote: null,
             setMoveDetails: (details) =>
                 set((state) => ({
                     moveDetails: { ...state.moveDetails, ...details }
+                })),
+            setPackagingOption: (option) =>
+                set((state) => ({
+                    moveDetails: { ...state.moveDetails, packagingOption: option }
                 })),
 
             // Step 2: Access
@@ -30,16 +49,9 @@ export const useMoveStore = create(
                     stairs: false,
                     shuttle: false,
                     longCarry: false,
-                    distanceFromDoor: '<10m', // <10m, 10-30m, >30m
-                    parkingType: 'driveway', // driveway, street, secure_complex, loading_bay
-                    permitRequired: false,
-                    specialConditions: {
-                        narrowPassage: false,
-                        lowCeiling: false,
-                        steepDriveway: false,
-                        securityGate: false
-                    },
-                    notes: ''
+                    distanceFromDoor: '<10m',
+                    notes: '',
+                    specialConditions: {}
                 },
                 destination: {
                     type: 'house',
@@ -49,314 +61,274 @@ export const useMoveStore = create(
                     shuttle: false,
                     longCarry: false,
                     distanceFromDoor: '<10m',
-                    parkingType: 'driveway',
-                    permitRequired: false,
-                    specialConditions: {
-                        narrowPassage: false,
-                        lowCeiling: false,
-                        steepDriveway: false,
-                        securityGate: false
-                    },
-                    notes: ''
-                },
-                timing: {
-                    preferredTime: 'flexible', // morning, afternoon, flexible
-                    weekendNeeded: false,
-                    securityBookingRequired: false
+                    notes: '',
+                    specialConditions: {}
                 }
             },
             setAccessDetails: (location, details) =>
-                set((state) => {
-                    // unexpected location 'timing' handled at root of accessDetails
-                    if (location === 'timing') {
-                        return {
-                            accessDetails: {
-                                ...state.accessDetails,
-                                timing: { ...state.accessDetails.timing, ...details }
-                            }
-                        }
+                set((state) => ({
+                    accessDetails: {
+                        ...state.accessDetails,
+                        [location]: { ...state.accessDetails[location], ...details }
                     }
-
-                    // Special handling for deep merging specialConditions if present
-                    let updatedSpecifics = { ...details }
-                    if (details.specialConditions) {
-                        updatedSpecifics.specialConditions = {
-                            ...state.accessDetails[location].specialConditions,
-                            ...details.specialConditions
-                        }
-                    }
-
-                    return {
-                        accessDetails: {
-                            ...state.accessDetails,
-                            [location]: { ...state.accessDetails[location], ...updatedSpecifics }
-                        }
-                    }
-                }),
+                })),
 
             // Step 3: Inventory
-            inventory: {}, // { itemId: quantity }
-            manualServiceCharges: {},
-            addItem: (itemId) =>
-                set((state) => ({
-                    inventory: { ...state.inventory, [itemId]: (state.inventory[itemId] || 0) + 1 }
-                })),
-            removeItem: (itemId) =>
+            inventory: {},
+            addItem: (id, variation = null) =>
                 set((state) => {
-                    const newInventory = { ...state.inventory }
-                    if (newInventory[itemId] > 1) {
-                        newInventory[itemId] -= 1
-                    } else {
-                        delete newInventory[itemId]
+                    const idKey = variation ? `${id}_${variation}` : id
+                    const newInventory = { ...state.inventory, [idKey]: (state.inventory[idKey] || 0) + 1 }
+                    return {
+                        inventory: newInventory,
+                        undoHistory: [...state.undoHistory, state.inventory]
                     }
-                    return { inventory: newInventory }
                 }),
+            removeItem: (id, variation = null) =>
+                set((state) => {
+                    const idKey = variation ? `${id}_${variation}` : id
+                    if (!state.inventory[idKey]) return state
+                    const newInventory = { ...state.inventory }
+                    if (newInventory[idKey] <= 1) {
+                        delete newInventory[idKey]
+                    } else {
+                        newInventory[idKey] -= 1
+                    }
+                    return {
+                        inventory: newInventory,
+                        undoHistory: [...state.undoHistory, state.inventory]
+                    }
+                }),
+            undoHistory: [],
+            undo: () => set((state) => {
+                if (state.undoHistory.length === 0) return state;
+                const previous = state.undoHistory[state.undoHistory.length - 1];
+                return {
+                    inventory: previous,
+                    undoHistory: state.undoHistory.slice(0, -1)
+                }
+            }),
+            currentVehicle: null,
+            setCurrentVehicle: (v) => set({ currentVehicle: v }),
 
-            // Computed helpers (would normally be selectors)
-            reset: () => set({ moveDetails: {}, accessDetails: {}, inventory: {}, manualServiceCharges: {} }),
-            clearInventory: () => set((state) => ({ inventory: {} })),
+            // Basic Helpers
+            reset: () => set({ 
+                moveDetails: { packagingOption: 'none', insuranceEnabled: false }, 
+                accessDetails: {}, 
+                inventory: {}, 
+                manualServiceCharges: {},
+                undoHistory: []
+            }),
+            clearInventory: () => set((state) => ({ inventory: {}, undoHistory: [...state.undoHistory, state.inventory] })),
+            
+            manualServiceCharges: {},
             updateManualServiceCharge: (key, value) => set((state) => ({
                 manualServiceCharges: { ...state.manualServiceCharges, [key]: value }
             })),
 
             getTotals: () => {
                 const state = get()
-                const { inventory, moveDetails, accessDetails } = state
-                return { inventory, moveDetails, accessDetails }
+                return calculateQuote(
+                    state.inventory,
+                    state.moveDetails,
+                    state.accessDetails,
+                    [], // Placeholder for INVENTORY_ITEMS
+                    state.manualServiceCharges || {}
+                )
             },
 
-            // Async Actions
-            submitQuote: async (extraPayload = {}) => {
+            // Quote Submission & Management
+            submitQuote: async (overrides = {}) => {
                 const state = get()
-                const { inventory, moveDetails, accessDetails } = state
+                const totals = calculateQuote(
+                    state.inventory,
+                    state.moveDetails,
+                    state.accessDetails,
+                    [], // INVENTORY_ITEMS should be passed if available locally, but store doesn't have it
+                    state.manualServiceCharges
+                )
 
-                // Calculate final totals to store
-                // We'd typically import the catalog or pass it in. 
-                // For now, assuming we trigger this from a component that has the data or we just save raw state.
-                // WE SHOULD TRY TO IMPORT CATALOG if possible or just save the raw IDs.
-                // Let's save the raw state mostly.
+                const quotePayload = {
+                    ...state.moveDetails,
+                    access_details: state.accessDetails,
+                    inventory: state.inventory,
+                    totals: {
+                        subtotal: totals.subTotal,
+                        vat: totals.vat,
+                        total: totals.total,
+                        discount: totals.discount,
+                        breakdown: totals.breakdown
+                    },
+                    status: overrides.status || 'new',
+                    ...overrides
+                }
 
-                // Construct the payload matching our planned Supabase schema
                 try {
-                    let inventoryItems = []
-                    try {
-                        const module = await import('../data/mockItems')
-                        inventoryItems = module.INVENTORY_ITEMS || []
-                    } catch (e) {
-                        console.warn("Could not load inventory items for calculation, using empty catalog", e)
+                    let result
+                    if (state.lastSavedQuote?.id) {
+                        result = await supabase
+                            .from('quotes')
+                            .update(quotePayload)
+                            .eq('id', state.lastSavedQuote.id)
+                            .select()
+                    } else {
+                        result = await supabase
+                            .from('quotes')
+                            .insert([quotePayload])
+                            .select()
                     }
 
-                    const calculation = calculateQuote(inventory || {}, moveDetails || {}, accessDetails || {}, inventoryItems)
-                    const safeVolume = calculation.totalVolume || 0
-                    const safePrice = calculation.total || 0
+                    if (result.error) throw result.error
 
-                    const payload = {
-                        client_name: moveDetails.contactName || '',
-                        client_email: moveDetails.contactEmail || '',
-                        client_phone: moveDetails.contactPhone || '',
-                        pickup_address: moveDetails.pickupAddress || '',
-                        dropoff_address: moveDetails.dropoffAddress || '',
-                        move_date: moveDetails.moveDate || new Date().toISOString(),
-                        status: 'new',
-                        distance_km: moveDetails.distanceKm || 0,
-                        items_json: inventory || {},
-                        access_details: accessDetails || {},
-                        trip_breakdown: moveDetails.tripBreakdown || null,
-                        total_volume: safeVolume,
-                        total_price: safePrice,
-                        vehicle_type: calculation.breakdown?.vehicleType || 'Unknown',
-                        created_at: new Date().toISOString(),
-                        ...extraPayload // Merge in any extra fields like request_call_back
-                    }
-
-                    console.log("Submitting Quote Payload:", payload)
-
-                    const { data, error } = await supabase
-                        .from('quotes')
-                        .insert([payload])
-                        .select()
-
-                    if (error) {
-                        console.error("Supabase Write Error:", error)
-                        throw error // Fail loudly if live connection fails
-                    }
-
-                    return { success: true, data }
-                } catch (error) {
-                    console.error('Error submitting quote:', error)
-                    return { success: false, error }
+                    const savedQuote = result.data[0]
+                    set({ lastSavedQuote: savedQuote })
+                    return { success: true, data: savedQuote }
+                } catch (err) {
+                    console.error('Submit Quote Error:', err)
+                    return { success: false, error: err }
                 }
             },
 
-            sendWhatsAppNotification: async (quoteId, phone, templateName, params = []) => {
+            submitQuoteActivity: async (quoteId, activityType, details) => {
                 try {
-                    // Invoke Supabase Edge Function
-                    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-                        body: {
-                            phone,
-                            template_name: templateName,
-                            parameters: params
-                        }
-                    })
+                    const { error } = await supabase
+                        .from('quote_activity')
+                        .insert([{ quote_id: quoteId, activity_type: activityType, details }])
+                    return { success: !error, error }
+                } catch (err) {
+                    return { success: false, error: err }
+                }
+            },
 
-                    if (error) throw error
-                    return { success: true, data }
+            updateQuoteStatus: async (quoteId, status, additionalData = {}) => {
+                try {
+                    const { error } = await supabase
+                        .from('quotes')
+                        .update({ status, ...additionalData })
+                        .eq('id', quoteId)
+                    return { success: !error, error }
+                } catch (err) {
+                    return { success: false, error: err }
+                }
+            },
+
+            sendWhatsApp: async (payload) => {
+                try {
+                    const response = await fetch('/api/whatsapp', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    })
+                    return await response.json()
                 } catch (error) {
-                    console.error('Error sending WhatsApp:', error)
-                    // If function fails (e.g. 404 not deployed), return mock success for UI demo
-                    return { success: false, error, mock: true }
+                    return { success: false, error }
                 }
             }
         }),
         {
-            name: 'master-movers-storage',
-            partialize: (state) => ({
-                moveDetails: state.moveDetails,
-                accessDetails: state.accessDetails,
-                inventory: state.inventory,
-                vehicle: state.vehicle,
-                manualServiceCharges: state.manualServiceCharges
-            })
+            name: 'master-movers-storage-v3',
+            version: 3
         }
     )
 )
 
-// Pricing Utility
-export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails = {}, catalog = [], manualServiceCharges = {}) => {
-    let totalVolume = 0 // in m3
-    Object.entries(inventory || {}).forEach(([id, qty]) => {
-        const item = catalog.find(i => i.id === id)
-        if (item) totalVolume += item.volume * qty
+export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges = {}) => {
+    let totalVolume = 0
+    let autoPackagingCost = 0
+
+    Object.entries(inventory).forEach(([idKey, qty]) => {
+        const [itemId] = idKey.split('_')
+        const item = INVENTORY_ITEMS.find(i => i.id === itemId)
+        if (item) {
+            totalVolume += item.volume * qty
+            if (item.autoPackagingType === 'Plastic Covers') autoPackagingCost += (qty * 145)
+            if (item.autoPackagingType === 'Wrapping') autoPackagingCost += (qty * 75)
+        }
     })
 
-    // Convert Volume to Cubic Feet for Vehicle Selection
-    const totalVolumeCuFt = totalVolume * 35.315
-
-    // Select Vehicle
-    // Find the first vehicle that fits the volume
-    let vehicle = SORTED_VEHICLE_RATES.find(v => v.capacityCuFt >= totalVolumeCuFt)
-
-    // If volume is larger than largest vehicle, use the largest one (or we could stack them, but simplest is to just max out rate)
-    if (!vehicle) {
-        vehicle = SORTED_VEHICLE_RATES[SORTED_VEHICLE_RATES.length - 1]
-    }
-
-    // Fallback if no vehicle found (shouldn't happen with valid list)
-    if (!vehicle) {
-        vehicle = { name: 'Standard', ratePerKm: 15, ratePerCuFt: 3.5 }
-    }
-
-    // Distance Logic (Depot -> Pickup -> Dropoff -> Depot)
-    const { depotToPickup = 0, pickupToDropoff = 0, dropoffToDepot = 0 } = moveDetails?.tripBreakdown || {}
-
-    // --- Long Distance & Shared Load Logic ---
-    let totalDistance = 0
+    const totalVolumeCuFt = totalVolume
+    const pickupAddress = (moveDetails.pickupAddress || '').toLowerCase()
+    const dropoffAddress = (moveDetails.dropoffAddress || '').toLowerCase()
+    
+    // Attempt detection from metadata first, then full address string
+    const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(pickupAddress)
+    const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(dropoffAddress)
+    
+    // Force National if we detect cross-city keywords in addresses even if codes are missing
+    const isNationalMove = (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) || 
+                          (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
+                          (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
+                          (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
+                          (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg'))
+    
+    const totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
     let transportCost = 0
     let volumeCost = 0
-    let isSharedLoad = false
+    let vehicleName = ''
+    let transportRate = 0
+    let volumeRate = 0
 
-    // Determine one-way distance (approx)
-    const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || 0
-
-    // Check for Long Distance Shared Load
-    // Criteria: > 200km AND < 850 cu ft (approx ~24 m3, half truck)
-    if (oneWayDist > 200 && totalVolumeCuFt < 850) {
-        isSharedLoad = true
-        // For Shared Load, we display one-way distance
-        totalDistance = oneWayDist
-
-        // Pricing based on VOLUME only for shared loads (derived from historical R6600 quote)
-        // Rate: ~R 38.50 per cu ft covers the transport
-        const sharedLoadRate = 38.50
-        transportCost = totalVolumeCuFt * sharedLoadRate
-
-        // Volume cost is effectively 0 because it's built into the transport rate
-        volumeCost = 0
-    } else {
-        // Standard / Dedicated Load Logic
-        if (moveDetails.tripBreakdown) {
-            totalDistance = depotToPickup + pickupToDropoff + dropoffToDepot
+    if (isNationalMove) {
+        // National logic: Flat rate per KM regardless of volume (Standard: Link)
+        const routeKey = `${pickupCityCode}-${dropoffCityCode}`
+        const nationalRate = NATIONAL_RATES[routeKey]
+        
+        if (nationalRate) {
+            transportRate = nationalRate.ratePerKm
+            transportCost = totalDistance * transportRate
+            if (nationalRate.minAmount && transportCost < nationalRate.minAmount) {
+                transportCost = nationalRate.minAmount
+            }
         } else {
-            // Fallback: A->B + 30km overhead
-            totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
+            // Fallback for undefined routes
+            transportRate = 35 
+            transportCost = totalDistance * transportRate
         }
-
-        transportCost = (totalDistance * vehicle.ratePerKm)
-        volumeCost = (totalVolumeCuFt * vehicle.ratePerCuFt)
-
-        // Enforce Local Minimum Charge (R3025.00)
-        // Applies to combined Transport + Volume costs
-        const MIN_LOCAL_CHARGE = 3025
-        const combinedCost = transportCost + volumeCost
-        if (combinedCost < MIN_LOCAL_CHARGE && combinedCost > 0) {
-            // Increase transport cost to meet the minimum
-            transportCost = MIN_LOCAL_CHARGE - volumeCost
-        }
+        
+        volumeCost = 0 // National has no ft3 charge in flat rate mode
+        volumeRate = 0
+        vehicleName = 'Standard National Link'
+    } else {
+        // Local logic: Vehicle selection by volume + ft3 charge
+        const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
+        const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
+        const vehicle = vehicleList.find(v => v.capacityCuFt >= totalVolumeCuFt) || vehicleList[vehicleList.length - 1]
+        
+        transportRate = vehicle.ratePerKm || 0
+        volumeRate = vehicle.ratePerCuFt || 0
+        
+        transportCost = totalDistance * transportRate
+        volumeCost = totalVolumeCuFt * volumeRate
+        vehicleName = vehicle.name
     }
 
-    // Access Fees
     let accessFees = 0
-    const checkAccess = (loc) => {
-        if (loc.elevator) accessFees += 300
-        if (loc.stairs) accessFees += (loc.floorLevel || 0) * 200  // R200 per floor
-        if (loc.longCarry) accessFees += 500
-        if (loc.shuttle) accessFees += 1500
+    const addAccess = (loc) => {
+        if (loc?.elevator) accessFees += 300
+        if (loc?.stairs) accessFees += (loc.floorLevel || 0) * 200
+        if (loc?.specialConditions?.panhandle) accessFees += 500
+        if (loc?.specialConditions?.hoisting) accessFees += 1200
+        if (loc?.parkingType === 'shuttle') accessFees += 1500
+    }
+    if (accessDetails?.origin) addAccess(accessDetails.origin)
+    if (accessDetails?.destination) addAccess(accessDetails.destination)
+
+    let packagingCost = 0
+    if (moveDetails.packagingOption !== 'none') {
+        const rates = moveDetails.packagingOption === 'boxes_only' 
+            ? PACKAGING_RATES.sendingBoxesOnly 
+            : PACKAGING_RATES.boxesAndPacking
+            
+        const st7Cost = (moveDetails.st7Boxes || 0) * rates.st7
+        const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
+        packagingCost = st7Cost + linenCost + rates.deliveryFee
     }
 
-    if (accessDetails?.origin) checkAccess(accessDetails.origin)
-    if (accessDetails?.destination) checkAccess(accessDetails.destination)
-
-    // Get move date for service charge and discount calculations
-    const moveDateStr = moveDetails.moveDate
-
-    // Service Charges (based on Master Movers pricing structure)
-    let serviceCharges = 0
-
-    // 1. Documentation Fee (always applied, unless overridden)
-    const documentationFee = manualServiceCharges.documentationFee !== undefined
-        ? Number(manualServiceCharges.documentationFee)
-        : 175
-    serviceCharges += documentationFee
-
-    // 2. Weekend/Holiday Surcharge (Saturday or Sunday)
-    let weekendSurcharge = 0
-    if (manualServiceCharges.weekendSurcharge !== undefined) {
-        weekendSurcharge = Number(manualServiceCharges.weekendSurcharge)
-        serviceCharges += weekendSurcharge
-    } else if (moveDateStr) {
-        const date = new Date(moveDateStr)
-        const dayOfWeek = date.getDay() // 0 = Sunday, 6 = Saturday
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            weekendSurcharge = 440
-            serviceCharges += weekendSurcharge
-        }
-    }
-
-    // 3. Packing Materials
-    const packingMaterials = accessDetails?.packingMaterials || 0
-    serviceCharges += packingMaterials
-
-    // 4. Other Manual Service Charges
-    Object.entries(manualServiceCharges).forEach(([key, val]) => {
-        if (key !== 'documentationFee' && key !== 'weekendSurcharge') {
-            serviceCharges += (Number(val) || 0)
-        }
-    })
-
-    // Define Subtotal (Base rate before discount/vat)
-    const subTotal = transportCost + volumeCost + accessFees + serviceCharges
-
-    // Check for Mid-Month Discount (5th - 24th)
+    const subTotal = transportCost + volumeCost + accessFees + autoPackagingCost + packagingCost + (PRICING_CONSTANTS.documentationFee || 175)
+    
     let discount = 0
-    let discountType = null
-    if (moveDateStr) {
-        const date = new Date(moveDateStr)
-        const day = date.getDate()
-        // Check if day is between 5 and 24 (inclusive)
-        if (day >= 5 && day <= 24) {
-            discount = subTotal * 0.10 // 10% off subTotal
-            discountType = 'Mid-Month Madness (10%)'
-        }
+    if (moveDetails.moveDate) {
+        const day = new Date(moveDetails.moveDate).getDate()
+        if (day >= 5 && day <= 24) discount = subTotal * 0.10
     }
 
     const subTotalAfterDiscount = subTotal - discount
@@ -364,25 +336,22 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const total = subTotalAfterDiscount + vat
 
     return {
-        totalVolume, // Return original m3 for display
-        totalVolumeCuFt, // Useful for debugging
+        total,
         subTotal,
         discount,
-        discountType,
         vat,
-        total,
+        totalVolume,
+        totalVolumeCuFt,
         breakdown: {
-            vehicleType: isSharedLoad ? 'Shared Load' : vehicle.name,
-            isSharedLoad,
-            base: 0, // No longer using fixed base rate
+            vehicleType: vehicleName,
             transport: transportCost,
             volume: volumeCost,
             access: accessFees,
-            serviceCharges: serviceCharges,
-            documentationFee: documentationFee,
-            weekendSurcharge: weekendSurcharge,
-            packingMaterials: packingMaterials,
-            distance: totalDistance
+            packaging: packagingCost + autoPackagingCost,
+            distance: totalDistance,
+            transportRate: transportRate,
+            volumeRate: volumeRate,
+            isSharedLoad: isNationalMove && totalVolumeCuFt < 850
         }
     }
 }

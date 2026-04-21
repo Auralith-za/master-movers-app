@@ -10,8 +10,8 @@ export default function CarMovingPage() {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-900 opacity-90" />
                     <img
-                        src="https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=2000&auto=format&fit=crop"
-                        alt="Car Carrier on Highway"
+                        src="https://images.unsplash.com/photo-1542361345-89e58247f2d5?auto=format&fit=crop&q=80&w=2000"
+                        alt="Luxury Car Transport"
                         className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
                     />
                 </div>

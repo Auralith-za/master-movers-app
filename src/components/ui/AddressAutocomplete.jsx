@@ -35,7 +35,7 @@ export default function AddressAutocomplete({
 
         const options = {
             componentRestrictions: { country: "za" }, // Restrict to South Africa
-            fields: ["formatted_address", "geometry", "name"],
+            fields: ["formatted_address", "geometry", "name", "address_components"],
             types: ["address"], // Only addresses
         }
 
@@ -49,13 +49,23 @@ export default function AddressAutocomplete({
 
             // If user selects a prediction
             if (place.formatted_address) {
-                // Determine the value to send back. 
-                // We mainly want the string address, but could pass the Place object if needed.
-                // For now, mimicking standard input event
+                // Extract city/locality
+                let city = "";
+                if (place.address_components) {
+                    const locality = place.address_components.find(c => 
+                        c.types.includes("locality") || 
+                        c.types.includes("sublocality") ||
+                        c.types.includes("administrative_area_level_2")
+                    );
+                    if (locality) city = locality.long_name;
+                }
+
+                // For now, mimicking standard input event but adding metadata
                 const event = {
                     target: {
                         name: name,
-                        value: place.formatted_address
+                        value: place.formatted_address,
+                        city: city
                     }
                 }
                 onChange(event)

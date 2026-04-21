@@ -10,8 +10,10 @@ export default function DashboardPage() {
     const [stats, setStats] = useState({
         totalRevenue: 0,
         pendingRevenue: 0,
+        rejectedRevenue: 0,
         activeLeads: 0,
-        pendingLeads: 0
+        pendingLeads: 0,
+        rejectedLeads: 0
     })
 
     useEffect(() => {
@@ -39,23 +41,28 @@ export default function DashboardPage() {
 
     const calculateStats = (data) => {
         const totalRev = data.reduce((acc, curr) => {
-            // Processing/Paid -> Count as Revenue
-            // Pending -> Count as Pending Revenue
             return acc + (curr.status === 'paid' ? (Number(curr.total_price) || 0) : 0)
         }, 0)
 
         const pendingRev = data.reduce((acc, curr) => {
-            return acc + (curr.status !== 'paid' ? (Number(curr.total_price) || 0) : 0)
+            return acc + (curr.status !== 'paid' && curr.status !== 'rejected' ? (Number(curr.total_price) || 0) : 0)
+        }, 0)
+
+        const rejectedRev = data.reduce((acc, curr) => {
+            return acc + (curr.status === 'rejected' ? (Number(curr.total_price) || 0) : 0)
         }, 0)
 
         const active = data.length
-        const pending = data.filter(q => q.status !== 'paid').length
+        const pending = data.filter(q => q.status !== 'paid' && q.status !== 'rejected').length
+        const rejected = data.filter(q => q.status === 'rejected').length
 
         setStats({
             totalRevenue: totalRev,
             pendingRevenue: pendingRev,
+            rejectedRevenue: rejectedRev,
             activeLeads: active,
-            pendingLeads: pending
+            pendingLeads: pending,
+            rejectedLeads: rejected
         })
     }
 
@@ -138,6 +145,14 @@ export default function DashboardPage() {
                     subValue="Total inquiries"
                     color="text-blue-500"
                     bg="bg-blue-50"
+                />
+                <StatCard
+                    icon={AlertCircle}
+                    label="Rejected Revenue"
+                    value={`R ${stats.rejectedRevenue.toLocaleString()}`}
+                    subValue={`${stats.rejectedLeads} rejected quotes`}
+                    color="text-red-500"
+                    bg="bg-red-50"
                 />
                 <StatCard
                     icon={FileText}
