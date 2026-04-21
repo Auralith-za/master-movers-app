@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { Truck } from 'lucide-react'
 import TruckVisual from './TruckVisual'
 
-export default function VolumeSummary({ items, inventory, children }) {
+export default function VolumeSummary({ items, inventory, packagingCost = 0, children }) {
     const totalVolume = useMemo(() => {
         return Object.entries(inventory).reduce((total, [idKey, qty]) => {
             const [itemId] = idKey.split('_')
@@ -16,7 +16,7 @@ export default function VolumeSummary({ items, inventory, children }) {
 
     return (
         <div
-            className="bg-slate-900 text-white rounded-2xl shadow-xl sticky top-24 flex flex-col overflow-hidden"
+            className="bg-slate-900 text-white rounded-2xl shadow-xl sticky top-24 flex flex-col overflow-hidden transition-all duration-300"
             style={{ maxHeight: 'calc(100vh - 7rem)' }}
         >
             {/* Header — never scrolls */}
@@ -42,6 +42,14 @@ export default function VolumeSummary({ items, inventory, children }) {
                 </div>
                 <p className="text-[11px] text-white font-bold mt-1">Pay in 4 interest-free installments</p>
             </div>
+
+            {/* Packaging Cost Summary */}
+            {packagingCost > 0 && (
+                <div className="px-6 py-3 bg-red-950/40 border-y border-red-500/20 flex justify-between items-center animate-in slide-in-from-right-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">Protective Packaging</span>
+                    <span className="text-sm font-black text-red-400">R {packagingCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+            )}
 
             {/* Item list — scrolls independently if it overflows */}
             <div className="flex-1 overflow-y-auto min-h-0 border-t border-slate-700 px-6 py-3 space-y-2 custom-scrollbar">

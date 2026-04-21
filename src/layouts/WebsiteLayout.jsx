@@ -13,7 +13,6 @@ export default function WebsiteLayout() {
                 <Outlet />
             </main>
             <Footer />
-            <MoveAssistantChat />
             <FloatingCallButton />
         </div>
     )

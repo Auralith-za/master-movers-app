@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Label } from '../../components/ui/Label'
@@ -36,6 +36,9 @@ const Tooltip = ({ text }) => (
 export default function Step2Access() {
     const navigate = useNavigate()
     const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails } = useMoveStore()
+    const location = useLocation()
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
+                     location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
 
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
@@ -385,8 +388,8 @@ export default function Step2Access() {
                 </div>
 
                 <div className="bg-gray-50 px-8 py-6 border-t border-gray-100 flex justify-between items-center">
-                    <Button variant="ghost" className="font-bold text-slate-400 hover:text-red-600" onClick={() => navigate('/quote')}>Back</Button>
-                    <Button size="lg" className="bg-red-600 hover:bg-red-700 px-12 py-7 uppercase tracking-widest font-black text-sm shadow-xl shadow-red-600/20" onClick={() => navigate('/quote/inventory')}>
+                    <Button variant="ghost" className="font-bold text-slate-400 hover:text-red-600" onClick={() => navigate(basePath)}>Back</Button>
+                    <Button size="lg" className="bg-red-600 hover:bg-red-700 px-12 py-7 uppercase tracking-widest font-black text-sm shadow-xl shadow-red-600/20" onClick={() => navigate(`${basePath}/inventory`)}>
                         Next: Inventory <Truck className="ml-2" size={18} />
                     </Button>
                 </div>

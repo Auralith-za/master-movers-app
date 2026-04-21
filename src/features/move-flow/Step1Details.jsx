@@ -1,5 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -10,6 +10,8 @@ import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2 } from 'lucide-
 export default function Step1Details() {
     const navigate = useNavigate()
     const { moveDetails, setMoveDetails } = useMoveStore()
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
+                     location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
 
     const handleChange = (e) => {
         const { name, value, city } = e.target
@@ -47,7 +49,7 @@ export default function Step1Details() {
     const handleSubmit = (e) => {
         e.preventDefault()
         // Basic validation could go here
-        navigate('/quote/access')
+        navigate(`${basePath}/access`)
     }
 
     return (

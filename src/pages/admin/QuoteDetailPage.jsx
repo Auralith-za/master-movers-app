@@ -4,12 +4,14 @@ import { supabase } from '../../lib/supabaseClient'
 import { 
     ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, 
     Building, Package, Download, Save, X, Edit2, AlertCircle, 
-    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy
+    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 import { calculateQuote } from '../../features/inventory/store/moveStore'
 import { generateProfessionalQuote } from '../../services/pdfService'
+import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
+import { calculateTripDistances } from '../../services/googleMaps'
 import clsx from 'clsx'
 
 export default function QuoteDetailPage() {
@@ -21,14 +23,54 @@ export default function QuoteDetailPage() {
     const [editForm, setEditForm] = useState({})
     const [activities, setActivities] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
+    const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [newNote, setNewNote] = useState('')
 
     useEffect(() => {
-        if (id) {
+        if (id === 'new') {
+            setQuote({ id: 'new', status: 'lead', client_name: '', items_json: {} })
+            setEditForm({
+                client_name: '',
+                client_email: '',
+                client_phone: '',
+                pickup_address: '',
+                dropoff_address: '',
+                distance_km: 0,
+                move_date: new Date().toISOString().split('T')[0],
+                status: 'lead',
+                items_json: {},
+                total_price: 0,
+                total_volume: 0,
+                packaging_option: 'none',
+                st7_boxes: 0,
+                linen_boxes: 0,
+                insurance_enabled: false,
+                is_shared_load: false,
+                access_details: { 
+                    origin: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} }, 
+                    destination: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} } 
+                }
+            })
+            setIsEditing(true)
+            setLoading(false)
+        } else if (id) {
             fetchQuote()
             fetchActivities()
         }
     }, [id])
+
+    // Auto-calculate distance when addresses change
+    useEffect(() => {
+        if (isEditing && editForm.pickup_address && editForm.dropoff_address) {
+            calculateTripDistances(editForm.pickup_address, editForm.dropoff_address)
+                .then(({ totalDistance }) => {
+                    if (totalDistance !== editForm.distance_km) {
+                        setEditForm(prev => ({ ...prev, distance_km: totalDistance }))
+                    }
+                })
+                .catch(err => console.error("Admin auto-dist error:", err))
+        }
+    }, [editForm.pickup_address, editForm.dropoff_address, isEditing])
 
     const fetchQuote = async () => {
         try {
@@ -111,28 +153,27 @@ export default function QuoteDetailPage() {
         // Prepare data for calculateQuote
         const inventory = {}
         Object.entries(editForm.items_json || {}).forEach(([itemId, qty]) => {
-            const [id, variation] = itemId.split('_')
-            const item = INVENTORY_ITEMS.find(i => i.id === id)
-            if (item) {
-                inventory[itemId] = {
-                    ...item,
-                    quantity: Number(qty),
-                    id: itemId // keep the full key
-                }
-            }
+            inventory[itemId] = Number(qty)
         })
 
         const moveDetails = {
+            pickupAddress: editForm.pickup_address,
+            dropoffAddress: editForm.dropoff_address,
             pickupCity: editForm.pickup_address,
             dropoffCity: editForm.dropoff_address,
             distanceKm: editForm.distance_km,
             moveDate: editForm.move_date,
-            packagingOption: editForm.packaging_option || 'none'
+            moveDate: editForm.move_date,
+            packagingOption: editForm.packaging_option || 'none',
+            st7Boxes: editForm.st7_boxes || 0,
+            linenBoxes: editForm.linen_boxes || 0,
+            insuranceEnabled: editForm.insurance_enabled || false,
+            isSharedLoad: editForm.is_shared_load || false
         }
 
         const accessDetails = editForm.access_details || {}
         
-        return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS)
+        return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, editForm.manual_service_charges || {})
     }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, isEditing])
 
     const handleUpdateQuantity = (itemId, newQty) => {
@@ -145,46 +186,78 @@ export default function QuoteDetailPage() {
         setEditForm({ ...editForm, items_json: updatedItems })
     }
 
-    const handleAddItem = (item) => {
+    const handleAddItem = (item, variation = null) => {
+        if (item.variationOptions && !variation) {
+            setSelectedItemForVariation(item)
+            return
+        }
+
+        const idKey = variation ? `${item.id}_${variation}` : item.id
         const updatedItems = { ...editForm.items_json }
-        updatedItems[item.id] = (updatedItems[item.id] || 0) + 1
+        updatedItems[idKey] = (updatedItems[idKey] || 0) + 1
         setEditForm({ ...editForm, items_json: updatedItems })
+        setSelectedItemForVariation(null)
         setSearchQuery('')
     }
 
     const handleSave = async () => {
         try {
-            const finalPrice = recalculatedData?.total || editForm.total_price
-            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume
+            const finalPrice = recalculatedData?.total || editForm.total_price || 0
+            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
 
-            const { error } = await supabase
-                .from('quotes')
-                .update({
-                    client_name: editForm.client_name,
-                    client_phone: editForm.client_phone,
-                    client_email: editForm.client_email,
-                    pickup_address: editForm.pickup_address,
-                    dropoff_address: editForm.dropoff_address,
-                    move_date: editForm.move_date,
-                    status: editForm.status,
-                    rejection_reason: editForm.rejection_reason,
-                    team_notes: editForm.team_notes,
-                    items_json: editForm.items_json,
-                    total_price: finalPrice,
-                    total_volume: finalVolume,
-                    customer_comments: editForm.customer_comments
-                })
-                .eq('id', id)
+            const payload = {
+                client_name: editForm.client_name,
+                client_phone: editForm.client_phone,
+                client_email: editForm.client_email,
+                pickup_address: editForm.pickup_address,
+                dropoff_address: editForm.dropoff_address,
+                move_date: editForm.move_date,
+                status: editForm.status,
+                rejection_reason: editForm.rejection_reason,
+                team_notes: editForm.team_notes,
+                items_json: editForm.items_json,
+                total_price: finalPrice,
+                total_volume: finalVolume,
+                customer_comments: editForm.customer_comments,
+                access_details: editForm.access_details,
+                packaging_option: editForm.packaging_option,
+                st7_boxes: editForm.st7_boxes,
+                linen_boxes: editForm.linen_boxes,
+                insurance_enabled: editForm.insurance_enabled,
+                is_shared_load: editForm.is_shared_load
+            }
+
+            let error
+            let newId = id
+            if (id === 'new') {
+                const { data, error: err } = await supabase
+                    .from('quotes')
+                    .insert([payload])
+                    .select()
+                error = err
+                if (data?.[0]) newId = data[0].id
+            } else {
+                const { error: err } = await supabase
+                    .from('quotes')
+                    .update(payload)
+                    .eq('id', id)
+                error = err
+            }
 
             if (error) throw error
 
-            setQuote({ ...editForm, total_price: finalPrice, total_volume: finalVolume })
-            await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toFixed(2)}`)
-            setIsEditing(false)
-            alert('Quote updated successfully!')
+            if (id === 'new') {
+                alert('Quote created successfully!')
+                navigate(`/admin/quotes/${newId}`)
+            } else {
+                setQuote({ ...editForm, total_price: finalPrice, total_volume: finalVolume })
+                await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`)
+                setIsEditing(false)
+                alert('Quote updated successfully!')
+            }
         } catch (error) {
-            console.error('Error updating quote:', error)
-            alert('Failed to update quote')
+            console.error('Error saving quote:', error)
+            alert('Failed to save quote: ' + error.message)
         }
     }
 
@@ -267,7 +340,9 @@ export default function QuoteDetailPage() {
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-bold text-slate-900">Quote #{quote.id.toString().substring(0, 6)}</h1>
+                        <h1 className="text-3xl font-bold text-slate-900">
+                            {id === 'new' ? 'New Manual Quote' : `Quote #${quote.id.toString().substring(0, 6)}`}
+                        </h1>
                         <span className={clsx(
                             "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
                             quote.status === 'booked' ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"
@@ -280,7 +355,18 @@ export default function QuoteDetailPage() {
                             </span>
                         )}
                     </div>
-                    <p className="text-slate-500 mt-1">Submission via: <span className="font-semibold text-slate-700 uppercase">{quote.items_json?.submission_type || 'QuoteWizard'}</span></p>
+                    {isEditing && (
+                        <div className="flex items-center gap-4 mt-2">
+                             <label className="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                                <input 
+                                    type="checkbox" 
+                                    checked={editForm.is_shared_load}
+                                    onChange={e => setEditForm({...editForm, is_shared_load: e.target.checked})}
+                                />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Shared Load / Part-Move</span>
+                            </label>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex gap-2">
@@ -312,39 +398,125 @@ export default function QuoteDetailPage() {
                 {/* LEFT COL - DETAILS & INVENTORY */}
                 <div className="lg:col-span-2 space-y-6">
 
+                    {/* SECTION 1: CLIENT & SERVICE OPTIONS */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">1</div>
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <User size={20} className="text-primary-600" /> Client & Service Options
+                            </h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Full Name</label>
+                                    {isEditing ? (
+                                        <input 
+                                            className="w-full text-sm border border-gray-200 rounded px-3 py-1.5 focus:border-indigo-500 outline-none"
+                                            value={editForm.client_name || ''}
+                                            onChange={e => setEditForm({...editForm, client_name: e.target.value})}
+                                        />
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-900">{quote.client_name}</p>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Email</label>
+                                        {isEditing ? (
+                                            <input className="w-full text-xs border border-gray-100 rounded p-2" value={editForm.client_email || ''} onChange={e => setEditForm({...editForm, client_email: e.target.value})} />
+                                        ) : (
+                                            <p className="text-xs text-slate-600">{quote.client_email}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Phone</label>
+                                        {isEditing ? (
+                                            <input className="w-full text-xs border border-gray-100 rounded p-2" value={editForm.client_phone || ''} onChange={e => setEditForm({...editForm, client_phone: e.target.value})} />
+                                        ) : (
+                                            <p className="text-xs text-slate-600">{quote.client_phone}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-slate-50 rounded-xl space-y-4 border border-slate-100">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-indigo-400 mb-2 block">Packaging Service</label>
+                                    {isEditing ? (
+                                        <select 
+                                            className="w-full text-xs border border-gray-200 rounded p-2 bg-white"
+                                            value={editForm.packaging_option}
+                                            onChange={e => setEditForm({...editForm, packaging_option: e.target.value})}
+                                        >
+                                            <option value="none">No Packaging (User Packs)</option>
+                                            <option value="boxes_only">Supply Boxes Only</option>
+                                            <option value="boxes_and_packing">Full Packaging (Boxes + Packing)</option>
+                                        </select>
+                                    ) : (
+                                        <span className="text-xs font-bold text-slate-900 uppercase">{quote.packaging_option}</span>
+                                    )}
+                                </div>
+                                {editForm.packaging_option !== 'none' && isEditing && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">ST7 Boxes</label>
+                                            <input type="number" className="w-full p-2 border border-blue-100 rounded bg-white text-xs" value={editForm.st7_boxes || 0} onChange={e => setEditForm({...editForm, st7_boxes: parseInt(e.target.value) || 0})} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">Linen Boxes</label>
+                                            <input type="number" className="w-full p-2 border border-blue-100 rounded bg-white text-xs" value={editForm.linen_boxes || 0} onChange={e => setEditForm({...editForm, linen_boxes: parseInt(e.target.value) || 0})} />
+                                        </div>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="flex items-center gap-2 cursor-pointer pt-2">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editForm.insurance_enabled}
+                                            onChange={e => setEditForm({...editForm, insurance_enabled: e.target.checked})}
+                                            disabled={!isEditing}
+                                        />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Add MasterCare Insurance</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* DUAL COMMENTS SECTION */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                <MessageCircle size={18} className="text-red-500" /> Customer Comments (Front)
+                                <MessageCircle size={18} className="text-red-500" /> Customer Comments
                             </h3>
                             {isEditing ? (
                                 <textarea
-                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
                                     value={editForm.customer_comments || ''}
                                     onChange={e => setEditForm({...editForm, customer_comments: e.target.value})}
-                                    placeholder="Comments visible to client..."
+                                    placeholder="Visible to client..."
                                 />
                             ) : (
                                 <p className="text-sm text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-100 italic">
-                                    {quote.customer_comments || "No comments from client."}
+                                    {quote.customer_comments || "No comments."}
                                 </p>
                             )}
                         </div>
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                <Lock size={18} className="text-indigo-500" /> Internal Team Notes (Back)
+                                <Lock size={18} className="text-indigo-500" /> Internal Notes
                             </h3>
                             {isEditing ? (
                                 <textarea
-                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[100px] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    className="w-full border border-gray-200 rounded-lg p-3 text-sm min-h-[80px] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                                     value={editForm.team_notes || ''}
                                     onChange={e => setEditForm({...editForm, team_notes: e.target.value})}
-                                    placeholder="Internal notes ONLY..."
+                                    placeholder="Staff only..."
                                 />
                             ) : (
                                 <p className="text-sm text-slate-600 bg-indigo-50/30 p-4 rounded-lg border border-indigo-100">
-                                    {quote.team_notes || "No internal notes yet."}
+                                    {quote.team_notes || "No notes."}
                                 </p>
                             )}
                         </div>
@@ -353,9 +525,12 @@ export default function QuoteDetailPage() {
                     {/* INVENTORY EDITOR */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                <Package size={20} className="text-primary-600" /> Inventory Breakdown
-                            </h3>
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">4</div>
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <Package size={20} className="text-primary-600" /> Inventory Breakdown
+                                </h3>
+                            </div>
                             {isEditing && (
                                 <div className="relative">
                                     <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500">
@@ -367,17 +542,38 @@ export default function QuoteDetailPage() {
                                             onChange={e => setSearchQuery(e.target.value)}
                                         />
                                     </div>
-                                    {filteredItems.length > 0 && (
+                                    {filteredItems.length > 0 && searchQuery.length >= 2 && (
                                         <div className="absolute right-0 top-full mt-1 w-64 bg-white shadow-xl border border-gray-100 rounded-lg z-50 p-1 overflow-hidden">
                                             {filteredItems.map(item => (
                                                 <button 
                                                     key={item.id}
                                                     onClick={() => handleAddItem(item)}
-                                                    className="w-full text-left p-2 hover:bg-slate-50 text-sm rounded transition-colors"
+                                                    className="w-full text-left p-2 hover:bg-slate-50 text-sm rounded transition-colors flex justify-between items-center"
                                                 >
-                                                    {item.name} ({item.volume}ft³)
+                                                    <span>{item.name} ({item.volume}ft³)</span>
+                                                    <Plus size={14} className="text-slate-300" />
                                                 </button>
                                             ))}
+                                        </div>
+                                    )}
+
+                                    {selectedItemForVariation && (
+                                        <div className="absolute top-full right-0 w-64 bg-slate-900 text-white rounded-lg shadow-xl mt-1 z-50 p-4 animate-in fade-in zoom-in-95">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Select Variation</h4>
+                                            <p className="text-xs font-bold mb-3">{selectedItemForVariation.name}</p>
+                                            <div className="space-y-1">
+                                                {selectedItemForVariation.variationOptions.map(opt => (
+                                                    <button 
+                                                        key={opt}
+                                                        onClick={() => handleAddItem(selectedItemForVariation, opt)}
+                                                        className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold hover:bg-white/10 rounded transition-colors flex justify-between items-center"
+                                                    >
+                                                        {opt}
+                                                        <Plus size={10} />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button onClick={() => setSelectedItemForVariation(null)} className="w-full mt-4 text-[9px] uppercase font-black text-slate-500 hover:text-white">Cancel</button>
                                         </div>
                                     )}
                                 </div>
@@ -435,20 +631,23 @@ export default function QuoteDetailPage() {
                         </div>
                     </div>
 
-                    {/* ADDRESSES & TRIP */}
+                    {/* SECTION 2: ADDRESSES & TRIP */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-                            <MapPin size={20} className="text-primary-600" /> Logistics Details
-                        </h3>
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">2</div>
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <MapPin size={20} className="text-primary-600" /> Route & Logistics
+                            </h3>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pickup Address</label>
                                     {isEditing ? (
-                                        <input 
-                                            className="w-full text-sm border-b border-gray-300 focus:border-indigo-500 outline-none pb-1"
+                                        <AddressAutocomplete 
+                                            placeholder="Start typing pickup address..."
                                             value={editForm.pickup_address || ''}
-                                            onChange={e => setEditForm({...editForm, pickup_address: e.target.value})}
+                                            onChange={e => setEditForm({...editForm, pickup_address: e.target.value, pickup_city: e.target.city})}
                                         />
                                     ) : (
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote.pickup_address}</p>
@@ -457,12 +656,15 @@ export default function QuoteDetailPage() {
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
                                     <Calendar size={14} className="text-slate-400" />
                                     {isEditing ? (
-                                        <input 
-                                            type="date"
-                                            className="text-sm font-medium border-none outline-none bg-indigo-50 rounded px-2"
-                                            value={editForm.move_date || ''}
-                                            onChange={e => setEditForm({...editForm, move_date: e.target.value})}
-                                        />
+                                        <div className="flex-1">
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">Move Date</label>
+                                            <input 
+                                                type="date"
+                                                className="w-full text-sm font-medium border-b border-gray-100 outline-none pb-1"
+                                                value={editForm.move_date || ''}
+                                                onChange={e => setEditForm({...editForm, move_date: e.target.value})}
+                                            />
+                                        </div>
                                     ) : (
                                         <p className="text-sm font-bold text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</p>
                                     )}
@@ -472,10 +674,10 @@ export default function QuoteDetailPage() {
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Dropoff Address</label>
                                     {isEditing ? (
-                                        <input 
-                                            className="w-full text-sm border-b border-gray-300 focus:border-indigo-500 outline-none pb-1"
+                                        <AddressAutocomplete 
+                                            placeholder="Start typing dropoff address..."
                                             value={editForm.dropoff_address || ''}
-                                            onChange={e => setEditForm({...editForm, dropoff_address: e.target.value})}
+                                            onChange={e => setEditForm({...editForm, dropoff_address: e.target.value, dropoff_city: e.target.city})}
                                         />
                                     ) : (
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote.dropoff_address}</p>
@@ -483,9 +685,129 @@ export default function QuoteDetailPage() {
                                 </div>
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
                                     <Truck size={14} className="text-slate-400" />
-                                    <p className="text-sm font-bold text-slate-800">{quote.distance_km} km total trip</p>
+                                    <div>
+                                        <label className="text-[9px] uppercase font-bold text-slate-400">Billable Distance</label>
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="number"
+                                                className="w-16 font-bold text-slate-800 text-sm border-none bg-transparent p-0 outline-none"
+                                                value={Number(isEditing ? editForm.distance_km : quote.distance_km).toFixed(1)}
+                                                onChange={e => setEditForm({...editForm, distance_km: parseFloat(e.target.value) || 0})}
+                                            />
+                                            <span className="text-sm text-slate-400">km</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION 3: SITE ACCESS DETAILS */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">3</div>
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <Building size={20} className="text-primary-600" /> Site Access & Challenges
+                            </h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {['origin', 'destination'].map(loc => (
+                                <div key={loc} className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                        {loc === 'origin' ? 'Pickup' : 'Dropoff'} Access
+                                        <div className={`w-2 h-2 rounded-full ${loc === 'origin' ? 'bg-red-500' : 'bg-slate-900'}`} />
+                                    </h4>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">Floor Level</label>
+                                            <input 
+                                                type="number"
+                                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-indigo-500 outline-none"
+                                                value={editForm.access_details?.[loc]?.floorLevel || 0}
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details }
+                                                    details[loc] = { ...details[loc], floorLevel: parseInt(e.target.value) || 0 }
+                                                    setEditForm({...editForm, access_details: details})
+                                                }}
+                                                disabled={!isEditing}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">Truck Parking</label>
+                                            <select 
+                                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-indigo-500 outline-none"
+                                                value={editForm.access_details?.[loc]?.parkingType || 'driveway'}
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details }
+                                                    details[loc] = { ...details[loc], parkingType: e.target.value }
+                                                    setEditForm({...editForm, access_details: details})
+                                                }}
+                                                disabled={!isEditing}
+                                            >
+                                                <option value="driveway">Driveway</option>
+                                                <option value="street">Street Parking</option>
+                                                <option value="panhandle">Panhandle</option>
+                                                <option value="loading_bay">Loading Bay</option>
+                                                <option value="secure_complex">Inside Complex</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <input 
+                                                type="checkbox"
+                                                className="w-4 h-4 text-indigo-600 rounded"
+                                                checked={editForm.access_details?.[loc]?.elevator || false}
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details }
+                                                    details[loc] = { ...details[loc], elevator: e.target.checked }
+                                                    setEditForm({...editForm, access_details: details})
+                                                }}
+                                                disabled={!isEditing}
+                                            />
+                                            <span className="text-[10px] font-bold uppercase text-slate-600 group-hover:text-slate-900 transition-colors">Lift Available</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <input 
+                                                type="checkbox"
+                                                className="w-4 h-4 text-indigo-600 rounded"
+                                                checked={editForm.access_details?.[loc]?.specialConditions?.longCarry || false}
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details }
+                                                    const currentCond = details[loc].specialConditions || {}
+                                                    details[loc] = { ...details[loc], specialConditions: { ...currentCond, longCarry: e.target.checked } }
+                                                    setEditForm({...editForm, access_details: details})
+                                                }}
+                                                disabled={!isEditing}
+                                            />
+                                            <span className="text-[10px] font-bold uppercase text-slate-600 group-hover:text-slate-900 transition-colors">Long Carry (+20m)</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-200/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Hoisting Req?</span>
+                                            <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.hoisting || false} onChange={e => {
+                                                const details = { ...editForm.access_details };
+                                                const cond = details[loc].specialConditions || {};
+                                                details[loc] = { ...details[loc], specialConditions: { ...cond, hoisting: e.target.checked } };
+                                                setEditForm({...editForm, access_details: details});
+                                            }} disabled={!isEditing} />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Narrow Passage?</span>
+                                            <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.narrowPassage || false} onChange={e => {
+                                                const details = { ...editForm.access_details };
+                                                const cond = details[loc].specialConditions || {};
+                                                details[loc] = { ...details[loc], specialConditions: { ...cond, narrowPassage: e.target.checked } };
+                                                setEditForm({...editForm, access_details: details});
+                                            }} disabled={!isEditing} />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -507,6 +829,10 @@ export default function QuoteDetailPage() {
                             </div>
                             
                             <div className="mt-8 space-y-3 pt-6 border-t border-white/10">
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Assigned Vehicle</span>
+                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">{(isEditing ? recalculatedData?.breakdown?.vehicleType : quote.breakdown_json?.vehicleType) || 'Standard'}</span>
+                                </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Inventory Volume</span>
                                     <span className="text-white font-bold tracking-wide">{(isEditing ? recalculatedData?.totalVolume : quote.total_volume)?.toFixed(2)} m³</span>
@@ -581,7 +907,7 @@ export default function QuoteDetailPage() {
                                 />
                                 <button 
                                     onClick={handleSaveNote}
-                                    disabled={!newNote.trim()}
+                                    disabled={!newNote.trim() || id === 'new'}
                                     className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                                 >
                                     <Save size={18} />

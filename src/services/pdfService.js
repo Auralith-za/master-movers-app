@@ -171,7 +171,7 @@ export const generateProfessionalQuote = (data) => {
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text('MasterMovers NextGen - Professional Moving & Logistics', 105, 285, { align: 'center' });
-    doc.text('MasterMovers.co.za | +27 11 000 0000 | info@mastermovers.co.za', 105, 290, { align: 'center' });
+    doc.text('MasterMovers.co.za | +27 11 493 7569 | info@mastermovers.co.za', 105, 290, { align: 'center' });
 
     doc.save(`MasterMovers_Quote_${quoteId || 'New'}.pdf`);
 };

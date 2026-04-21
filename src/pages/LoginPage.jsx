@@ -16,10 +16,17 @@ export default function LoginPage() {
         e.preventDefault()
         setLoading(true)
 
-        // For demo purposes, allow a "backdoor" or mock login if auth is not configured
-        if ((email === 'admin@mastermovers.co.za' && password === 'admin') ||
-            (email === 'curt' && password === '1234') ||
-            (email === 'curt@cloudsplash.co.za' && password === '1234')) {
+        // Individual login support for Sales Team
+        const mockUsers = [
+            { email: 'admin@mastermovers.co.za', pass: 'admin' },
+            { email: 'curt@cloudsplash.co.za', pass: '1234' },
+            { email: 'sales1@mastermovers.co.za', pass: 'sales1' },
+            { email: 'sales2@mastermovers.co.za', pass: 'sales2' }
+        ]
+
+        const foundUser = mockUsers.find(u => u.email === email && u.pass === password)
+
+        if (foundUser || (email === 'curt' && password === '1234')) {
             // Fake successful login
             setTimeout(() => {
                 navigate('/admin')

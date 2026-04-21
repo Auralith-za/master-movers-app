@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
@@ -70,6 +70,9 @@ class ErrorBoundary extends React.Component {
 function Step4SummaryContent({ submissionType = 'standard' }) {
     const navigate = useNavigate()
     const { moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote, manualServiceCharges, updateManualServiceCharge } = useMoveStore()
+    const location = useLocation()
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
+                     location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
     const [searchParams, setSearchParams] = useSearchParams()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
@@ -110,8 +113,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     React.useEffect(() => {
         if (moveDetails.contactName && !searchParams.get('saved') && !isStep4Initialized.current) {
             isStep4Initialized.current = true
-            // Mapping: standard -> new, test -> lead
-            const initialStatus = submissionType === 'test' ? 'lead' : 'new'
+            // Mapping: standard -> new, test -> lead, admin -> lead
+            const initialStatus = (submissionType === 'test' || submissionType === 'admin') ? 'lead' : 'new'
 
             submitQuote({
                 status: initialStatus,
@@ -130,9 +133,16 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         try {
             // Save to backend — non-blocking: show payment regardless of result
             const result = await submitQuote({
-                status: 'pending_payment',
+                status: (submissionType === 'admin') ? 'lead' : 'pending_payment',
                 submission_type: submissionType
             })
+            
+            if (submissionType === 'admin' && result.success) {
+                alert('Manual Quote Created Successfully!')
+                navigate(`/admin/quotes/${result.data?.[0]?.id || ''}`)
+                return
+            }
+
             if (!result.success) {
                 console.warn('Backend save failed (non-blocking):', result.error)
             }
@@ -141,7 +151,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         } finally {
             setIsSubmitting(false)
         }
-        // Always show payment options
+        // Always show payment options for non-admin
         setSearchParams({ saved: 'true' })
     }
 
@@ -421,17 +431,21 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     onClick={handleProceed}
                                     isLoading={isSubmitting}
                                 >
-                                    <span className="font-black uppercase tracking-widest text-sm">Proceed to Payment</span>
-                                    <CreditCard size={18} className="opacity-70 group-hover:opacity-100 transition-opacity" />
+                                    <span className="font-black uppercase tracking-widest text-sm">
+                                        {submissionType === 'admin' ? 'Finalize Manual Quote' : 'Proceed to Payment'}
+                                    </span>
+                                    {submissionType === 'admin' ? <Send size={18} /> : <CreditCard size={18} className="opacity-70 group-hover:opacity-100 transition-opacity" />}
                                 </Button>
 
-                                <button
-                                    onClick={() => setShowRejectModal(true)}
-                                    disabled={isSubmitting}
-                                    className="w-full py-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] hover:bg-[#e31837] hover:border-[#e31837] transition-all shadow-lg text-center"
-                                >
-                                    Reject Payment / Pay Later
-                                </button>
+                                {submissionType !== 'admin' && (
+                                    <button
+                                        onClick={() => setShowRejectModal(true)}
+                                        disabled={isSubmitting}
+                                        className="w-full py-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] hover:bg-[#e31837] hover:border-[#e31837] transition-all shadow-lg text-center"
+                                    >
+                                        Reject Payment / Pay Later
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div id="payment-options" className="space-y-6 animate-in fade-in slide-in-from-top-4 scroll-mt-24">
@@ -621,7 +635,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         </ul>
                     </div>
 
-                    <Button variant="ghost" className="w-full" onClick={() => navigate('/quote/inventory')}>
+                    <Button variant="ghost" className="w-full" onClick={() => navigate(`${basePath}/inventory`)}>
                         Start Over / Edit Inventory
                     </Button>
                 </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useMoveStore } from '../inventory/store/moveStore'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS, CATEGORIES } from '../inventory/data/mockItems'
 import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'
@@ -12,7 +12,10 @@ import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
 
 export default function Step3Inventory() {
     const navigate = useNavigate()
-    const { inventory, addItem, removeItem, clearInventory, undo } = useMoveStore()
+    const location = useLocation()
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
+                     location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
+    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, undo } = useMoveStore()
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
 
@@ -21,30 +24,26 @@ export default function Step3Inventory() {
     const [crateModalItem, setCrateModalItem] = useState(null) // For optional crate popup
     const [warningModal, setWarningModal] = useState({ show: false, title: '', message: '', onConfirm: null })
 
-    const totalVolume = React.useMemo(() => {
-        return Object.entries(inventory).reduce((total, [idKey, qty]) => {
-            const [itemId] = idKey.split('_')
-            const item = INVENTORY_ITEMS.find(i => i.id === itemId)
-            return total + (item ? item.volume * qty : 0)
-        }, 0)
-    }, [inventory])
+    const { totalVolume, packagingCost, currentVehicleName } = React.useMemo(() => {
+        const result = calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
+        return {
+            totalVolume: result.totalVolumeCuFt,
+            packagingCost: result.packagingCost,
+            currentVehicleName: result.breakdown.vehicleType
+        }
+    }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
     const { currentVehicle, setCurrentVehicle } = useMoveStore()
 
+    const [lastVehicleName, setLastVehicleName] = useState(currentVehicleName)
+    
     // Truck Change Notification
     React.useEffect(() => {
-        // Calculate vehicle based on volume
-        const rates = LOCAL_VEHICLE_RATES[CITY_CODES?.JHB] || []
-        const newVehicle = rates.find(v => v.capacityCuFt >= totalVolume) || rates[rates.length - 1]
-
-        if (currentVehicle && newVehicle && newVehicle.id !== currentVehicle.id) {
-            const isUpped = newVehicle.capacityCuFt > currentVehicle.capacityCuFt
-            if (isUpped) {
-                alert(`🚛 TRUCK UPDATE:\n\nYour inventory now requires a ${newVehicle.name}.\n\nThe quote has been adjusted for the larger vehicle and additional crew required.`)
-            }
+        if (lastVehicleName && currentVehicleName && currentVehicleName !== lastVehicleName) {
+            alert(`🚛 TRUCK UPDATE:\n\nYou are now moving to a bigger truck with bigger capacity.\n\nYour inventory now requires a ${currentVehicleName}.\n\nThe quote has been adjusted for the larger vehicle and additional crew required.`)
         }
-        if (newVehicle) setCurrentVehicle(newVehicle)
-    }, [totalVolume, currentVehicle, setCurrentVehicle])
+        setLastVehicleName(currentVehicleName)
+    }, [currentVehicleName, lastVehicleName])
 
     const getQuantity = (itemId) => {
         return Object.entries(inventory)
@@ -112,7 +111,7 @@ export default function Step3Inventory() {
         if (totalVolume > VOLUME_THRESHOLD_FT3 && !showVolumeModal) {
             setShowVolumeModal(true)
         } else {
-            navigate('/quote/summary')
+            navigate(`${basePath}/summary`)
         }
     }
 
@@ -152,7 +151,7 @@ export default function Step3Inventory() {
                                 <Button
                                     variant="ghost"
                                     className="w-full text-slate-400 hover:text-red-600 font-semibold"
-                                    onClick={() => navigate('/quote/summary')}
+                                    onClick={() => navigate(`${basePath}/summary`)}
                                 >
                                     I know what I'm doing, complete quote
                                 </Button>
@@ -344,9 +343,8 @@ export default function Step3Inventory() {
                     </div>
                 </div>
 
-                {/* Right Column: Summary + Actions */}
                 <div className="lg:col-span-1">
-                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory}>
+                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory} packagingCost={packagingCost}>
                         <Button variant="primary" size="lg" className="w-full bg-[#e31837] hover:bg-[#c0152f] font-bold" onClick={handleProceed}>
                             View Quote Summary
                         </Button>
@@ -354,7 +352,7 @@ export default function Step3Inventory() {
                             <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center gap-2 border border-slate-700" onClick={() => undo()}>
                                 <RotateCcw size={14} /> Undo
                             </Button>
-                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800" onClick={() => navigate('/quote/access')}>
+                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800" onClick={() => navigate(`${basePath}/access`)}>
                                 Back
                             </Button>
                         </div>

@@ -11,8 +11,11 @@ export default function MoveWizard() {
     const location = useLocation()
     const navigate = useNavigate()
 
-    // Determine if we're in test mode based on current path
-    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : '/quote';
+    // Determine if we're in test mode or admin mode based on current path
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
+                     location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
+    
+    const isAdmin = basePath === '/admin/quotes/new';
 
     const STEPS = useMemo(() => [
         { id: 'details', label: 'Details', path: basePath },
@@ -29,8 +32,8 @@ export default function MoveWizard() {
         <div className="max-w-6xl mx-auto pb-20">
             {/* Stepper Header */}
             <div className="mb-8 max-w-4xl mx-auto text-center md:text-left">
-                <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Plan Your Move</h1>
-                <p className="text-slate-500">Get an instant quote in 4 easy steps.</p>
+                <h1 className="text-3xl font-extrabold text-slate-900 mb-2">{isAdmin ? 'Create Manual Quote' : 'Plan Your Move'}</h1>
+                <p className="text-slate-500">{isAdmin ? 'Step-by-step quote generation for internal processing.' : 'Get an instant quote in 4 easy steps.'}</p>
 
                 {/* Modern Stepper */}
                 <div className="mt-8 relative px-4">
@@ -97,7 +100,7 @@ export default function MoveWizard() {
                         <Route index element={<Step1Details />} />
                         <Route path="access" element={<Step2Access />} />
                         <Route path="inventory" element={<Step3Inventory />} />
-                        <Route path="summary" element={<Step4Summary submissionType={basePath === '/quote-test' ? 'test' : 'standard'} />} />
+                        <Route path="summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : (basePath === '/quote-test' ? 'test' : 'standard')} />} />
                     </Routes>
                 </motion.div>
             </AnimatePresence>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard } from 'lucide-react';
+import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
 import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
@@ -134,11 +134,40 @@ export default function QuoteReviewPage() {
                                     </div>
                                     <div className="flex items-center gap-2 text-slate-500 text-sm">
                                         <Truck size={16} />
-                                        <span>Distance: <strong className="text-slate-800">{quote.distance_km} km</strong></span>
+                                        <span>Distance: <strong className="text-slate-800">{quote.distance_km} km</strong> {quote.is_shared_load && <span className="ml-2 text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Shared Load</span>}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Move Services Card */}
+                        {(quote.packaging_option !== 'none' || quote.insurance_enabled) && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+                                <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                    <ShieldCheck size={20} className="text-emerald-500" /> Included Services
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {quote.packaging_option !== 'none' && (
+                                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                                            <Package className="text-red-600" size={24} />
+                                            <div>
+                                                <p className="text-xs font-black text-slate-900 uppercase">Packaging: {quote.packaging_option === 'boxes_only' ? 'Supplying Boxes' : 'Full Packing Service'}</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{quote.st7_boxes || 0}x ST7, {quote.linen_boxes || 0}x Linen</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {quote.insurance_enabled && (
+                                        <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <ShieldCheck className="text-emerald-600" size={24} />
+                                            <div>
+                                                <p className="text-xs font-black text-emerald-900 uppercase tracking-tight">MasterCare Protection</p>
+                                                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest leading-none mt-1">Comprehensive Cover Included</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Inventory Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
@@ -233,8 +262,11 @@ export default function QuoteReviewPage() {
 
                         {/* Support Card */}
                         <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100">
-                            <p className="text-xs text-slate-500 font-medium">Need help with this quote?</p>
-                            <a href="tel:+27110000000" className="text-slate-900 font-black mt-1 block">+27 11 000 0000</a>
+                            <p className="text-xs text-slate-500 font-medium mb-3">Questions about your quote?</p>
+                            <a href="tel:+27114937569" className="w-full py-3 bg-white text-slate-900 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2 mb-2">
+                                <Phone size={16} /> Contact a Human
+                            </a>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Office: +27 11 493 7569</p>
                         </div>
                     </div>
                 </div>

@@ -232,8 +232,11 @@ export const useMoveStore = create(
 )
 
 export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges = {}) => {
+    const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let autoPackagingCost = 0
+    let requiresCrateFlag = false
+    let requiresPhotoFlag = false
 
     Object.entries(inventory).forEach(([idKey, qty]) => {
         const [itemId] = idKey.split('_')
@@ -242,6 +245,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
             totalVolume += item.volume * qty
             if (item.autoPackagingType === 'Plastic Covers') autoPackagingCost += (qty * 145)
             if (item.autoPackagingType === 'Wrapping') autoPackagingCost += (qty * 75)
+            if (item.requiresCrate) requiresCrateFlag = true
+            if (item.requiresPhoto) requiresPhotoFlag = true
         }
     })
 
@@ -307,6 +312,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
         if (loc?.stairs) accessFees += (loc.floorLevel || 0) * 200
         if (loc?.specialConditions?.panhandle) accessFees += 500
         if (loc?.specialConditions?.hoisting) accessFees += 1200
+        if (loc?.specialConditions?.longCarry) accessFees += 800
         if (loc?.parkingType === 'shuttle') accessFees += 1500
     }
     if (accessDetails?.origin) addAccess(accessDetails.origin)
@@ -335,6 +341,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
     const vat = subTotalAfterDiscount * 0.15
     const total = subTotalAfterDiscount + vat
 
+    const needsConsultation = totalDistance > 100 || totalVolumeCuFt > 3600
+
     return {
         total,
         subTotal,
@@ -342,6 +350,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
         vat,
         totalVolume,
         totalVolumeCuFt,
+        packagingCost: packagingCost + autoPackagingCost,
+        requiresCrateFlag,
+        requiresPhotoFlag,
+        needsConsultation,
         breakdown: {
             vehicleType: vehicleName,
             transport: transportCost,
@@ -351,7 +363,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
             distance: totalDistance,
             transportRate: transportRate,
             volumeRate: volumeRate,
-            isSharedLoad: isNationalMove && totalVolumeCuFt < 850
+            isSharedLoad: sharedLoadPreference !== null ? sharedLoadPreference : (isNationalMove && totalVolumeCuFt < 850)
         }
     }
 }
