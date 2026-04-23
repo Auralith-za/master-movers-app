@@ -53,18 +53,31 @@ export default function QuotesPage() {
         return true
     })
 
-    const getWhatsAppLink = (quote) => {
-        const phone = quote.client_phone?.replace(/\s+/g, '').replace(/^0/, '27') // Basic format to Int format (South Africa)
-        if (!phone) return '#'
+    const handleAutomatedEmail = async (quote) => {
+        if (!quote.client_email) return;
+        
+        const confirmSend = confirm(`Send automated status update to ${quote.client_email}?`);
+        if (!confirmSend) return;
 
-        let message = `Hello ${quote.client_name}, this is MasterMovers.`
-        if (quote.status === 'new') {
-            message += ` I noticed you have a pending quote regarding your move from ${quote.pickup_address?.split(',')[0]}. Do you need any assistance completing the booking?`
-        } else {
-            message += ` Regarding your move scheduled for ${quote.move_date}...`
+        try {
+            const { sendEmail } = useMoveStore.getState();
+            const result = await sendEmail({
+                to: quote.client_email,
+                subject: `Update: Master Movers Quote #${quote.id.toString().substring(0, 6)}`,
+                clientName: quote.client_name,
+                quoteId: quote.id,
+                status: quote.status,
+                reviewLink: `${window.location.origin}/quote/review/${quote.id}`
+            });
+
+            if (result.success) {
+                alert('Email sent successfully!');
+            } else {
+                alert('Email automation request processed. Ensure mailbox is connected.');
+            }
+        } catch (error) {
+            alert('Error sending email.');
         }
-
-        return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
     }
 
     return (
@@ -172,15 +185,13 @@ export default function QuotesPage() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <a
-                                                href={getWhatsAppLink(quote)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-1.5 text-emerald-600 bg-emerald-50 rounded hover:bg-emerald-100"
-                                                title="WhatsApp Check-in"
+                                            <button
+                                                onClick={() => handleAutomatedEmail(quote)}
+                                                className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100"
+                                                title="Send Automated Update Email"
                                             >
-                                                <MessageCircle size={16} />
-                                            </a>
+                                                <Mail size={16} />
+                                            </button>
                                             <a
                                                 href={`mailto:${quote.client_email}`}
                                                 className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100"

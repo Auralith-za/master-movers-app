@@ -35,7 +35,7 @@ export default function TermsModal({ isOpen, onClose, onAccept }) {
                     </section>
                     <section>
                         <h3 className="font-bold text-slate-900 mb-2">4. Access & Surcharges</h3>
-                        <p>Prices assume standard access. Surcharges apply for long carries (>30m), stairs (above 1st floor without elevator), or required shuttle vehicles.</p>
+                        <p>Prices assume standard access. Surcharges apply for long carries (&gt;30m), stairs (above 1st floor without elevator), or required shuttle vehicles.</p>
                     </section>
                     <div className="bg-red-50 p-6 rounded-2xl border border-red-100 mt-4">
                         <p className="text-red-900 font-bold mb-4">I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above.</p>

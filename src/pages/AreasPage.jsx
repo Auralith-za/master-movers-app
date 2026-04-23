@@ -3,14 +3,14 @@ import { MapPin, Truck } from 'lucide-react'
 
 export default function AreasPage() {
     const branches = [
-        { city: 'Johannesburg', type: 'Head Office', address: 'Germiston, Gauteng' },
-        { city: 'Cape Town', type: 'Branch', address: 'Airport City, Western Cape' },
-        { city: 'Durban', type: 'Branch', address: 'Riverhorse Valley, KZN' },
+        { city: 'Johannesburg', type: 'Head Office', address: 'Gosforth Park, Germiston' },
+        { city: 'Cape Town', type: 'Branch', address: 'Epping, Cape Town' },
+        { city: 'Durban', type: 'Branch', address: 'Ballito, KZN' },
     ]
 
     const hubs = [
         'Pretoria', 'Bloemfontein', 'Port Elizabeth', 'East London',
-        'George', 'Nelspruit', 'Polokwane', 'Kimberley'
+        'George', 'Nelspruit', 'Polokwane', 'Kimberley', 'Garden Route'
     ]
 
     return (

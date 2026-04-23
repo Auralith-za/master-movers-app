@@ -11,6 +11,7 @@ import PayflexCheckout from '../payment/PayflexCheckout'
 import { event } from '../../lib/gtag'
 import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
 import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
+import clsx from 'clsx'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -92,22 +93,6 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
-
-    // Notify about discount
-    const alertedRef = React.useRef(false)
-    React.useEffect(() => {
-        if (discount > 0 && !alertedRef.current) {
-            alert("✨ Great News! ✨\n\nYour move falls between the 5th and 24th, so you've qualified for our Mid-Month Madness discount!\n\nA 10% discount has been applied to your quote.")
-            alertedRef.current = true
-        }
-    }, [discount])
-    
-    // Additional alerts for long distance
-    React.useEffect(() => {
-        if (needsConsultation) {
-            alert("📍 Point of Interest:\n\nOur system has detected that your pickup or dropoff location is more than 100km from our nearest hub.\n\nWhile we have provided an automated estimate, please note that for these distances, we recommend speaking directly with a sales consultant for the most accurate routing and pricing.")
-        }
-    }, [needsConsultation])
 
     // Auto-save on mount if not already saved
     React.useEffect(() => {
@@ -335,6 +320,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <div className="text-right">
                                 <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <div className="text-xs text-slate-400 uppercase tracking-widest">Incl. VAT</div>
+                                <div className="text-[10px] text-slate-500 mt-1 italic">* Pricing valid for 7 days from date of issue.</div>
                             </div>
                         </div>
                     </div>
@@ -377,6 +363,54 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             </div>
                         )}
 
+                        {/* Payment Method Selection */}
+                        <div className="pt-4 border-t border-gray-100 space-y-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Payment Method</h4>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                <label className={clsx(
+                                    "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                    moveDetails.paymentMethod === 'eft' ? "bg-slate-50 border-slate-900 shadow-sm" : "bg-white border-slate-100 hover:border-slate-200"
+                                )}>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="paymentMethod"
+                                            checked={moveDetails.paymentMethod === 'eft'}
+                                            onChange={() => setMoveDetails({ paymentMethod: 'eft' })}
+                                            className="w-4 h-4 text-slate-900 border-gray-300"
+                                        />
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">EFT / Debit Card</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">Standard Rate</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Free</span>
+                                </label>
+
+                                <label className={clsx(
+                                    "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                    moveDetails.paymentMethod === 'payflex' ? "bg-indigo-50 border-indigo-600 shadow-sm" : "bg-white border-slate-100 hover:border-slate-200"
+                                )}>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="paymentMethod"
+                                            checked={moveDetails.paymentMethod === 'payflex'}
+                                            onChange={() => setMoveDetails({ paymentMethod: 'payflex' })}
+                                            className="w-4 h-4 text-indigo-600 border-gray-300"
+                                        />
+                                        <div>
+                                            <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Payflex (Interest Free)</p>
+                                            <p className="text-[9px] text-indigo-600 font-bold uppercase">7% Surcharge applies</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">+7%</span>
+                                </label>
+                            </div>
+                        </div>
+
                         {/* Service Charges Editor */}
                         <div className="border-t border-gray-100 pt-4">
                             <button
@@ -386,7 +420,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 {showServices ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 {showServices ? 'Hide Service Charges' : 'Adjust Service Charges (Testing)'}
                             </button>
-
+                            
                             {showServices && (
                                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg animate-in fade-in slide-in-from-top-2">
                                     {SERVICE_KEYS.map(({ key, label }) => (
@@ -558,6 +592,36 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     </div>
                                 </div>
 
+                                {breakdown.crew > 0 && (
+                                    <div className="space-y-1 border-b border-white/10 pb-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50 uppercase">Specialist Crew:</span>
+                                            <span className="text-emerald-400 font-bold">R {breakdown.crew.toFixed(2)}</span>
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 italic">Heavy Item Surcharge (2x R700)</div>
+                                    </div>
+                                )}
+
+                                {breakdown.extraDistance > 0 && (
+                                    <div className="space-y-1 border-b border-white/10 pb-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50 uppercase">Extra Distance:</span>
+                                            <span className="text-emerald-400 font-bold">R {breakdown.extraDistance.toFixed(2)}</span>
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 italic uppercase tracking-wider">{breakdown.detailedExtraDistance}</div>
+                                    </div>
+                                )}
+
+                                {breakdown.access > 0 && (
+                                    <div className="space-y-1 border-b border-white/10 pb-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-white/50 uppercase">Access & Services:</span>
+                                            <span className="text-emerald-400 font-bold">R {breakdown.access.toFixed(2)}</span>
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 italic uppercase tracking-wider">{breakdown.detailedAccess}</div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <span className="text-white/50 uppercase block">Vehicle:</span>
@@ -638,6 +702,14 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     <Button variant="ghost" className="w-full" onClick={() => navigate(`${basePath}/inventory`)}>
                         Start Over / Edit Inventory
                     </Button>
+
+                    {/* Support Contact */}
+                    <div className="pt-6 border-t border-slate-100 mt-6 text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">Need immediate help with your quote?</p>
+                        <p className="text-sm font-black text-slate-900 group">
+                            Call us at any time: <a href="tel:+27114937569" className="text-red-600 hover:underline">+27 11 493 7569</a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

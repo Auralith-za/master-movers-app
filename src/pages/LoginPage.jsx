@@ -106,6 +106,11 @@ export default function LoginPage() {
                     <div className="text-center text-xs text-slate-400">
                         Demo Credentials: admin@mastermovers.co.za / admin <br /> OR curt@cloudsplash.co.za / 1234
                     </div>
+
+                    <div className="pt-6 border-t border-slate-100 mt-6 text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Need help? Call us at any time</p>
+                        <a href="tel:+27114937569" className="text-xs font-black text-slate-600 hover:text-red-600 transition-colors tracking-tight">+27 11 493 7569</a>
+                    </div>
                 </form>
             </div>
         </div>

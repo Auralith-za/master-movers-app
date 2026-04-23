@@ -23,8 +23,8 @@ export default function LeadsPage() {
             // Filter for leads client-side to handle missing columns gracefully
             const processedLeads = (data || []).filter(quote =>
                 quote.status === 'lead' ||
-                quote.request_call_back === true ||
-                quote.items_json?.request_call_back === true
+                Boolean(quote.request_call_back) === true ||
+                Boolean(quote.items_json?.request_call_back) === true
             )
             setLeads(processedLeads)
         } catch (error) {

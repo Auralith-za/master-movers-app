@@ -220,7 +220,30 @@ export default function Step2Access() {
                             checked={data.specialConditions?.securityGate}
                             onChange={() => handleSpecialCondition(locationType, 'securityGate')}
                         />
+                        <ConditionCheckbox
+                            label="Long Carry"
+                            tooltip="Required if the distance between the house and the truck is more than 30m."
+                            checked={data.specialConditions?.longCarry}
+                            onChange={() => handleSpecialCondition(locationType, 'longCarry')}
+                        />
                     </div>
+
+                    {data.specialConditions?.longCarry && (
+                        <div className="mb-4 p-4 bg-red-50 rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-2">
+                            <Label className="text-[10px] uppercase font-black text-red-600 tracking-widest mb-2 block">Distance from Truck (meters)</Label>
+                            <div className="flex items-center gap-3">
+                                <Input 
+                                    type="number" 
+                                    placeholder="e.g. 45"
+                                    value={data.longCarryDistance || ''}
+                                    onChange={(e) => handleUpdate(locationType, 'longCarryDistance', e.target.value)}
+                                    className="bg-white h-10"
+                                />
+                                <span className="text-xs font-bold text-slate-400 uppercase">meters</span>
+                            </div>
+                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: Distances over 30m incur a flat rate of R450.</p>
+                        </div>
+                    )}
 
                     <textarea
                         placeholder="Additional instructions? (e.g. 'Bad road', 'Contact security at gate'...)"
@@ -273,7 +296,7 @@ export default function Step2Access() {
                             />
                             <PackagingOptionCard
                                 id="boxes_only"
-                                title="Sending Boxes Only"
+                                title="Send Me Boxes Only"
                                 description="We deliver ST 7 & Linen boxes for you to pack."
                                 icon={Truck}
                                 selected={moveDetails.packagingOption === 'boxes_only'}

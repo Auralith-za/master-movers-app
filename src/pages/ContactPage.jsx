@@ -39,14 +39,17 @@ export default function ContactPage() {
                                     <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">JOHANNESBURG (Head Office)</h3>
                                     <p className="text-sm font-semibold text-slate-700">Master Movers Johannesburg</p>
                                     <p className="text-slate-500 text-sm mt-1 leading-relaxed">
-                                        17 Indianapolis Boulevard<br />
-                                        Raceway Industrial Park<br />
-                                        Gosforth Park, Germiston
+                                        17 Indianapolis Blvd,<br />
+                                        Gosforth Park, Germiston,<br />
+                                        1401
                                     </p>
                                     <div className="mt-3 space-y-2 text-sm">
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <Phone size={16} className="text-primary-500" />
-                                            <span>+27 11 493 7569</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Call us at any time</span>
+                                                <span className="font-bold">+27 11 493 7569</span>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <Mail size={16} className="text-primary-500" />
@@ -65,8 +68,9 @@ export default function ContactPage() {
                                     <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">CAPE TOWN</h3>
                                     <p className="text-sm font-semibold text-slate-700">Master Movers Cape Town</p>
                                     <p className="text-slate-500 text-sm mt-1 leading-relaxed">
-                                        Unit 1 Bosal Park, 77 Bofors Circle<br />
-                                        Epping Industria, Western Cape
+                                        Unit 1, Bosal Park,<br />
+                                        77 Bofors Cir, Epping,<br />
+                                        Cape Town, 7460
                                     </p>
                                     <div className="mt-3 space-y-2 text-sm">
                                         <div className="flex items-center gap-2 text-slate-600">
@@ -90,8 +94,8 @@ export default function ContactPage() {
                                     <h3 className="font-bold text-slate-900 border-b border-primary-100 pb-2 mb-2 inline-block">DURBAN</h3>
                                     <p className="text-sm font-semibold text-slate-700">Master Movers Kwazulu Natal</p>
                                     <p className="text-slate-500 text-sm mt-1 leading-relaxed">
-                                        Units 5 & 6 Raddical Park<br />
-                                        3 Gourly Road, Ballito, 4420
+                                        Units 5 & 6 Raddical Park,<br />
+                                        3 Gourly Rd, Ballito, 4420
                                     </p>
                                     <div className="mt-3 space-y-2 text-sm">
                                         <div className="flex items-center gap-2 text-slate-600">

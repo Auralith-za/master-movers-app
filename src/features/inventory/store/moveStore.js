@@ -28,7 +28,9 @@ export const useMoveStore = create(
                 packagingOption: 'none',
                 st7Boxes: 0,
                 linenBoxes: 0,
-                insuranceEnabled: false
+                insuranceEnabled: false,
+                paymentMethod: 'eft', // Default to EFT
+                tripBreakdown: null
             },
             lastSavedQuote: null,
             setMoveDetails: (details) =>
@@ -49,6 +51,7 @@ export const useMoveStore = create(
                     stairs: false,
                     shuttle: false,
                     longCarry: false,
+                    longCarryDistance: 0,
                     distanceFromDoor: '<10m',
                     notes: '',
                     specialConditions: {}
@@ -60,6 +63,7 @@ export const useMoveStore = create(
                     stairs: false,
                     shuttle: false,
                     longCarry: false,
+                    longCarryDistance: 0,
                     distanceFromDoor: '<10m',
                     notes: '',
                     specialConditions: {}
@@ -117,7 +121,8 @@ export const useMoveStore = create(
                 accessDetails: {}, 
                 inventory: {}, 
                 manualServiceCharges: {},
-                undoHistory: []
+                undoHistory: [],
+                lastSavedQuote: null
             }),
             clearInventory: () => set((state) => ({ inventory: {}, undoHistory: [...state.undoHistory, state.inventory] })),
             
@@ -140,48 +145,66 @@ export const useMoveStore = create(
             // Quote Submission & Management
             submitQuote: async (overrides = {}) => {
                 const state = get()
+                console.log('--- SUBMIT QUOTE TRIGGERED ---')
+                console.log('OVERRIDES:', overrides)
+                console.log('CURRENT STATE DETAILS:', state.moveDetails)
+                
                 const totals = calculateQuote(
                     state.inventory,
                     state.moveDetails,
                     state.accessDetails,
-                    [], // INVENTORY_ITEMS should be passed if available locally, but store doesn't have it
+                    [], // items will be passed from calculation engine
                     state.manualServiceCharges
                 )
 
+                // Strip non-DB control flags from overrides before building payload
+                const { forceNew, submission_type, contactName, contactEmail, contactPhone, ...dbOverrides } = overrides
+
+                // Build a clean payload with only known database columns
                 const quotePayload = {
-                    ...state.moveDetails,
-                    access_details: state.accessDetails,
-                    inventory: state.inventory,
-                    totals: {
-                        subtotal: totals.subTotal,
-                        vat: totals.vat,
-                        total: totals.total,
-                        discount: totals.discount,
-                        breakdown: totals.breakdown
-                    },
-                    status: overrides.status || 'new',
-                    ...overrides
+                    client_name: dbOverrides.client_name || overrides.contactName || state.moveDetails.contactName || '',
+                    client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
+                    client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
+                    pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
+                    dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
+                    distance_km: Number(dbOverrides.distance_km || state.moveDetails.distanceKm || 0),
+                    move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
+                    items_json: state.inventory,
+                    total_price: totals.total,
+                    status: dbOverrides.status || overrides.status || 'new',
+                    request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back),
                 }
+
+                console.log('SUBMITTING QUOTE PAYLOAD (clean):', quotePayload)
 
                 try {
                     let result
-                    if (state.lastSavedQuote?.id) {
+                    if (state.lastSavedQuote?.id && !overrides.forceNew) {
                         result = await supabase
                             .from('quotes')
                             .update(quotePayload)
                             .eq('id', state.lastSavedQuote.id)
                             .select()
                     } else {
+                        // For new inserts, remove the ID if it's a temp one
+                        const { id, ...insertPayload } = quotePayload
                         result = await supabase
                             .from('quotes')
-                            .insert([quotePayload])
+                            .insert([insertPayload])
                             .select()
                     }
 
+                    console.log('SUPABASE RAW RESULT:', result)
                     if (result.error) throw result.error
+
+                    if (!result.data || result.data.length === 0) {
+                        console.warn('SUPABASE: Record created but no data returned. Check RLS SELECT policy.')
+                        return { success: true, data: null }
+                    }
 
                     const savedQuote = result.data[0]
                     set({ lastSavedQuote: savedQuote })
+
                     return { success: true, data: savedQuote }
                 } catch (err) {
                     console.error('Submit Quote Error:', err)
@@ -212,10 +235,11 @@ export const useMoveStore = create(
                 }
             },
 
-            sendWhatsApp: async (payload) => {
+            sendEmail: async (payload) => {
                 try {
-                    const response = await fetch('/api/whatsapp', {
+                    const response = await fetch('/api/send-email', {
                         method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     })
                     return await response.json()
@@ -231,7 +255,7 @@ export const useMoveStore = create(
     )
 )
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges = {}) => {
+export const calculateQuote = (inventory, moveDetails, accessDetails, items, manualServiceCharges = {}) => {
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let autoPackagingCost = 0
@@ -240,7 +264,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
 
     Object.entries(inventory).forEach(([idKey, qty]) => {
         const [itemId] = idKey.split('_')
-        const item = INVENTORY_ITEMS.find(i => i.id === itemId)
+        const item = items.find(i => i.id === itemId)
         if (item) {
             totalVolume += item.volume * qty
             if (item.autoPackagingType === 'Plastic Covers') autoPackagingCost += (qty * 145)
@@ -258,14 +282,16 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
     const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(pickupAddress)
     const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(dropoffAddress)
     
-    // Force National if we detect cross-city keywords in addresses even if codes are missing
+    const totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
+
+    // Force National if we detect cross-city keywords OR distance is high
     const isNationalMove = (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) || 
+                          totalDistance > 150 ||
                           (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
                           (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
                           (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
                           (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg'))
-    
-    const totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
+
     let transportCost = 0
     let volumeCost = 0
     let vehicleName = ''
@@ -280,9 +306,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
         if (nationalRate) {
             transportRate = nationalRate.ratePerKm
             transportCost = totalDistance * transportRate
-            if (nationalRate.minAmount && transportCost < nationalRate.minAmount) {
-                transportCost = nationalRate.minAmount
-            }
+            // National logic is flat rate times distance - no minAmount anymore as per request
         } else {
             // Fallback for undefined routes
             transportRate = 35 
@@ -307,21 +331,66 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
     }
 
     let accessFees = 0
+    let hasShuttle = false
+    
+    // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc) => {
         if (loc?.elevator) accessFees += 300
         if (loc?.stairs) accessFees += (loc.floorLevel || 0) * 200
-        if (loc?.specialConditions?.panhandle) accessFees += 500
-        if (loc?.specialConditions?.hoisting) accessFees += 1200
-        if (loc?.specialConditions?.longCarry) accessFees += 800
-        if (loc?.parkingType === 'shuttle') accessFees += 1500
+        if (loc?.specialConditions?.panhandle) accessFees += 0
+        if (loc?.specialConditions?.hoisting) accessFees += 0
+        
+        // Shuttle: Track if needed
+        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle) {
+            hasShuttle = true
+        }
+        
+        // Long Carry: Flat rate R450 if distance > 30m
+        if (loc?.specialConditions?.longCarry && (parseFloat(loc?.longCarryDistance) > ADDITIONAL_COSTS.longCarry.thresholdMeters)) {
+            accessFees += ADDITIONAL_COSTS.longCarry.flatRate
+        }
     }
     if (accessDetails?.origin) addAccess(accessDetails.origin)
     if (accessDetails?.destination) addAccess(accessDetails.destination)
 
+    if (hasShuttle) {
+        accessFees += ADDITIONAL_COSTS.shuttle.flatRate
+    }
+
+    let additionalCrewCost = 0
+    let hasHeavyItems = false
+    // Additional Costs: Heavy Items (2 Crew @ R700pp - Flat fee)
+    Object.entries(inventory).forEach(([idKey, qty]) => {
+        if (qty <= 0) return
+        const [itemId] = idKey.split('_')
+        const item = items.find(i => i.id === itemId)
+        const isHeavy = item?.isHeavy || ['piano', 'golf-cart', 'statue', 'gym', 'server', 'bulk-filer', 'jungle-gym', 'wendy-house', 'safe'].some(k => itemId.toLowerCase().includes(k))
+        
+        if (isHeavy) {
+            hasHeavyItems = true
+        }
+    })
+
+    if (hasHeavyItems) {
+        additionalCrewCost = (ADDITIONAL_COSTS.heavyItemCrew.perPerson * ADDITIONAL_COSTS.heavyItemCrew.count)
+    }
+
+    // Additional Costs: Distance-based depot fees (Over 80km) - LOCAL ONLY
+    let extraDistanceFees = 0
+    if (!isNationalMove && moveDetails.tripBreakdown) {
+        const { depotToPickup, dropoffToDepot } = moveDetails.tripBreakdown
+        if (depotToPickup > ADDITIONAL_COSTS.collectionOver80Km.thresholdKm) {
+            extraDistanceFees += depotToPickup * ADDITIONAL_COSTS.collectionOver80Km.ratePerKm
+        }
+        if (dropoffToDepot > ADDITIONAL_COSTS.deliveryOver80Km.thresholdKm) {
+            extraDistanceFees += dropoffToDepot * ADDITIONAL_COSTS.deliveryOver80Km.ratePerKm
+        }
+    }
+
     let packagingCost = 0
     if (moveDetails.packagingOption !== 'none') {
         const rates = moveDetails.packagingOption === 'boxes_only' 
-            ? PACKAGING_RATES.sendingBoxesOnly 
+            ? PACKAGING_RATES.sendMeBoxesOnly 
             : PACKAGING_RATES.boxesAndPacking
             
         const st7Cost = (moveDetails.st7Boxes || 0) * rates.st7
@@ -329,7 +398,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
         packagingCost = st7Cost + linenCost + rates.deliveryFee
     }
 
-    const subTotal = transportCost + volumeCost + accessFees + autoPackagingCost + packagingCost + (PRICING_CONSTANTS.documentationFee || 175)
+    const subTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + (PRICING_CONSTANTS.documentationFee || 175)
     
     let discount = 0
     if (moveDetails.moveDate) {
@@ -338,8 +407,44 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
     }
 
     const subTotalAfterDiscount = subTotal - discount
-    const vat = subTotalAfterDiscount * 0.15
-    const total = subTotalAfterDiscount + vat
+    let vat = subTotalAfterDiscount * 0.15
+    let total = subTotalAfterDiscount + vat
+
+    // Additional Costs: Payflex Surcharge (+7%)
+    if (moveDetails.paymentMethod === 'payflex') {
+        total = total * (1 + ADDITIONAL_COSTS.payflex.surcharge)
+        // Adjust VAT accordingly if needed, or just keep it as a flat surcharge on final
+    }
+
+    // Additional Notes: Min Order R2250
+    if (total < PRICING_CONSTANTS.minOrder) {
+        total = PRICING_CONSTANTS.minOrder
+    }
+
+    const detailedAccess = []
+    if (hasShuttle) detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
+    const checkLoc = (loc, prefix) => {
+        if (loc?.elevator) detailedAccess.push(`${prefix} Elevator: R300`)
+        if (loc?.stairs) detailedAccess.push(`${prefix} Stairs (${loc.floorLevel} flr): R${loc.floorLevel * 200}`)
+        if (loc?.specialConditions?.panhandle) detailedAccess.push(`${prefix} Panhandle: R0`)
+        if (loc?.specialConditions?.hoisting) detailedAccess.push(`${prefix} Hoisting: R0`)
+        if (loc?.specialConditions?.longCarry && (parseFloat(loc?.longCarryDistance) > ADDITIONAL_COSTS.longCarry.thresholdMeters)) {
+            detailedAccess.push(`${prefix} Long Carry (${loc.longCarryDistance}m): R${ADDITIONAL_COSTS.longCarry.flatRate}`)
+        }
+    }
+    if (accessDetails?.origin) checkLoc(accessDetails.origin, 'Origin')
+    if (accessDetails?.destination) checkLoc(accessDetails.destination, 'Dest')
+
+    const detailedExtraDistance = []
+    if (!isNationalMove && moveDetails.tripBreakdown) {
+        const { depotToPickup, dropoffToDepot } = moveDetails.tripBreakdown
+        if (depotToPickup > ADDITIONAL_COSTS.collectionOver80Km.thresholdKm) {
+            detailedExtraDistance.push(`Pickup > 80km: ${depotToPickup.toFixed(1)}km × R${ADDITIONAL_COSTS.collectionOver80Km.ratePerKm}`)
+        }
+        if (dropoffToDepot > ADDITIONAL_COSTS.deliveryOver80Km.thresholdKm) {
+            detailedExtraDistance.push(`Dropoff > 80km: ${dropoffToDepot.toFixed(1)}km × R${ADDITIONAL_COSTS.deliveryOver80Km.ratePerKm}`)
+        }
+    }
 
     const needsConsultation = totalDistance > 100 || totalVolumeCuFt > 3600
 
@@ -359,6 +464,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, INVENTORY_
             transport: transportCost,
             volume: volumeCost,
             access: accessFees,
+            detailedAccess: detailedAccess.length > 0 ? detailedAccess.join(' | ') : 'Standard Access (No Surcharges)',
+            crew: additionalCrewCost,
+            extraDistance: extraDistanceFees,
+            detailedExtraDistance: detailedExtraDistance.length > 0 ? detailedExtraDistance.join(' | ') : 'No Depot Surcharges',
             packaging: packagingCost + autoPackagingCost,
             distance: totalDistance,
             transportRate: transportRate,

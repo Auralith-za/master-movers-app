@@ -69,7 +69,7 @@ export default function Footer() {
                         <ul className="space-y-4 text-sm">
                             <li className="flex items-start gap-3">
                                 <MapPin size={18} className="text-primary-500 mt-0.5 shrink-0" />
-                                <span>17 Indianapolis Blvd,<br />Raceway Industrial Park,<br />Gosforth Park, Germiston</span>
+                                <span>17 Indianapolis Blvd,<br />Gosforth Park, Germiston,<br />1401</span>
                             </li>
                             <li className="flex items-center gap-3">
                                 <Phone size={18} className="text-primary-500 shrink-0" />

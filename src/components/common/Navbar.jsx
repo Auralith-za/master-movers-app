@@ -105,6 +105,17 @@ export default function Navbar() {
                             )}
                         </div>
                     ))}
+                    
+                    {/* Phone Number */}
+                    <div className="flex items-center gap-3 pl-6 border-l border-slate-100">
+                        <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                            <Phone size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase leading-none mb-1">Call us at any time</span>
+                            <a href="tel:+27114937569" className="text-sm font-black text-slate-900 hover:text-red-600 transition-colors tracking-tight">+27 11 493 7569</a>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Mobile Menu Button */}

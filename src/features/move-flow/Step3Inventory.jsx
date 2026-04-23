@@ -317,7 +317,7 @@ export default function Step3Inventory() {
                         </div>
 
                         {/* Items Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-2">
                             {filteredItems.map(item => {
                                 // Determine the current variation for this item (if any)
                                 const idKeys = Object.keys(inventory).filter(k => k === item.id || k.startsWith(`${item.id}_`));

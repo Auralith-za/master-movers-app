@@ -1,15 +1,135 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2 } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X } from 'lucide-react'
+import { getCityCode } from '../inventory/data/pricingRates'
+
+const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
+    const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
+    const [isSuccess, setIsSuccess] = useState(false)
+    
+    React.useEffect(() => {
+        if (isOpen) {
+            setForm({
+                name: initialData.contactName || '',
+                surname: initialData.surname || '',
+                email: initialData.contactEmail || '',
+                phone: initialData.contactPhone || ''
+            })
+            setIsSuccess(false)
+        }
+    }, [isOpen]) // Only reset when modal opens, NOT on initialData changes while open
+    
+    if (!isOpen) return null
+    
+    const handleLocalSubmit = async (e) => {
+        e.preventDefault()
+        const success = await onSubmit(form)
+        if (success) {
+            setIsSuccess(true)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+                {!isSuccess ? (
+                    <>
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Request a Call Back</h3>
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">We'll contact you shortly</p>
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleLocalSubmit} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Name</label>
+                                    <input 
+                                        required
+                                        value={form.name}
+                                        onChange={e => setForm({...form, name: e.target.value})}
+                                        placeholder="First Name"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-red-600 outline-none transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Surname</label>
+                                    <input 
+                                        required
+                                        value={form.surname}
+                                        onChange={e => setForm({...form, surname: e.target.value})}
+                                        placeholder="Last Name"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-red-600 outline-none transition-all"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                                <input 
+                                    required
+                                    type="email"
+                                    value={form.email}
+                                    onChange={e => setForm({...form, email: e.target.value})}
+                                    placeholder="email@example.com"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-red-600 outline-none transition-all"
+                                />
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cell Number</label>
+                                <input 
+                                    required
+                                    type="tel"
+                                    value={form.phone}
+                                    onChange={e => setForm({...form, phone: e.target.value})}
+                                    placeholder="082 123 4567"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-red-600 outline-none transition-all"
+                                />
+                            </div>
+                            
+                            <Button type="submit" isLoading={isLoading} className="w-full py-4 text-sm font-black uppercase tracking-widest bg-red-600 hover:bg-red-700 shadow-xl shadow-red-200">
+                                Submit Request <Phone size={16} className="ml-2" />
+                            </Button>
+                        </form>
+                    </>
+                ) : (
+                    <div className="text-center py-6 animate-in zoom-in-95 duration-300">
+                        <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <CheckCircle size={40} />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Thank You!</h3>
+                        <p className="text-slate-500 font-medium mt-2 leading-relaxed">
+                            One of our agents will call you back shortly <br />
+                            to discuss your move requirements.
+                        </p>
+                        <div className="mt-8">
+                            <Button onClick={onClose} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl transition-all">
+                                Got it, Thanks!
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
 
 export default function Step1Details() {
     const navigate = useNavigate()
-    const { moveDetails, setMoveDetails } = useMoveStore()
+    const { moveDetails, setMoveDetails, submitQuote } = useMoveStore()
+    const location = useLocation()
+    const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
+    const [showLeadModal, setShowLeadModal] = React.useState(false)
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
 
@@ -26,10 +146,13 @@ export default function Step1Details() {
     // Auto-calculate distance in background when both addresses are filled
     React.useEffect(() => {
         if (moveDetails.pickupAddress && moveDetails.dropoffAddress) {
+            const cityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress) || 'JHB';
+            
             // Silently calculate in background without showing loading state
             calculateTripDistances(
                 moveDetails.pickupAddress,
-                moveDetails.dropoffAddress
+                moveDetails.dropoffAddress,
+                cityCode
             )
                 .then(({ breakdown, totalDistance }) => {
                     setMoveDetails({
@@ -230,14 +353,29 @@ export default function Step1Details() {
                 <div className="bg-gray-50 px-8 py-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
                     <button
                         type="button"
-                        onClick={() => {
-                            // Backend Callback Simulation
-                            alert("Request Sent! One of our agents will call you back shortly. 📞")
+                        onClick={async () => {
+                            // If details already filled, just submit
+                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                                setIsSubmittingLead(true)
+                                try {
+                                    await submitQuote({ status: 'lead', request_call_back: true })
+                                    alert("Request Sent! One of our agents will call you back shortly. 📞")
+                                } catch (err) {
+                                    console.error("Callback submission error:", err)
+                                    alert("Request Sent! (Note: Offline mode) We will call you shortly.")
+                                } finally {
+                                    setIsSubmittingLead(false)
+                                }
+                                return
+                            }
+                            // Otherwise show modal
+                            setShowLeadModal(true)
                         }}
+                        disabled={isSubmittingLead}
                         className="flex-1 flex flex-col items-center md:items-start p-6 bg-white border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group"
                     >
                         <div className="flex items-center gap-3 mb-1">
-                            <Phone size={24} className="text-red-600 group-hover:animate-bounce" />
+                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={24} /> : <Phone size={24} className="text-red-600 group-hover:animate-bounce" />}
                             <span className="font-black text-slate-900 uppercase tracking-widest text-sm italic">"No, I'm Old School"</span>
                         </div>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.1em]">Request a Call Back from a human Agent</p>
@@ -247,6 +385,39 @@ export default function Step1Details() {
                         Next Step <Truck className="ml-3" size={20} />
                     </Button>
                 </div>
+
+                <LeadCaptureModal 
+                    isOpen={showLeadModal} 
+                    onClose={() => setShowLeadModal(false)}
+                    isLoading={isSubmittingLead}
+                    onSubmit={async (formData) => {
+                        setIsSubmittingLead(true)
+                        try {
+                            // Save to store
+                            setMoveDetails({
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone
+                            })
+                            // Submit lead
+                            await submitQuote({ 
+                                status: 'lead', 
+                                request_call_back: true,
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone,
+                                forceNew: true
+                            })
+                            return true
+                        } catch (err) {
+                            console.error("Lead submission error:", err)
+                            alert("Submission Error: " + (err.message || "Failed to reach server") + ". Please call us directly if this persists.")
+                            // Keep modal open so user knows it failed
+                        } finally {
+                            setIsSubmittingLead(false)
+                        }
+                    }}
+                />
             </div>
         </form>
     )

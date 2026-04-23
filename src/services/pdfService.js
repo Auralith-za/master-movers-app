@@ -117,6 +117,13 @@ export const generateProfessionalQuote = (data) => {
     currentY += 8;
 
     const costs = [
+        ['Transport Base Cost', `R ${breakdown.transport?.toFixed(2) || '0.00'}`],
+        ['Volume Handling', `R ${breakdown.volume?.toFixed(2) || '0.00'}`],
+        ...(breakdown.access > 0 ? [['Access & Special Services', `R ${breakdown.access.toFixed(2)}`]] : []),
+        ...(breakdown.crew > 0 ? [['Specialist Crew Surcharge', `R ${breakdown.crew.toFixed(2)}`]] : []),
+        ...(breakdown.extraDistance > 0 ? [['Depot Distance Surcharge', `R ${breakdown.extraDistance.toFixed(2)}`]] : []),
+        ...(breakdown.packaging > 0 ? [['Protective Packaging', `R ${breakdown.packaging.toFixed(2)}`]] : []),
+        ['Documentation Fee', 'R 175.00'],
         ['Subtotal Excl. VAT', `R ${subTotal?.toFixed(2) || '0.00'}`],
         ['VAT (15%)', `R ${vat?.toFixed(2) || '0.00'}`],
         ['TOTAL AMOUNT DUE', `R ${total?.toFixed(2) || '0.00'}`]
@@ -159,6 +166,7 @@ export const generateProfessionalQuote = (data) => {
     const terms = [
         '- Full payment is required 48 hours prior to the move date to confirm booking.',
         '- We accept PayFast, Payflex (Pay in 4), and Direct EFT.',
+        '- Pricing provided is valid for 7 days from the date of issue and is subject to change thereafter.',
         '- Items not listed in the inventory may incur additional charges on move day.',
         '- Standard liability insurance is included. Platinum cover available on request.'
     ];

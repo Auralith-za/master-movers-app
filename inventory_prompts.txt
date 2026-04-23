@@ -1,0 +1,172 @@
+INVENTORY IMAGE GENERATION PROMPTS
+==================================
+Use these lines as prompts in "Draw Things" or other AI image generators.
+Style: Realistic 3D render, catalog product photography, high resolution, soft studio lighting, pure white background.
+
+1. Realistic 3D render of a BABY GRAND PIANO on a white background
+2. Realistic 3D render of an UPRIGHT PIANO on a white background
+3. Realistic 3D render of a GOLF CART on a white background
+4. Realistic 3D render of a JUNGLE GYM on a white background
+5. Realistic 3D render of a MOTORBIKE on a white background
+6. Realistic 3D render of LARGE STATUES on a white background
+7. Realistic 3D render of SMALL STATUES on a white background
+8. Realistic 3D render of EMPTY POTS LARGE on a white background
+9. Realistic 3D render of LARGE POT PLANTS on a white background
+10. Realistic 3D render of MEDIUM POT PLANTS on a white background
+11. Realistic 3D render of SMALL POT PLANTS on a white background
+12. Realistic 3D render of a WENDY HOUSE on a white background
+13. Realistic 3D render of a BOARDROOM TABLE 3 PIECE on a white background
+14. Realistic 3D render of BULK FILERS SINGLE BAY on a white background
+15. Realistic 3D render of SERVER CABINETS on a white background
+16. Realistic 3D render of a GLASS-TOP TABLE on a white background
+17. Realistic 3D render of a CONCRETE GARDEN SET on a white background
+18. Realistic 3D render of an ARMCHAIR SINGLE on a white background
+19. Realistic 3D render of a SINGLE SEATER SOFA on a white background
+20. Realistic 3D render of a DOUBLE SEATER SOFA on a white background
+21. Realistic 3D render of a THREE SEATER SOFA on a white background
+22. Realistic 3D render of a LOUNGE RECLINER on a white background
+23. Realistic 3D render of a POOL LOUNGER on a white background
+24. Realistic 3D render of an OTTOMAN on a white background
+25. Realistic 3D render of a BEAN BAG CHAIR on a white background
+26. Realistic 3D render of a COFFEE TABLE on a white background
+27. Realistic 3D render of a COFFEE TABLE LARGE on a white background
+28. Realistic 3D render of an OCC TABLE SMALL on a white background
+29. Realistic 3D render of an OCCL TABLE LARGE on a white background
+30. Realistic 3D render of a HALF MOON TABLE on a white background
+31. Realistic 3D render of a SMALL TABLE on a white background
+32. Realistic 3D render of a TABLE on a white background
+33. Realistic 3D render of a HALL STAND on a white background
+34. Realistic 3D render of a ROOM DIVIDER on a white background
+35. Realistic 3D render of a TV ENTERTAINMENT CTR on a white background
+36. Realistic 3D render of a TV LARGE (Modern Flat Screen) on a white background
+37. Realistic 3D render of a TV SMALL (Modern Flat Screen) on a white background
+38. Realistic 3D render of a FLATRON TV on a white background
+39. Realistic 3D render of a TV TROLLEY on a white background
+40. Realistic 3D render of a TV CABINET on a white background
+41. Realistic 3D render of a HIFI SYSTEM on a white background
+42. Realistic 3D render of a 4 SEATER DINING TABLE on a white background
+43. Realistic 3D render of a 6 SEAT TABLE + BASE on a white background
+44. Realistic 3D render of a 6 SEAT TABLE TOP ONLY on a white background
+45. Realistic 3D render of an 8 SEATER DINING TABLE on a white background
+46. Realistic 3D render of a 10 SEATER DINING TABLE on a white background
+47. Realistic 3D render of a DINING ROOM CHAIR on a white background
+48. Realistic 3D render of a KITCHEN TABLE on a white background
+49. Realistic 3D render of a ROUND TABLE 1 PIECE on a white background
+50. Realistic 3D render of a ROUND TABLE SMALL on a white background
+51. Realistic 3D render of a HOSTESS on a white background
+52. Realistic 3D render of a TEA TROLLEY on a white background
+53. Realistic 3D render of a SIDEBOARD on a white background
+54. Realistic 3D render of a SMALL SIDEBOARD on a white background
+55. Realistic 3D render of a WELSH DRESSER on a white background
+56. Realistic 3D render of a CREDENZA on a white background
+57. Realistic 3D render of a DISPLAY CABINET on a white background
+58. Realistic 3D render of a WINE RACK on a white background
+59. Realistic 3D render of a KING SIZE BED BASE on a white background
+60. Realistic 3D render of a KING SIZE BED MATTRAS on a white background
+61. Realistic 3D render of a DOUBLE BED BASE on a white background
+62. Realistic 3D render of a DOUBLE BED MATTRESS on a white background
+63. Realistic 3D render of a QUEEN BED BASE on a white background
+64. Realistic 3D render of a QUEEN BED MATTRAS on a white background
+65. Realistic 3D render of a SINGLE BED BASE on a white background
+66. Realistic 3D render of a SINGLE BED MATTRASS on a white background
+67. Realistic 3D render of a SINGLE BED HEADBOARD on a white background
+68. Realistic 3D render of a D BED HEADBOARD on a white background
+69. Realistic 3D render of BUNK BEDS SINGLE on a white background
+70. Realistic 3D render of a BABYCOT on a white background
+71. Realistic 3D render of a PRAM on a white background
+72. Realistic 3D render of a WARDROBE on a white background
+73. Realistic 3D render of a COMPACTUM on a white background
+74. Realistic 3D render of a CHEST OF DRAWERS on a white background
+75. Realistic 3D render of a TALL BOY DRESSER on a white background
+76. Realistic 3D render of a DRESSING TABLE/STOOL on a white background
+77. Realistic 3D render of a CHEVAL MIRROR on a white background
+78. Realistic 3D render of a MIRROR (LARGE) on a white background
+79. Realistic 3D render of a KIST (Storage Trunk) on a white background
+80. Realistic 3D render of a DUMB VALET on a white background
+81. Realistic 3D render of a FRIDGE DOUBLE UPRIGHT on a white background
+82. Realistic 3D render of a FRIDGE D DOOR (Side by Side) on a white background
+83. Realistic 3D render of a FRIDGE LARGE S DOOR on a white background
+84. Realistic 3D render of a SMALL FRIDGE on a white background
+85. Realistic 3D render of a BARFRIDGE on a white background
+86. Realistic 3D render of a DEEP FREEZE on a white background
+87. Realistic 3D render of a WASHING MACHINE on a white background
+88. Realistic 3D render of a TUMBLE DRYER on a white background
+89. Realistic 3D render of a DISHWASHER on a white background
+90. Realistic 3D render of a MICROWAVE OVEN on a white background
+91. Realistic 3D render of a COFFEE MACHINE on a white background
+92. Realistic 3D render of a VACUUM CLEANER on a white background
+93. Realistic 3D render of a WATER COOLER on a white background
+94. Realistic 3D render of an OIL HEATER on a white background
+95. Realistic 3D render of a GAS HEATER on a white background
+96. Realistic 3D render of HUGE GAS HEATERS on a white background
+97. Realistic 3D render of a LARGE DESK on a white background
+98. Realistic 3D render of an L-SHAPE DESK on a white background
+99. Realistic 3D render of a SMALL DESK on a white background
+100. Realistic 3D render of a COMPUTER STAND on a white background
+101. Realistic 3D render of OFFICE CHAIRS on a white background
+102. Realistic 3D render of a 2 DRAWER FIL CABINET on a white background
+103. Realistic 3D render of a 4 DRAWER FIL CABINET on a white background
+104. Realistic 3D render of a STATIONERY CUPBOARD on a white background
+105. Realistic 3D render of a WHITE BOARD on a white background
+106. Realistic 3D render of LOCKERS on a white background
+107. Realistic 3D render of a STANDING SHELF UNIT on a white background
+108. Realistic 3D render of LOOSE SHELVES on a white background
+109. Realistic 3D render of a BOOK CASE on a white background
+110. Realistic 3D render of a LARGE BOOKCASE on a white background
+111. Realistic 3D render of a LARGE BOOKCASE GLASS on a white background
+112. Realistic 3D render of PICTURES/MIRRORS on a white background
+113. Realistic 3D render of a MEDIUM WALL UNIT on a white background
+114. Realistic 3D render of a SMALL WALL UNIT on a white background
+115. Realistic 3D render of a KITCHEN CUPBOARD on a white background
+116: Realistic 3D render of a BAR COUNTER on a white background
+117: Realistic 3D render of a BENCH on a white background
+118: Realistic 3D render of a TOOL BOX on a white background
+119: Realistic 3D render of a TOY BOX on a white background
+120: Realistic 3D render of TABLE BASES on a white background
+121: Realistic 3D render of a 4 SEATER PATIO TABLE on a white background
+122: Realistic 3D render of a 6 SEATER PATIO TABLE on a white background
+123: Realistic 3D render of an 8 SEATER PATIO TABLE on a white background
+124: Realistic 3D render of a 10 SEATER PATIO TABLE on a white background
+125: Realistic 3D render of PATIO CHAIRS on a white background
+126: Realistic 3D render of a PLASTIC STACK CHAIR on a white background
+127: Realistic 3D render of a GARDEN BENCH on a white background
+128: Realistic 3D render of a GARDEN SWING on a white background
+129: Realistic 3D render of a GARDEN HOSE on a white background
+130: Realistic 3D render of GARDEN TOOLS on a white background
+131: Realistic 3D render of a G UMBRELLA + BASE on a white background
+132: Realistic 3D render of a WEBER BRAAI on a white background
+133: Realistic 3D render of a BIRD BATH on a white background
+134: Realistic 3D render of a BICYCLE on a white background
+135: Realistic 3D render of a CANOE on a white background
+136: Realistic 3D render of a WHEELBARROW on a white background
+137: Realistic 3D render of a LAWNMOWER on a white background
+138: Realistic 3D render of a WEED EATER on a white background
+139: Realistic 3D render of a WORKBENCH on a white background
+140: Realistic 3D render of a CLOTHES HORSE on a white background
+141: Realistic 3D render of a LADDER on a white background
+142: Realistic 3D render of a DOG KENNEL on a white background
+143: Realistic 3D render of a SATELLITE DISH on a white background
+144: Realistic 3D render of a DSTV DISH on a white background
+145: Realistic 3D render of a STANDING FAN on a white background
+146: Realistic 3D render of an EXERCISE BIKE on a white background
+147: Realistic 3D render of a GOLF BAG on a white background
+148: Realistic 3D render of a FISHING ROD on a white background
+149: Realistic 3D render of a COOLER BOX on a white background
+150: Realistic 3D render of a BATH on a white background
+151: Realistic 3D render of GENERAL CARTONS on a white background
+152: Realistic 3D render of LINEN CARTONS on a white background
+153: Realistic 3D render of WARDROBE CARTONS on a white background
+154: Realistic 3D render of a STANDING LAMP on a white background
+155: Realistic 3D render of a BEDSIDE LAMP on a white background
+156: Realistic 3D render of an IRONING BOARD on a white background
+157: Realistic 3D render of a SUITCASE on a white background
+158: Realistic 3D render of a WASHING BASKET on a white background
+159: Realistic 3D render of a DUSTBIN on a white background
+160: Realistic 3D render of a CARPET on a white background
+161: Realistic 3D render of a CDRACK on a white background
+162: Realistic 3D render of a FOLDING CHAIR on a white background
+163: Realistic 3D render of a FOLDING TABLE on a white background
+164: Realistic 3D render of a BAR STOOL on a white background
+165: Realistic 3D render of a CHAIR KITCHEN ROOM on a white background
+166: Realistic 3D render of a BUTLERS TRAY on a white background
+167: Realistic 3D render of a GENERATOR on a white background

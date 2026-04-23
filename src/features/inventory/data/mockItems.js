@@ -8,6 +8,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -19,6 +20,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -30,6 +32,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -41,6 +44,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": true,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -52,6 +56,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": true,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -63,6 +68,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": true,
         "autoPackagingType": "Wrapping",
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -74,6 +80,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": true,
         "autoPackagingType": "Wrapping",
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -85,6 +92,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": true,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -129,6 +137,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": true,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -151,6 +160,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -162,6 +172,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -184,6 +195,7 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": null,
+        "isHeavy": true,
         "variationOptions": null
     },
     {
@@ -578,17 +590,6 @@ export const INVENTORY_ITEMS = [
         "variationOptions": null
     },
     {
-        "id": "hostess",
-        "name": "HOSTESS",
-        "category": "Dining Room",
-        "volume": 11.9,
-        "image": "🍽️",
-        "requiresPhoto": false,
-        "requiresCrate": false,
-        "autoPackagingType": null,
-        "variationOptions": null
-    },
-    {
         "id": "tea-trolley",
         "name": "TEA TROLLEY",
         "category": "Dining Room",
@@ -842,17 +843,6 @@ export const INVENTORY_ITEMS = [
         "variationOptions": null
     },
     {
-        "id": "tall-boy",
-        "name": "TALL BOY",
-        "category": "Bedrooms",
-        "volume": 13.2,
-        "image": "🛏️",
-        "requiresPhoto": false,
-        "requiresCrate": false,
-        "autoPackagingType": null,
-        "variationOptions": null
-    },
-    {
         "id": "dressing-table-stool",
         "name": "DRESSING TABLE/STOOL",
         "category": "Bedrooms",
@@ -883,17 +873,6 @@ export const INVENTORY_ITEMS = [
         "requiresPhoto": false,
         "requiresCrate": false,
         "autoPackagingType": "Wrapping",
-        "variationOptions": null
-    },
-    {
-        "id": "kist",
-        "name": "KIST",
-        "category": "Bedrooms",
-        "volume": 13.6,
-        "image": "🛏️",
-        "requiresPhoto": false,
-        "requiresCrate": false,
-        "autoPackagingType": null,
         "variationOptions": null
     },
     {
