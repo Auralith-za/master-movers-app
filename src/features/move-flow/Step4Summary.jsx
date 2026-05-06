@@ -12,6 +12,7 @@ import { event } from '../../lib/gtag'
 import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
 import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
 import clsx from 'clsx'
+import { LeadCaptureModal } from './Step1Details'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -80,6 +81,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [showServices, setShowServices] = useState(false)
     const [showAllItems, setShowAllItems] = useState(false)
     const [showRejectModal, setShowRejectModal] = useState(false)
+    const [showLeadModal, setShowLeadModal] = useState(false)
     const [showDebug, setShowDebug] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
     const isStep4Initialized = React.useRef(false)
@@ -151,6 +153,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [searchParams])
 
     const handleCallBackRequest = async () => {
+        // If contact info is missing, show the modal instead of submitting
+        if (!moveDetails.contactName || !moveDetails.contactEmail) {
+            setShowLeadModal(true)
+            return
+        }
+
         setIsSubmitting(true)
         try {
             const alreadySaved = searchParams.get('saved') === 'true'
@@ -180,7 +188,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             const result = await submitQuote({
                 status: 'lead',
                 request_call_back: true,
-                submission_type: submissionType
+                submission_type: submissionType,
+                forceNew: true
             })
 
             // Optimistic success — don't block user if Supabase is flaky
@@ -711,6 +720,40 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         </p>
                     </div>
                 </div>
+                {/* Contact Modal for late lead capture */}
+                <LeadCaptureModal 
+                    isOpen={showLeadModal} 
+                    onClose={() => setShowLeadModal(false)}
+                    isLoading={isSubmitting}
+                    initialData={moveDetails}
+                    onSubmit={async (formData) => {
+                        setIsSubmitting(true)
+                        try {
+                            // Update store
+                            const contactName = `${formData.name} ${formData.surname}`
+                            setMoveDetails({
+                                contactName: contactName,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone
+                            })
+                            // Submit lead
+                            await submitQuote({ 
+                                status: 'lead', 
+                                request_call_back: true,
+                                client_name: contactName,
+                                client_email: formData.email,
+                                client_phone: formData.phone,
+                                forceNew: true
+                            })
+                            return true
+                        } catch (err) {
+                            console.error("Late lead submission error:", err)
+                            return false
+                        } finally {
+                            setIsSubmitting(false)
+                        }
+                    }}
+                />
             </div>
         </div>
     )

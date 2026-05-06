@@ -16,13 +16,13 @@ export default function VolumeSummary({ items, inventory, packagingCost = 0, chi
 
     return (
         <div
-            className="bg-slate-900 text-white rounded-2xl shadow-xl sticky top-24 flex flex-col overflow-hidden transition-all duration-300"
-            style={{ maxHeight: 'calc(100vh - 7rem)' }}
+            className="bg-slate-900 text-white rounded-2xl shadow-xl sticky top-2 lg:top-24 flex flex-col overflow-hidden transition-all duration-300 z-40 mb-4 lg:mb-0"
+            style={{ maxHeight: '40vh' }}
         >
             {/* Header — never scrolls */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
-                <h3 className="text-lg font-bold flex items-center gap-2 uppercase tracking-tighter">
-                    <Truck className="text-red-400" />
+            <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-1 flex-shrink-0">
+                <h3 className="text-sm md:text-lg font-bold flex items-center gap-2 uppercase tracking-tighter">
+                    <Truck className="text-red-400 w-4 h-4 md:w-6 md:h-6" />
                     Your Move Truck
                 </h3>
             </div>

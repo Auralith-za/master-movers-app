@@ -28,6 +28,11 @@ export default function MoveWizard() {
         ? STEPS.findIndex(s => s.path === location.pathname)
         : 0;
 
+    // Scroll to top on step change
+    React.useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [location.pathname]);
+
     return (
         <div className="max-w-6xl mx-auto pb-20">
             {/* Stepper Header */}

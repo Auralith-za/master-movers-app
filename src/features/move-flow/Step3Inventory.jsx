@@ -282,19 +282,47 @@ export default function Step3Inventory() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-8">
 
-                {/* Left Column: Inventory List */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                {/* Summary Column - First on mobile, Right on desktop */}
+                <div className="lg:order-2 lg:col-span-1">
+                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory} packagingCost={packagingCost}>
+                        <Button variant="primary" size="lg" className="w-full bg-[#e31837] hover:bg-[#c0152f] font-bold" onClick={handleProceed}>
+                            View Quote Summary
+                        </Button>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center gap-2 border border-slate-700" onClick={() => undo()}>
+                                <RotateCcw size={14} /> Undo
+                            </Button>
+                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800" onClick={() => navigate(`${basePath}/access`)}>
+                                Back
+                            </Button>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            className="w-full text-red-400 hover:text-red-300 hover:bg-slate-800 text-xs"
+                            onClick={() => {
+                                if (window.confirm('Are you sure you want to clear all inventory items?')) {
+                                     clearInventory()
+                                }
+                            }}
+                        >
+                            <Trash2 size={14} className="mr-2" /> Reset Inventory
+                        </Button>
+                    </VolumeSummary>
+                </div>
+
+                {/* Left Column: Inventory List - Second on mobile, Left on desktop */}
+                <div className="lg:order-1 lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
 
                         {/* Search */}
                         <div className="relative mb-6">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Search for items (e.g. Bed, Sofa)..."
-                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition-shadow"
+                                placeholder="Search for items..."
+                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition-shadow text-sm md:text-base"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -306,7 +334,7 @@ export default function Step3Inventory() {
                                 <button
                                     key={cat}
                                     onClick={() => setActiveCategory(cat)}
-                                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
+                                    className={`px-4 py-2 rounded-full text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
                                         ? 'bg-red-600 text-white'
                                         : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
                                         }`}
@@ -316,8 +344,8 @@ export default function Step3Inventory() {
                             ))}
                         </div>
 
-                        {/* Items Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-2">
+                        {/* Items Grid - 2 columns on mobile */}
+                        <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-6 mt-2">
                             {filteredItems.map(item => {
                                 // Determine the current variation for this item (if any)
                                 const idKeys = Object.keys(inventory).filter(k => k === item.id || k.startsWith(`${item.id}_`));
@@ -340,37 +368,26 @@ export default function Step3Inventory() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Next Button at bottom of items list */}
+                        <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="text-center md:text-left">
+                                <p className="text-slate-900 font-black uppercase tracking-tight text-xl mb-1">Inventory Complete?</p>
+                                <p className="text-slate-500 text-sm">Review your move summary and final pricing.</p>
+                            </div>
+                            <Button 
+                                size="xl" 
+                                className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all"
+                                onClick={handleProceed}
+                            >
+                                Next: Summary <Truck className="ml-3" size={20} />
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="lg:col-span-1">
-                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory} packagingCost={packagingCost}>
-                        <Button variant="primary" size="lg" className="w-full bg-[#e31837] hover:bg-[#c0152f] font-bold" onClick={handleProceed}>
-                            View Quote Summary
-                        </Button>
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center gap-2 border border-slate-700" onClick={() => undo()}>
-                                <RotateCcw size={14} /> Undo
-                            </Button>
-                            <Button variant="ghost" className="w-full text-slate-300 hover:text-white hover:bg-slate-800" onClick={() => navigate(`${basePath}/access`)}>
-                                Back
-                            </Button>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            className="w-full text-red-400 hover:text-red-300 hover:bg-slate-800 text-xs"
-                            onClick={() => {
-                                if (window.confirm('Are you sure you want to clear all inventory items?')) {
-                                    clearInventory()
-                                }
-                            }}
-                        >
-                            <Trash2 size={14} className="mr-2" /> Reset Inventory
-                        </Button>
-                    </VolumeSummary>
-                </div>
-
             </div>
+
         </div>
     )
 }

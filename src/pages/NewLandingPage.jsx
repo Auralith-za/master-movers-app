@@ -41,7 +41,7 @@ export default function NewLandingPage() {
                 <div className="absolute inset-y-0 right-0 w-[15%] bg-gradient-to-l from-white to-transparent pointer-events-none" />
             </div>
 
-            <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center pt-24">
+            <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center pt-24 pb-40">
 
                 {/* 2. Seamless Brand Reveal Container */}
                 <div className="relative flex flex-col items-center w-full">
@@ -61,7 +61,7 @@ export default function NewLandingPage() {
                             }}
                             className="text-center"
                         >
-                            <div className="text-7xl md:text-[10rem] font-black tracking-tighter mb-8 select-none flex flex-wrap justify-center items-baseline gap-x-8">
+                            <div className="text-5xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-wrap justify-center items-baseline gap-x-4 md:gap-x-8">
                                 <span className="text-red-600">Master</span>
                                 <span className="text-slate-900">Movers</span>
                             </div>
@@ -73,7 +73,7 @@ export default function NewLandingPage() {
                                     x: showContent ? 0 : -50
                                 }}
                                 transition={{ delay: 0.5, duration: 1.2 }}
-                                className="text-xl md:text-5xl font-light text-slate-400 tracking-tight"
+                                className="text-lg md:text-5xl font-light text-slate-400 tracking-tight px-4"
                             >
                                 Start your moving journey with <span className="text-slate-900 font-medium whitespace-nowrap">Master Movers</span>
                             </motion.h2>
@@ -81,7 +81,7 @@ export default function NewLandingPage() {
                     </div>
 
                     {/* 3. The Call to Action (Final Reveal) */}
-                    <div className="mt-28 flex flex-col items-center gap-10 relative z-20 w-full max-w-4xl">
+                    <div className="mt-16 md:mt-28 flex flex-col items-center gap-10 relative z-20 w-full max-w-4xl">
                         <AnimatePresence>
                             {showCTA && (
                                 <motion.div
@@ -94,11 +94,11 @@ export default function NewLandingPage() {
                                     <Link to="/quote">
                                         <Button
                                             size="xl"
-                                            className="group relative bg-red-600 hover:bg-red-700 text-white min-w-[360px] px-20 py-12 text-4xl font-black rounded-full transition-all duration-700 shadow-[0_30px_60px_rgba(220,38,38,0.25)] hover:shadow-[0_40px_80px_rgba(220,38,38,0.4)] hover:-translate-y-5 uppercase tracking-[0.2em] overflow-hidden"
+                                            className="group relative bg-red-600 hover:bg-red-700 text-white min-w-[280px] md:min-w-[360px] px-8 md:px-20 py-8 md:py-12 text-2xl md:text-4xl font-black rounded-full transition-all duration-700 shadow-[0_30px_60px_rgba(220,38,38,0.25)] hover:shadow-[0_40px_80px_rgba(220,38,38,0.4)] hover:-translate-y-5 uppercase tracking-[0.2em] overflow-hidden"
                                         >
-                                            <span className="relative z-10 flex items-center justify-center gap-10 w-full">
+                                            <span className="relative z-10 flex items-center justify-center gap-6 md:gap-10 w-full">
                                                 <span>Start</span>
-                                                <ArrowRight className="group-hover:translate-x-8 transition-transform duration-700 w-14 h-14 flex-shrink-0" />
+                                                <ArrowRight className="group-hover:translate-x-8 transition-transform duration-700 w-8 h-8 md:w-14 md:h-14 flex-shrink-0" />
                                             </span>
                                         </Button>
                                     </Link>
@@ -114,22 +114,23 @@ export default function NewLandingPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: showCTA ? 1 : 0 }}
                         transition={{ delay: 1.5, duration: 2 }}
-                        className="mt-20 flex items-center justify-center gap-20 text-slate-400 text-[14px] font-black uppercase tracking-[0.7em] select-none pointer-events-none"
+                        className="mt-12 md:mt-20 flex flex-wrap items-center justify-center gap-6 md:gap-20 text-slate-400 text-[10px] md:text-[14px] font-black uppercase tracking-[0.3em] md:tracking-[0.7em] select-none pointer-events-none px-4"
                     >
-                        <div className="flex items-center gap-4">
-                            <Sparkles className="w-5 h-5 text-red-600/60" />
+                        <div className="flex items-center gap-2 md:gap-4">
+                            <Sparkles className="w-3 h-3 md:w-5 md:h-5 text-red-600/60" />
                             AI Optimized
                         </div>
-                        <div className="w-2.5 h-2.5 bg-slate-200 rounded-full" />
+                        <div className="hidden md:block w-2.5 h-2.5 bg-slate-200 rounded-full" />
                         <div className="whitespace-nowrap">Nationwide Network</div>
-                        <div className="w-2.5 h-2.5 bg-slate-200 rounded-full" />
+                        <div className="hidden md:block w-2.5 h-2.5 bg-slate-200 rounded-full" />
                         <div className="whitespace-nowrap">Premium Gear</div>
                     </motion.div>
                 </div>
             </main>
 
             {/* Final Cinematic Border Overlay - Lower z-index to stay below Navbar (z-50) */}
-            <div className="fixed inset-0 border-[30px] border-white pointer-events-none z-30 opacity-100" />
+            <div className="fixed inset-0 border-[15px] md:border-[30px] border-white pointer-events-none z-30 opacity-100" />
         </div>
     )
+
 }

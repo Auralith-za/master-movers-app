@@ -25,6 +25,7 @@ export default function QuoteDetailPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [newNote, setNewNote] = useState('')
+    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '' })
 
     useEffect(() => {
         if (id === 'new') {
@@ -46,6 +47,7 @@ export default function QuoteDetailPage() {
                 linen_boxes: 0,
                 insurance_enabled: false,
                 is_shared_load: false,
+                custom_products: [],
                 access_details: { 
                     origin: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} }, 
                     destination: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} } 
@@ -87,7 +89,8 @@ export default function QuoteDetailPage() {
             const rawItems = data.items_json?.items || data.items_json || {}
             setEditForm({
                 ...data,
-                items_json: rawItems
+                items_json: rawItems,
+                custom_products: data.custom_products || []
             })
         } catch (error) {
             console.error('Error fetching quote:', error)
@@ -199,10 +202,29 @@ export default function QuoteDetailPage() {
         setSearchQuery('')
     }
 
+    const handleAddCustomProduct = () => {
+        const name = customProductForm.name.trim()
+        const cubes = parseFloat(customProductForm.cubes) || 0
+        const price = parseFloat(customProductForm.price) || 0
+        if (!name) return
+        const newProduct = { id: Date.now(), name, cubes, price }
+        setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
+        setCustomProductForm({ name: '', cubes: '', price: '' })
+    }
+
+    const handleRemoveCustomProduct = (productId) => {
+        setEditForm(prev => ({ ...prev, custom_products: (prev.custom_products || []).filter(p => p.id !== productId) }))
+    }
+
+    const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
+    const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes) || 0), 0)
+
     const handleSave = async () => {
         try {
-            const finalPrice = recalculatedData?.total || editForm.total_price || 0
-            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
+            const basePrice = recalculatedData?.total || editForm.total_price || 0
+            const finalPrice = basePrice + customProductsTotal
+            const baseVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
+            const finalVolume = baseVolume + customProductsVolume
 
             const payload = {
                 client_name: editForm.client_name,
@@ -223,7 +245,8 @@ export default function QuoteDetailPage() {
                 st7_boxes: editForm.st7_boxes,
                 linen_boxes: editForm.linen_boxes,
                 insurance_enabled: editForm.insurance_enabled,
-                is_shared_load: editForm.is_shared_load
+                is_shared_load: editForm.is_shared_load,
+                custom_products: editForm.custom_products || []
             }
 
             let error
@@ -666,6 +689,104 @@ export default function QuoteDetailPage() {
                         </div>
                     </div>
 
+                    {/* CUSTOM PRODUCT TESTING SECTION */}
+                    <div className="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+                        <div className="p-6 border-b border-amber-50 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">⚗</div>
+                            <div>
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    Custom Product
+                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[9px] font-black uppercase tracking-widest">Testing</span>
+                                </h3>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Add a product not on the system — manually enter cubes &amp; price to include in quote.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {/* Input row */}
+                            {isEditing && (
+                                <div className="flex flex-col sm:flex-row gap-3 p-4 bg-amber-50/60 border border-amber-100 rounded-xl">
+                                    <div className="flex-1">
+                                        <label className="text-[9px] font-black uppercase text-amber-600 tracking-widest block mb-1">Product Name</label>
+                                        <input
+                                            className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none bg-white"
+                                            placeholder="e.g. Custom Wardrobe"
+                                            value={customProductForm.name}
+                                            onChange={e => setCustomProductForm({ ...customProductForm, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="w-full sm:w-28">
+                                        <label className="text-[9px] font-black uppercase text-amber-600 tracking-widest block mb-1">Cubes (m³)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none bg-white"
+                                            placeholder="0.00"
+                                            value={customProductForm.cubes}
+                                            onChange={e => setCustomProductForm({ ...customProductForm, cubes: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="w-full sm:w-32">
+                                        <label className="text-[9px] font-black uppercase text-amber-600 tracking-widest block mb-1">Price (R)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:border-amber-400 outline-none bg-white"
+                                            placeholder="0"
+                                            value={customProductForm.price}
+                                            onChange={e => setCustomProductForm({ ...customProductForm, price: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <button
+                                            onClick={handleAddCustomProduct}
+                                            disabled={!customProductForm.name.trim()}
+                                            className="w-full sm:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-sm disabled:opacity-40 transition-colors flex items-center gap-2"
+                                        >
+                                            <Plus size={16} /> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Custom product list */}
+                            {(editForm.custom_products || []).length === 0 ? (
+                                <p className="text-xs text-slate-400 italic text-center py-4">{isEditing ? 'No custom products added yet.' : 'None.'}</p>
+                            ) : (
+                                <div className="divide-y divide-gray-50">
+                                    {(editForm.custom_products || []).map(product => (
+                                        <div key={product.id} className="flex items-center gap-4 py-3">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-base">🧪</div>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-slate-800 text-sm">{product.name}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{product.cubes} m³ &nbsp;·&nbsp; Custom Item</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-amber-700">R {parseFloat(product.price || 0).toLocaleString()}</p>
+                                            </div>
+                                            {isEditing && (
+                                                <button
+                                                    onClick={() => handleRemoveCustomProduct(product.id)}
+                                                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {(editForm.custom_products || []).length > 0 && (
+                                        <div className="flex justify-between items-center pt-3">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Custom Products Subtotal</span>
+                                            <span className="font-black text-amber-700">+ R {customProductsTotal.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* SECTION 2: ADDRESSES & TRIP */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center gap-2 mb-6">
@@ -857,9 +978,9 @@ export default function QuoteDetailPage() {
                         <div className="relative z-10">
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-white">R {(isEditing ? recalculatedData?.total : quote.total_price)?.toLocaleString()}</span>
-                                {isEditing && recalculatedData?.total !== quote.total_price && (
-                                    <span className="text-emerald-400 text-xs font-bold animate-pulse">Recalculating...</span>
+                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : quote.total_price)?.toLocaleString()}</span>
+                                {isEditing && (
+                                    <span className="text-emerald-400 text-xs font-bold animate-pulse">Live</span>
                                 )}
                             </div>
                             
@@ -870,11 +991,17 @@ export default function QuoteDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Inventory Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? recalculatedData?.totalVolume : quote.total_volume)?.toFixed(2)} m³</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : quote.total_volume)?.toFixed(2)} m³</span>
                                 </div>
+                                {isEditing && customProductsTotal > 0 && (
+                                    <div className="flex justify-between text-xs text-amber-400">
+                                        <span>Custom Products</span>
+                                        <span className="font-bold">+ R {customProductsTotal.toLocaleString()}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? recalculatedData?.vat : (quote.total_price * 0.15 / 1.15)) || 0).toLocaleString()}</span>
+                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : (quote.total_price * 0.15 / 1.15)) || 0).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>

@@ -413,53 +413,54 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                 </div>
             </div>
 
-            <div className="p-5 flex flex-col flex-1 gap-4">
+            <div className="p-3 md:p-5 flex flex-col flex-1 gap-2 md:gap-4">
                 <div className="flex-1">
-                    <h4 className="text-base font-bold text-slate-800 leading-tight mb-2 group-hover:text-red-600 transition-colors">
+                    <h4 className="text-xs md:text-base font-bold text-slate-800 leading-tight mb-1 md:mb-2 group-hover:text-red-600 transition-colors line-clamp-2">
                         {item.name}
                     </h4>
                     
                     <div className="space-y-1">
                         {needsPackaging && (
-                            <span className="block text-[11px] text-blue-600 font-bold uppercase tracking-wider">
+                            <span className="block text-[9px] md:text-[11px] text-blue-600 font-bold uppercase tracking-wider">
                                 🛡 {item.autoPackagingType || 'Wrapping'}
                             </span>
                         )}
-                        <span className="text-xs text-slate-400 font-medium italic">Vol: {item.volume} ft³</span>
+                        <span className="text-[10px] md:text-xs text-slate-400 font-medium italic">Vol: {item.volume} ft³</span>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between pt-2 md:pt-4 border-t border-slate-50">
+                    <div className="flex items-center gap-1 md:gap-2">
                         <button
                             onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
                             className={clsx(
-                                "w-10 h-10 rounded-2xl flex items-center justify-center transition-all",
+                                "w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center transition-all",
                                 quantity > 0 
                                     ? "bg-slate-100 text-slate-500 hover:bg-slate-200" 
                                     : "opacity-0 pointer-events-none"
                             )}
                         >
-                            <Minus size={18} />
+                            <Minus size={14} className="md:w-[18px] md:h-[18px]" />
                         </button>
                         {quantity > 0 && (
-                            <span className="text-lg font-black text-slate-900 w-8 text-center">{quantity}</span>
+                            <span className="text-sm md:text-lg font-black text-slate-900 w-6 md:w-8 text-center">{quantity}</span>
                         )}
                     </div>
 
                     <button
                         onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
                         className={clsx(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-95",
+                            "w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-95",
                             quantity > 0
                                 ? "bg-red-600 text-white hover:bg-red-700 shadow-red-200"
                                 : "bg-white border-2 border-slate-100 text-slate-400 hover:border-red-600 hover:text-red-600"
                         )}
                     >
-                        <Plus size={24} />
+                        <Plus size={20} className="md:w-[24px] md:h-[24px]" />
                     </button>
                 </div>
             </div>
+
         </div>
     )
 }

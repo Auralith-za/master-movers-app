@@ -8,7 +8,7 @@ import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X } from 'lucide-react'
 import { getCityCode } from '../inventory/data/pricingRates'
 
-const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
+export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
     const [isSuccess, setIsSuccess] = useState(false)
     

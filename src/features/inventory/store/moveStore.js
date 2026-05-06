@@ -162,15 +162,15 @@ export const useMoveStore = create(
 
                 // Build a clean payload with only known database columns
                 const quotePayload = {
-                    client_name: dbOverrides.client_name || overrides.contactName || state.moveDetails.contactName || '',
+                    client_name: dbOverrides.client_name || overrides.contactName || state.moveDetails.contactName || 'Anonymous',
                     client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
                     client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
                     pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
                     distance_km: Number(dbOverrides.distance_km || state.moveDetails.distanceKm || 0),
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
-                    items_json: state.inventory,
-                    total_price: totals.total,
+                    items_json: state.inventory || {},
+                    total_price: totals.total || 0,
                     status: dbOverrides.status || overrides.status || 'new',
                     request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back),
                 }

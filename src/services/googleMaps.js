@@ -3,7 +3,7 @@
  * Handles distance calculations using the Google Maps Distance Matrix API.
  */
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 export const DEPOT_LOCATIONS = {
     JHB: "17 Indianapolis Blvd, Gosforth Park, Germiston, 1401",
