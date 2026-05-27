@@ -10,42 +10,42 @@ export const CITY_CODES = {
 };
 
 export const NATIONAL_RATES = {
-    'JHB-CPT': { ratePerKm: 28.40 },
-    'JHB-DBN': { ratePerKm: 15.00 },
-    'JHB-GR': { ratePerKm: 30.00 },
-    'CPT-JHB': { ratePerKm: 15.00 },
-    'CPT-DBN': { ratePerKm: 15.00 },
-    'CPT-GR': { ratePerKm: 16.00 },
-    'DBN-JHB': { ratePerKm: 13.00 },
-    'DBN-CPT': { ratePerKm: 28.40 },
-    'DBN-GR': { ratePerKm: 30.00 },
+    'JHB-CPT': { ratePerCuFt: 25, minCharge: 5250 },
+    'JHB-DBN': { ratePerCuFt: 15, minCharge: 4750 },
+    'JHB-GR': { ratePerCuFt: 29, minCharge: 14500 },
+    'CPT-JHB': { ratePerCuFt: 15, minCharge: 5250 },
+    'CPT-DBN': { ratePerCuFt: 15, minCharge: 8250 },
+    'CPT-GR': { ratePerCuFt: 15, minCharge: 14500 },
+    'DBN-JHB': { ratePerCuFt: 9, minCharge: 5500 },
+    'DBN-CPT': { ratePerCuFt: 25, minCharge: 8250 },
+    'DBN-GR': { ratePerCuFt: 29, minCharge: 14500 },
 };
 
 export const LOCAL_VEHICLE_RATES = {
     [CITY_CODES.JHB]: [
-        { name: 'Dyna 4', capacityCuFt: 400, ratePerKm: 15.80, ratePerCuFt: 3.26 },
-        { name: 'Dyna 6', capacityCuFt: 600, ratePerKm: 16.00, ratePerCuFt: 3.26 },
-        { name: 'Mb800', capacityCuFt: 700, ratePerKm: 17.20, ratePerCuFt: 3.26 },
-        { name: 'Isuzu', capacityCuFt: 900, ratePerKm: 22.45, ratePerCuFt: 3.26 },
-        { name: '1213', capacityCuFt: 1100, ratePerKm: 27.10, ratePerCuFt: 3.26 },
-        { name: 'Dyna 7', capacityCuFt: 1100, ratePerKm: 26.90, ratePerCuFt: 3.26 },
-        { name: 'Hino', capacityCuFt: 1700, ratePerKm: 26.90, ratePerCuFt: 3.26 },
-        { name: 'Atego', capacityCuFt: 1800, ratePerKm: 25.90, ratePerCuFt: 3.26 },
-        { name: '41Ft trailer', capacityCuFt: 3600, ratePerKm: 23.35, ratePerCuFt: 3.26 },
-        { name: 'Link Trailers x 2', capacityCuFt: 5000, ratePerKm: 39.55, ratePerCuFt: 3.26 },
+        { name: 'Dyna 4', capacityCuFt: 400, ratePerKm: 14.23, ratePerCuFt: 3.26, minCharge: 2600 },
+        { name: 'Dyna 6', capacityCuFt: 600, ratePerKm: 14.43, ratePerCuFt: 3.26, minCharge: 2600 },
+        { name: 'Mb800', capacityCuFt: 700, ratePerKm: 16.03, ratePerCuFt: 3.26, minCharge: 2600 },
+        { name: 'Isuzu', capacityCuFt: 900, ratePerKm: 20.61, ratePerCuFt: 3.26, minCharge: 2600 },
+        { name: '1213', capacityCuFt: 1100, ratePerKm: 26.58, ratePerCuFt: 3.26 },
+        { name: 'Dyna 7', capacityCuFt: 1100, ratePerKm: 26.34, ratePerCuFt: 3.26 },
+        { name: 'Hino', capacityCuFt: 1700, ratePerKm: 26.34, ratePerCuFt: 3.26 },
+        { name: 'Atego', capacityCuFt: 1800, ratePerKm: 25.01, ratePerCuFt: 3.26 },
+        { name: '41Ft trailer', capacityCuFt: 3600, ratePerKm: 35.57, ratePerCuFt: 3.26 },
+        { name: 'Link Trailers x 2', capacityCuFt: 5000, ratePerKm: 40.56, ratePerCuFt: 3.26 },
     ],
     [CITY_CODES.CPT]: [
-        { name: 'Hino', capacityCuFt: 1000, ratePerKm: 25.50, ratePerCuFt: 3.26 },
-        { name: 'Semi Trailer', capacityCuFt: 1600, ratePerKm: 23.35, ratePerCuFt: 3.26 },
-        { name: 'Link Trailer', capacityCuFt: 2500, ratePerKm: 23.35, ratePerCuFt: 3.26 },
-        { name: 'Link Trailers x 2', capacityCuFt: 5000, ratePerKm: 39.55, ratePerCuFt: 3.26 },
+        { name: 'Hino', capacityCuFt: 1000, ratePerKm: 20.60, ratePerCuFt: 3.26 },
+        { name: 'Semi Trailer', capacityCuFt: 1600, ratePerKm: 35.57, ratePerCuFt: 3.26 },
+        { name: 'Link Trailer', capacityCuFt: 2500, ratePerKm: 35.57, ratePerCuFt: 3.26 },
+        { name: 'Link Trailers x 2', capacityCuFt: 5000, ratePerKm: 40.56, ratePerCuFt: 3.26 },
     ],
     [CITY_CODES.DBN]: [
-        { name: 'Dyna 4', capacityCuFt: 300, ratePerKm: 15.80, ratePerCuFt: 3.26 },
-        { name: 'Hino 300', capacityCuFt: 1000, ratePerKm: 25.00, ratePerCuFt: 3.26 },
+        { name: 'Dyna 4', capacityCuFt: 300, ratePerKm: 13.65, ratePerCuFt: 3.26 },
+        { name: 'Hino 300', capacityCuFt: 1000, ratePerKm: 20.60, ratePerCuFt: 3.26 },
         { name: 'old Hino', capacityCuFt: 1500, ratePerKm: 26.40, ratePerCuFt: 3.26 },
-        { name: 'Link + 1 Trailer', capacityCuFt: 2500, ratePerKm: 23.35, ratePerCuFt: 3.26 },
-        { name: 'Link + 2 Trailers', capacityCuFt: 5000, ratePerKm: 39.55, ratePerCuFt: 3.26 },
+        { name: 'Link + 1 Trailer', capacityCuFt: 2500, ratePerKm: 35.57, ratePerCuFt: 3.26 },
+        { name: 'Link + 2 Trailers', capacityCuFt: 5000, ratePerKm: 40.56, ratePerCuFt: 3.26 },
     ],
     [CITY_CODES.GR]: 'NATIONAL', 
 };
@@ -62,19 +62,19 @@ export const ADDITIONAL_COSTS = {
 
 export const PACKAGING_RATES = {
     sendMeBoxesOnly: {
-        st7: 59.50,
-        linen: 146.00,
-        deliveryFee: 220.00
+        st7: 50.00,
+        linen: 125.00,
+        deliveryFee: 500.00
     },
     boxesAndPacking: {
-        st7: 146.00,
-        linen: 175.00,
-        deliveryFee: 220.00
+        st7: 85.00,
+        linen: 165.00,
+        deliveryFee: 500.00
     }
 };
 
 export const PRICING_CONSTANTS = {
-    minOrder: 2250,
+    minOrder: 2600,
     minKmRadius: 100,
     documentationFee: 175,
     weekendSurcharge: 440,

@@ -62,22 +62,30 @@ export default function Navbar() {
                 }
                 flex justify-between items-center
             `}>
-                {/* Logo */}
                 <Link to="/" className="flex items-center gap-2 group">
-                    <div className="flex items-center gap-1">
-                        <span className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 transition-transform duration-300 group-hover:scale-105">
+                    <img 
+                        src="/images/logo.png" 
+                        alt="Master Movers" 
+                        className="h-7 md:h-9 object-contain transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                        }}
+                    />
+                    <div className="hidden items-center gap-1">
+                        <span className="text-xl md:text-2xl font-black tracking-tighter text-slate-900">
                             <span className="text-red-600">Master</span>Movers
                         </span>
                     </div>
                 </Link>
 
                 {/* Desktop Nav */}
-                <div className="hidden xl:flex items-center gap-8">
+                <div className="hidden xl:flex items-center gap-6">
                     {navLinks.map((link) => (
                         <div key={link.name} className="relative group">
                             <Link
                                 to={link.path}
-                                className={`text-[11px] font-black tracking-[0.2em] transition-all duration-300 hover:text-red-600 flex items-center gap-1.5 ${isActive(link.path)
+                                className={`text-[11px] font-black tracking-[0.2em] whitespace-nowrap transition-all duration-300 hover:text-red-600 flex items-center gap-1.5 ${isActive(link.path)
                                     ? 'text-red-600'
                                     : 'text-slate-500'
                                     }`}

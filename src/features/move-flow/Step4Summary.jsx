@@ -87,12 +87,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const isStep4Initialized = React.useRef(false)
 
     // Calculate Totals
-    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, requiresCrateFlag, requiresPhotoFlag, needsConsultation } = useMemo(() => {
+    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove } = useMemo(() => {
         try {
             return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
         } catch (e) {
             console.error("Calculation Error:", e)
-            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
+            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
@@ -111,8 +111,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [moveDetails.contactName, searchParams, submitQuote, submissionType])
 
     const handleProceed = async () => {
-        if (subTotal < PRICING_CONSTANTS.minOrder) {
-            alert(`Minimum Charge Notice:\n\nOur minimum rate for a move is R ${PRICING_CONSTANTS.minOrder.toLocaleString()}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
+        if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
+            alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString()}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
             return
         }
 
@@ -316,6 +316,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 </div>
             )}
 
+            <div className="mb-8 flex flex-col sm:flex-row items-center justify-between bg-white border border-slate-100 p-6 rounded-3xl shadow-sm gap-4">
+                <div className="flex items-center gap-4">
+                    <img src="/images/logo.png" alt="Master Movers" className="h-12 object-contain" />
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Move Proposal</h2>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">Official Pricing & Summary</p>
+                    </div>
+                </div>
+                <div className="bg-red-50 text-red-600 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-100">
+                    Step 4 of 4
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Quote Card */}
@@ -420,37 +433,6 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             </div>
                         </div>
 
-                        {/* Service Charges Editor */}
-                        <div className="border-t border-gray-100 pt-4">
-                            <button
-                                onClick={() => setShowServices(!showServices)}
-                                className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-red-600 transition-colors w-full"
-                            >
-                                {showServices ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                {showServices ? 'Hide Service Charges' : 'Adjust Service Charges (Testing)'}
-                            </button>
-                            
-                            {showServices && (
-                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg animate-in fade-in slide-in-from-top-2">
-                                    {SERVICE_KEYS.map(({ key, label }) => (
-                                        <div key={key} className="flex flex-col gap-1">
-                                            <label className="text-xs text-slate-500">{label}</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R</span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={manualServiceCharges[key] || ''}
-                                                    onChange={(e) => updateManualServiceCharge(key, e.target.value)}
-                                                    className="w-full pl-6 pr-3 py-1 text-sm border border-gray-200 rounded focus:border-primary-500 outline-none bg-white"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                         {discount > 0 && (
                             <div className="flex justify-between items-center py-4 border-b border-green-100 bg-green-50 px-4 -mx-4 rounded-xl">
                                 <span className="text-green-800 font-black uppercase text-xs tracking-widest flex items-center gap-2">
@@ -552,12 +534,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <FileText size={16} className="mr-2" /> Download PDF
                             </Button>
                             <Button variant="secondary" onClick={handleCallBackRequest} isLoading={isSubmitting}>
-                                <div className="flex items-center">
+                                <div className="flex items-center text-xs font-bold uppercase">
                                     <span className="relative flex h-3 w-3 mr-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                                     </span>
-                                    Request Call Back
+                                    Last chance, Old Schoolers?
                                 </div>
                             </Button>
                         </div>
@@ -706,6 +688,25 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </li>
                             )}
                         </ul>
+                    </div>
+
+                    {/* Move Notes / Special Instructions */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+                        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                            <Sparkles className="text-red-600" size={18} />
+                            Move Notes
+                        </h3>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notes / Special Instructions (If none, please say none)</label>
+                            <textarea
+                                name="generalNotes"
+                                required
+                                value={moveDetails.generalNotes}
+                                onChange={(e) => setMoveDetails({ generalNotes: e.target.value })}
+                                placeholder="Please describe any special items, tight spaces, or specific requirements..."
+                                className="w-full min-h-[100px] p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all text-sm bg-slate-50"
+                            />
+                        </div>
                     </div>
 
                     <Button variant="ghost" className="w-full" onClick={() => navigate(`${basePath}/inventory`)}>

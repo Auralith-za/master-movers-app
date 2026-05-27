@@ -4,7 +4,8 @@ import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Label } from '../../components/ui/Label'
 import { Input } from '../../components/ui/Input'
-import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus } from 'lucide-react'
+import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus, Loader2, Phone } from 'lucide-react'
+import { LeadCaptureModal } from './Step1Details'
 import clsx from 'clsx'
 
 const PROPERTY_TYPES = [
@@ -35,10 +36,12 @@ const Tooltip = ({ text }) => (
 
 export default function Step2Access() {
     const navigate = useNavigate()
-    const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails } = useMoveStore()
+    const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails, submitQuote } = useMoveStore()
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
+    const [showLeadModal, setShowLeadModal] = React.useState(false)
+    const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
 
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
@@ -116,13 +119,21 @@ export default function Step2Access() {
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
                                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Floor</p>
-                                    <Input
-                                        type="number"
-                                        min="0"
+                                    <select
                                         value={data.floorLevel}
-                                        onChange={(e) => handleUpdate(locationType, 'floorLevel', parseInt(e.target.value) || 0)}
-                                        className="h-9 text-sm"
-                                    />
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            handleUpdate(locationType, 'floorLevel', val === 'double_volume' || val === 'multiple_stairs' ? val : parseInt(val) || 0);
+                                        }}
+                                        className="w-full p-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium outline-none"
+                                    >
+                                        <option value={0}>Ground Floor</option>
+                                        <option value={1}>1st Floor</option>
+                                        <option value={2}>2nd Floor</option>
+                                        <option value={3}>3rd Floor</option>
+                                        <option value="double_volume">Double Volume</option>
+                                        <option value="multiple_stairs">Multiple Flights of Stairs</option>
+                                    </select>
                                 </div>
                                 <div className="flex flex-col gap-2 pt-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
@@ -408,14 +419,92 @@ export default function Step2Access() {
                         </div>
                     </div>
 
+                    {/* Step 2 Notes */}
+                    <div className="pt-8 border-t border-gray-100 space-y-4">
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
+                            <Sparkles className="text-red-600" size={24} />
+                            Step 2 Notes
+                        </h3>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Additional Site Details or Notes</label>
+                            <textarea
+                                name="generalNotes"
+                                value={moveDetails.generalNotes}
+                                onChange={(e) => setMoveDetails({ generalNotes: e.target.value })}
+                                placeholder="Describe any specialized entry details, parking rules, or access conditions here..."
+                                className="w-full min-h-[100px] p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all text-sm bg-slate-50"
+                            />
+                        </div>
+                    </div>
+
                 </div>
 
-                <div className="bg-gray-50 px-8 py-6 border-t border-gray-100 flex justify-between items-center">
-                    <Button variant="ghost" className="font-bold text-slate-400 hover:text-red-600" onClick={() => navigate(basePath)}>Back</Button>
-                    <Button size="lg" className="bg-red-600 hover:bg-red-700 px-12 py-7 uppercase tracking-widest font-black text-sm shadow-xl shadow-red-600/20" onClick={() => navigate(`${basePath}/inventory`)}>
-                        Next: Inventory <Truck className="ml-2" size={18} />
-                    </Button>
+                <div className="bg-gray-50 px-8 py-6 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                                setIsSubmittingLead(true)
+                                try {
+                                    await submitQuote({ status: 'lead', request_call_back: true })
+                                    alert("Request Sent! One of our agents will call you back shortly. 📞")
+                                } catch (err) {
+                                    console.error("Callback submission error:", err)
+                                    alert("Request Sent! (Note: Offline mode) We will call you shortly.")
+                                } finally {
+                                    setIsSubmittingLead(false)
+                                }
+                                return
+                            }
+                            setShowLeadModal(true)
+                        }}
+                        disabled={isSubmittingLead}
+                        className="flex flex-col items-center md:items-start p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group w-full md:max-w-xs text-left"
+                    >
+                        <div className="flex items-center gap-3 mb-1">
+                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
+                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"Sure you're not Old School?"</span>
+                        </div>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
+                    </button>
+                    <div className="flex gap-4 w-full md:w-auto justify-end">
+                        <Button variant="ghost" className="font-bold text-slate-400 hover:text-red-600" onClick={() => navigate(basePath)}>Back</Button>
+                        <Button size="lg" className="bg-red-600 hover:bg-red-700 px-12 py-7 uppercase tracking-widest font-black text-sm shadow-xl shadow-red-600/20" onClick={() => navigate(`${basePath}/inventory`)}>
+                            Next: Inventory <Truck className="ml-2" size={18} />
+                        </Button>
+                    </div>
                 </div>
+
+                <LeadCaptureModal 
+                    isOpen={showLeadModal} 
+                    onClose={() => setShowLeadModal(false)}
+                    isLoading={isSubmittingLead}
+                    initialData={moveDetails}
+                    onSubmit={async (formData) => {
+                        setIsSubmittingLead(true)
+                        try {
+                            setMoveDetails({
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone
+                            })
+                            await submitQuote({ 
+                                status: 'lead', 
+                                request_call_back: true,
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone,
+                                forceNew: true
+                            })
+                            return true
+                        } catch (err) {
+                            console.error("Lead submission error:", err)
+                            alert("Submission Error: " + (err.message || "Failed to reach server"))
+                        } finally {
+                            setIsSubmittingLead(false)
+                        }
+                    }}
+                />
             </div>
         </div>
     )

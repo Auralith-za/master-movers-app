@@ -20,10 +20,15 @@ export default function AdminLayout() {
         <div className="min-h-screen bg-slate-50 flex">
             {/* Sidebar */}
             <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10">
-                <div className="p-6 border-b border-slate-800">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary-500 to-rose-500 bg-clip-text text-transparent">
-                        MasterMovers Admin
-                    </h1>
+                <div className="p-4 border-b border-slate-800 flex flex-col gap-2 items-start justify-center">
+                    <div className="bg-white p-2.5 rounded-xl w-full flex items-center justify-center shadow-inner">
+                        <img 
+                            src="/images/logo.png" 
+                            alt="Master Movers" 
+                            className="h-10 object-contain"
+                        />
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest font-black text-slate-400 px-1 mt-1">Admin Panel</span>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2">

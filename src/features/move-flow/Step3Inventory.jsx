@@ -6,23 +6,36 @@ import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'
 import { Button } from '../../components/ui/Button'
 import { motion } from 'framer-motion'
-import { Search, Trash2, Truck, RotateCcw } from 'lucide-react'
+import { Search, Trash2, Truck, RotateCcw, Phone, Loader2, Sparkles } from 'lucide-react'
 import { Input } from '../../components/ui/Input'
 import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
+import { LeadCaptureModal } from './Step1Details'
+
+const orderedCategories = (() => {
+    const list = [...CATEGORIES];
+    const index = list.indexOf("Special Handling Items");
+    if (index > -1) {
+        list.splice(index, 1);
+        list.push("Special Handling Items");
+    }
+    return list;
+})();
 
 export default function Step3Inventory() {
     const navigate = useNavigate()
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
-    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, undo } = useMoveStore()
+    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
     const [searchTerm, setSearchTerm] = useState('')
-    const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
+    const [activeCategory, setActiveCategory] = useState(orderedCategories[0])
 
     // Modal states
     const [variationModalItem, setVariationModalItem] = useState(null)
     const [crateModalItem, setCrateModalItem] = useState(null) // For optional crate popup
     const [warningModal, setWarningModal] = useState({ show: false, title: '', message: '', onConfirm: null })
+    const [showLeadModal, setShowLeadModal] = useState(false)
+    const [isSubmittingLead, setIsSubmittingLead] = useState(false)
 
     const { totalVolume, packagingCost, currentVehicleName } = React.useMemo(() => {
         const result = calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
@@ -330,7 +343,7 @@ export default function Step3Inventory() {
 
                         {/* Categories */}
                         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                            {CATEGORIES.map(cat => (
+                            {orderedCategories.map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setActiveCategory(cat)}
@@ -369,18 +382,64 @@ export default function Step3Inventory() {
                             )}
                         </div>
 
+                        {/* Step 3 Notes */}
+                        <div className="mt-8 pt-8 border-t border-gray-100 space-y-4">
+                            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
+                                <Sparkles className="text-red-600" size={24} />
+                                Step 3 Notes
+                            </h3>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Additional Inventory or Wrapping Notes</label>
+                                <textarea
+                                    name="generalNotes"
+                                    value={moveDetails.generalNotes}
+                                    onChange={(e) => setMoveDetails({ generalNotes: e.target.value })}
+                                    placeholder="List any delicate furniture, wrapping demands, or special instructions here..."
+                                    className="w-full min-h-[100px] p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all text-sm bg-slate-50"
+                                />
+                            </div>
+                        </div>
+
                         {/* Next Button at bottom of items list */}
-                        <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="text-center md:text-left">
+                        <div className="mt-8 pt-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                                        setIsSubmittingLead(true)
+                                        try {
+                                            await submitQuote({ status: 'lead', request_call_back: true })
+                                            alert("Request Sent! One of our agents will call you back shortly. 📞")
+                                        } catch (err) {
+                                            console.error("Callback submission error:", err)
+                                            alert("Request Sent! (Note: Offline mode) We will call you shortly.")
+                                        } finally {
+                                            setIsSubmittingLead(false)
+                                        }
+                                        return
+                                    }
+                                    setShowLeadModal(true)
+                                }}
+                                disabled={isSubmittingLead}
+                                className="flex flex-col items-center md:items-start p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group w-full md:max-w-xs text-left"
+                            >
+                                <div className="flex items-center gap-3 mb-1">
+                                    {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
+                                    <span className="font-black text-slate-900 uppercase tracking-widest text-[10px] italic">"Are you really sure you're not Old School?"</span>
+                                </div>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
+                            </button>
+
+                            <div className="text-center md:text-left flex-1 md:ml-4">
                                 <p className="text-slate-900 font-black uppercase tracking-tight text-xl mb-1">Inventory Complete?</p>
                                 <p className="text-slate-500 text-sm">Review your move summary and final pricing.</p>
                             </div>
                             <Button 
-                                size="xl" 
-                                className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all"
+                                size="lg" 
+                                className="w-full md:w-auto px-10 py-5 text-sm uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all h-14"
                                 onClick={handleProceed}
                             >
-                                Next: Summary <Truck className="ml-3" size={20} />
+                                Next: Summary <Truck className="ml-3" size={16} />
                             </Button>
                         </div>
                     </div>
@@ -388,6 +447,36 @@ export default function Step3Inventory() {
 
             </div>
 
+            <LeadCaptureModal 
+                isOpen={showLeadModal} 
+                onClose={() => setShowLeadModal(false)}
+                isLoading={isSubmittingLead}
+                initialData={moveDetails}
+                onSubmit={async (formData) => {
+                    setIsSubmittingLead(true)
+                    try {
+                        setMoveDetails({
+                            contactName: `${formData.name} ${formData.surname}`,
+                            contactEmail: formData.email,
+                            contactPhone: formData.phone
+                        })
+                        await submitQuote({ 
+                            status: 'lead', 
+                            request_call_back: true,
+                            contactName: `${formData.name} ${formData.surname}`,
+                            contactEmail: formData.email,
+                            contactPhone: formData.phone,
+                            forceNew: true
+                        })
+                        return true
+                    } catch (err) {
+                        console.error("Lead submission error:", err)
+                        alert("Submission Error: " + (err.message || "Failed to reach server"))
+                    } finally {
+                        setIsSubmittingLead(false)
+                    }
+                }}
+            />
         </div>
     )
 }

@@ -57,11 +57,15 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <div className="mx-auto h-16 w-16 bg-primary-600 rounded-xl flex items-center justify-center text-white">
-                        <Shield size={32} />
+                <div className="text-center flex flex-col items-center justify-center">
+                    <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 mb-6 flex items-center justify-center">
+                        <img 
+                            src="/images/logo.png" 
+                            alt="Master Movers Logo" 
+                            className="h-14 object-contain"
+                        />
                     </div>
-                    <h2 className="mt-6 text-3xl font-extrabold text-slate-900">
+                    <h2 className="text-3xl font-extrabold text-slate-900">
                         Admin Portal
                     </h2>
                     <p className="mt-2 text-sm text-slate-600">

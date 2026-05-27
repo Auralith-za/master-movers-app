@@ -17,7 +17,6 @@ export default function VolumeSummary({ items, inventory, packagingCost = 0, chi
     return (
         <div
             className="bg-slate-900 text-white rounded-2xl shadow-xl sticky top-2 lg:top-24 flex flex-col overflow-hidden transition-all duration-300 z-40 mb-4 lg:mb-0"
-            style={{ maxHeight: '40vh' }}
         >
             {/* Header — never scrolls */}
             <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-1 flex-shrink-0">

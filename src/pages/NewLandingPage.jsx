@@ -92,15 +92,14 @@ export default function NewLandingPage() {
                                     className="flex flex-col items-center gap-10 w-full"
                                 >
                                     <Link to="/quote">
-                                        <Button
-                                            size="xl"
-                                            className="group relative bg-red-600 hover:bg-red-700 text-white min-w-[280px] md:min-w-[360px] px-8 md:px-20 py-8 md:py-12 text-2xl md:text-4xl font-black rounded-full transition-all duration-700 shadow-[0_30px_60px_rgba(220,38,38,0.25)] hover:shadow-[0_40px_80px_rgba(220,38,38,0.4)] hover:-translate-y-5 uppercase tracking-[0.2em] overflow-hidden"
+                                        <button
+                                            className="group relative bg-[#E31837] hover:bg-[#c4122d] text-white px-10 py-5 text-xl font-black rounded-2xl transition-all duration-300 shadow-[0_12px_24px_rgba(227,24,55,0.2)] hover:shadow-[0_16px_32px_rgba(227,24,55,0.35)] hover:-translate-y-1 flex items-center justify-center gap-4 uppercase tracking-[0.1em]"
                                         >
-                                            <span className="relative z-10 flex items-center justify-center gap-6 md:gap-10 w-full">
+                                            <span className="relative z-10 flex items-center justify-center gap-4 w-full">
                                                 <span>Start</span>
-                                                <ArrowRight className="group-hover:translate-x-8 transition-transform duration-700 w-8 h-8 md:w-14 md:h-14 flex-shrink-0" />
+                                                <ArrowRight className="group-hover:translate-x-2 transition-transform duration-300 w-6 h-6 flex-shrink-0" />
                                             </span>
-                                        </Button>
+                                        </button>
                                     </Link>
 
 
@@ -109,22 +108,6 @@ export default function NewLandingPage() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Subtle Cinematic Details - Now in flex flow to prevent overlap */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: showCTA ? 1 : 0 }}
-                        transition={{ delay: 1.5, duration: 2 }}
-                        className="mt-12 md:mt-20 flex flex-wrap items-center justify-center gap-6 md:gap-20 text-slate-400 text-[10px] md:text-[14px] font-black uppercase tracking-[0.3em] md:tracking-[0.7em] select-none pointer-events-none px-4"
-                    >
-                        <div className="flex items-center gap-2 md:gap-4">
-                            <Sparkles className="w-3 h-3 md:w-5 md:h-5 text-red-600/60" />
-                            AI Optimized
-                        </div>
-                        <div className="hidden md:block w-2.5 h-2.5 bg-slate-200 rounded-full" />
-                        <div className="whitespace-nowrap">Nationwide Network</div>
-                        <div className="hidden md:block w-2.5 h-2.5 bg-slate-200 rounded-full" />
-                        <div className="whitespace-nowrap">Premium Gear</div>
-                    </motion.div>
                 </div>
             </main>
 

@@ -324,27 +324,25 @@ export default function Step1Details() {
                                 required
                             />
                         </div>
-                    </div>
 
-                    <div className="border-t border-gray-100 my-8"></div>
+                        <div className="border-t border-gray-100 my-8"></div>
 
-                    {/* Section: Notes */}
-                    <div className="space-y-6">
-                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                            <Sparkles className="text-red-600" size={32} />
-                            Move Notes
-                        </h3>
-                        <div className="space-y-3">
-                            <label className="text-sm font-black text-slate-900 uppercase tracking-widest">Notes / Special Instructions (If none, please say none)</label>
-                            <textarea
-                                name="generalNotes"
-                                required
-                                value={moveDetails.generalNotes}
-                                onChange={handleChange}
-                                placeholder="Please describe any special items, tight spaces, or specific requirements..."
-                                className="w-full min-h-[160px] p-6 rounded-2xl border-2 border-gray-100 focus:ring-4 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all text-lg"
-                            />
-                            <p className="text-xs text-slate-400 font-medium">Help us give you the most accurate quote by providing as much detail as possible.</p>
+                        {/* Section: Notes */}
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                                <Sparkles className="text-red-600" size={24} />
+                                Step 1 Notes / Special Instructions
+                            </h3>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notes / Instructions (e.g. tight roads, specific timing)</label>
+                                <textarea
+                                    name="generalNotes"
+                                    value={moveDetails.generalNotes}
+                                    onChange={handleChange}
+                                    placeholder="Please describe any unique details about your details or timing requirements..."
+                                    className="w-full min-h-[100px] p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all text-sm bg-slate-50"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -354,7 +352,6 @@ export default function Step1Details() {
                     <button
                         type="button"
                         onClick={async () => {
-                            // If details already filled, just submit
                             if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
                                 setIsSubmittingLead(true)
                                 try {
@@ -368,19 +365,17 @@ export default function Step1Details() {
                                 }
                                 return
                             }
-                            // Otherwise show modal
                             setShowLeadModal(true)
                         }}
                         disabled={isSubmittingLead}
-                        className="flex-1 flex flex-col items-center md:items-start p-6 bg-white border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group"
+                        className="flex flex-col items-center md:items-start p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group w-full md:max-w-xs text-left"
                     >
                         <div className="flex items-center gap-3 mb-1">
-                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={24} /> : <Phone size={24} className="text-red-600 group-hover:animate-bounce" />}
-                            <span className="font-black text-slate-900 uppercase tracking-widest text-sm italic">"No, I'm Old School"</span>
+                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
+                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"Old School?"</span>
                         </div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.1em]">Request a Call Back from a human Agent</p>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
-
                     <Button type="submit" size="lg" className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all">
                         Next Step <Truck className="ml-3" size={20} />
                     </Button>

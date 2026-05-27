@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../../../lib/supabaseClient'
+import { INVENTORY_ITEMS } from '../data/mockItems'
 import { 
     CITY_CODES, 
     NATIONAL_RATES, 
@@ -137,7 +138,7 @@ export const useMoveStore = create(
                     state.inventory,
                     state.moveDetails,
                     state.accessDetails,
-                    [], // Placeholder for INVENTORY_ITEMS
+                    INVENTORY_ITEMS,
                     state.manualServiceCharges || {}
                 )
             },
@@ -153,7 +154,7 @@ export const useMoveStore = create(
                     state.inventory,
                     state.moveDetails,
                     state.accessDetails,
-                    [], // items will be passed from calculation engine
+                    INVENTORY_ITEMS,
                     state.manualServiceCharges
                 )
 
@@ -171,6 +172,7 @@ export const useMoveStore = create(
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
                     items_json: state.inventory || {},
                     total_price: totals.total || 0,
+                    total_volume: totals.totalVolume || 0,
                     status: dbOverrides.status || overrides.status || 'new',
                     request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back),
                 }
@@ -255,7 +257,7 @@ export const useMoveStore = create(
     )
 )
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, items, manualServiceCharges = {}) => {
+export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}) => {
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let autoPackagingCost = 0
@@ -299,22 +301,30 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
     let volumeRate = 0
 
     if (isNationalMove) {
-        // National logic: Flat rate per KM regardless of volume (Standard: Link)
+        // Jose's National logic: Volume-based calculation (volume * ratePerCuFt)
         const routeKey = `${pickupCityCode}-${dropoffCityCode}`
         const nationalRate = NATIONAL_RATES[routeKey]
         
         if (nationalRate) {
-            transportRate = nationalRate.ratePerKm
-            transportCost = totalDistance * transportRate
-            // National logic is flat rate times distance - no minAmount anymore as per request
+            volumeRate = nationalRate.ratePerCuFt
+            volumeCost = totalVolumeCuFt * volumeRate
+            
+            // Apply route-specific min charge
+            const minCharge = nationalRate.minCharge || 0
+            if (volumeCost < minCharge) {
+                volumeCost = minCharge
+            }
         } else {
             // Fallback for undefined routes
-            transportRate = 35 
-            transportCost = totalDistance * transportRate
+            volumeRate = 25
+            volumeCost = totalVolumeCuFt * volumeRate
+            if (volumeCost < 5000) {
+                volumeCost = 5000
+            }
         }
         
-        volumeCost = 0 // National has no ft3 charge in flat rate mode
-        volumeRate = 0
+        transportCost = 0 // National has no distance charge in Jose's volume-based mode
+        transportRate = 0
         vehicleName = 'Standard National Link'
     } else {
         // Local logic: Vehicle selection by volume + ft3 charge
@@ -328,6 +338,14 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
         transportCost = totalDistance * transportRate
         volumeCost = totalVolumeCuFt * volumeRate
         vehicleName = vehicle.name
+
+        // Apply flat minimum charge of R2600 for local moves
+        const localMinCharge = 2600
+        const currentLocalCost = transportCost + volumeCost
+        if (currentLocalCost < localMinCharge) {
+            const diff = localMinCharge - currentLocalCost
+            volumeCost += diff
+        }
     }
 
     let accessFees = 0
@@ -336,18 +354,34 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc) => {
         if (loc?.elevator) accessFees += 300
-        if (loc?.stairs) accessFees += (loc.floorLevel || 0) * 200
+        if (loc?.stairs) {
+            const fl = loc.floorLevel;
+            if (fl === 'double_volume') {
+                accessFees += 500;
+            } else if (fl === 'multiple_stairs') {
+                accessFees += 800;
+            } else {
+                accessFees += (parseInt(fl) || 0) * 200;
+            }
+        }
         if (loc?.specialConditions?.panhandle) accessFees += 0
         if (loc?.specialConditions?.hoisting) accessFees += 0
         
         // Shuttle: Track if needed
-        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle) {
+        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle) {
             hasShuttle = true
         }
         
-        // Long Carry: Flat rate R450 if distance > 30m
-        if (loc?.specialConditions?.longCarry && (parseFloat(loc?.longCarryDistance) > ADDITIONAL_COSTS.longCarry.thresholdMeters)) {
-            accessFees += ADDITIONAL_COSTS.longCarry.flatRate
+        // Long Carry / Shuttle based on distance:
+        // - 50m and over needs shuttle (R2500)
+        // - 30 - 50m gets R450 flat rate
+        if (loc?.specialConditions?.longCarry) {
+            const dist = parseFloat(loc?.longCarryDistance) || 0
+            if (dist >= 50) {
+                hasShuttle = true
+            } else if (dist >= 30) {
+                accessFees += ADDITIONAL_COSTS.longCarry.flatRate
+            }
         }
     }
     if (accessDetails?.origin) addAccess(accessDetails.origin)
@@ -398,7 +432,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
         packagingCost = st7Cost + linenCost + rates.deliveryFee
     }
 
-    const subTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + (PRICING_CONSTANTS.documentationFee || 175)
+    const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0
+    const subTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + (PRICING_CONSTANTS.documentationFee || 175)
     
     let discount = 0
     if (moveDetails.moveDate) {
@@ -416,8 +451,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
         // Adjust VAT accordingly if needed, or just keep it as a flat surcharge on final
     }
 
-    // Additional Notes: Min Order R2250
-    if (total < PRICING_CONSTANTS.minOrder) {
+    // Additional Notes: Min Order R2600 for local only
+    if (!isNationalMove && total < PRICING_CONSTANTS.minOrder) {
         total = PRICING_CONSTANTS.minOrder
     }
 
@@ -425,7 +460,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
     if (hasShuttle) detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
     const checkLoc = (loc, prefix) => {
         if (loc?.elevator) detailedAccess.push(`${prefix} Elevator: R300`)
-        if (loc?.stairs) detailedAccess.push(`${prefix} Stairs (${loc.floorLevel} flr): R${loc.floorLevel * 200}`)
+        if (loc?.stairs) {
+            const fl = loc.floorLevel;
+            const stairsFee = fl === 'double_volume' ? 500 : fl === 'multiple_stairs' ? 800 : (parseInt(fl) || 0) * 200;
+            const stairsLabel = fl === 'double_volume' ? 'Double Volume' : fl === 'multiple_stairs' ? 'Multiple Flights' : `${fl} flr`;
+            detailedAccess.push(`${prefix} Stairs (${stairsLabel}): R${stairsFee}`)
+        }
         if (loc?.specialConditions?.panhandle) detailedAccess.push(`${prefix} Panhandle: R0`)
         if (loc?.specialConditions?.hoisting) detailedAccess.push(`${prefix} Hoisting: R0`)
         if (loc?.specialConditions?.longCarry && (parseFloat(loc?.longCarryDistance) > ADDITIONAL_COSTS.longCarry.thresholdMeters)) {
@@ -455,6 +495,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items, man
         vat,
         totalVolume,
         totalVolumeCuFt,
+        isNationalMove,
         packagingCost: packagingCost + autoPackagingCost,
         requiresCrateFlag,
         requiresPhotoFlag,

@@ -1,0 +1,114 @@
+==================================================
+SHEET: Room Volumes
+==================================================
+                           Room  Volume (m³)
+0                  OFFICE/STUDY          NaN
+1                   Bulk filler       115.00
+2                    Desk lamp          5.10
+3               Mirror/pictures         4.00
+4                  Mirror large         5.00
+5                   Normal Desk        26.00
+6                      Credenza        22.00
+7                    Whiteboard         2.00
+8                Sewing machine        17.00
+9                      Pedestal         5.10
+10                       Carpet        13.60
+11                     Computer         4.00
+12                      Printer        10.00
+13                   Two Seater        37.00
+14                 Three seater        51.00
+15                   One seater        17.00
+16                Standing Lamp        17.00
+17                          Fan         8.00
+18                   Gas heater         8.00
+19                   Oil heater         4.25
+20   Exercise Machine/Treadmill        17.00
+21                 Coffee table        13.60
+22           Large coffee table        17.00
+23                        boxes         4.25
+24             Occasional table         6.80
+25               Small bookcase         8.00
+26               Large Bookcase        34.00
+27           LOUNGE/LIVING ROOM          NaN
+28         Three seater leather        51.00
+29           Two seater leather        37.00
+30           One seater leather        17.00
+31                     Tall boy        13.24
+32                     Painting          NaN
+33                  Bar Counter        34.00
+34                Standing lamp        17.00
+35                   Table lamp         5.10
+36                Upright Piano        85.00
+37             Baby grand Piano        85.00
+38              Display cabinet        51.00
+39             Wall unit medium        34.00
+40              wall unit small        26.00
+41               Small bookcase         8.00
+42               Large Bookcase        34.00
+43             Pictures/mirrors         4.00
+44                       Guiter         8.00
+45                       carpet        13.60
+46                      Cd rack         8.50
+47                    Bar stool         4.00
+48                 Mirror large         5.00
+49                        boxes         4.25
+50                  DINING ROOM          NaN
+51              Book case small         8.00
+52               Large Bookcase        34.00
+53                Kitchen chair         5.10
+54                     Tall boy        13.24
+55                     Painting         4.00
+56                       Guiter         8.00
+57                      CD rack         8.50
+58                  Bar counter        34.00
+59                       carpet        13.60
+60                Standing Lamp        17.00
+61                    Bar stool         4.00
+62                        Boxes         4.25
+63             Pictures/mirrors         4.00
+64                 Mirror large         5.00
+65             PASSAGE/ENTRANCE          NaN
+66              Telephone table         8.00
+67               Halfmoon table         8.50
+68                       Mirror         5.00
+69                     Painting         4.00
+70             Pictures/mirrors         4.00
+71               Glass pedestal         5.10
+72                    Hat stand         8.00
+73                   Hall stand        34.00
+74                         Kist        13.60
+75                        boxes         4.25
+76                     BEDROOMS          NaN
+77             Pictures/mirrors         4.00
+78                     Painting         4.00
+79               King headboard        34.00
+80              Double bunk bed        68.00
+81              Sleigh king bed        85.00
+82             Sleigh queen bed        73.00
+83            Sleigh double bed        73.00
+84                     Pedestal         5.10
+85                   Desk lamp          4.00
+86                         Desk        26.00
+87               Small bookcase         8.00
+88                   Small desk        17.00
+89   Exercise Machine/Treadmill        17.00
+90                 Office chair         8.50
+91                     Camp cot         8.00
+92                   Side table         5.10
+93                      Toy box         8.00
+94                 Bedside lamp         4.00
+95                Standing Lamp        17.00
+96                       Carpet        13.60
+97                         Kist        13.60
+98                        Boxes         4.25
+99                 Long ottoman         8.00
+100                  Love couch        17.00
+101                   Suitcases         8.00
+102           GENERAL FURNITURE          NaN
+103                  Cooler box         8.00
+104               Water machine        17.00
+105                  Pool table        85.00
+106                Tennis table       102.00
+107                  Trampoline        17.00
+108               Folding table        17.00
+

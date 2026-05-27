@@ -43,6 +43,7 @@ const REAL_RENDERS = {
     'display-cabinet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/u330a675_vm.webp',
     'wine-rack': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/dds.jpeg',
     'king-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-1453505460-612x612-1.jpg',
+    'king-size-bed-mattras': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-1453505460-612x612-1.jpg',
     'mattress-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/mattress-single-isolated-white-background-3d-illustration_771335-16282.jpg.avif',
     'double-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/cozy-bed-with-soft-fabric-upholstery-and-stylish-wooden-frame-set-against-a-bright-white-background-free-png.png',
     'queen-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/CreamArchieChenilleBed.jpg',
@@ -55,9 +56,27 @@ const REAL_RENDERS = {
     'compactum': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/224859845-1200-1600.webp',
     'chest-of-drawers': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/224168512-1200-1600.webp',
     'dressing-table': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/cle207_5.jpg',
-    'cheval-mirror': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images-1.jpeg',
+    'cheval-mirror': '/images/inventory/cheval-mirror.webp',
     'large-mirror-bedroom': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/71x31.5-inch-metal-arch-stand-full-length-mirror-for-Living-RoomBedroom.jpg',
-    'dumb-valet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/Dumb-Valet-Mahogany-Veneer.jpg',
+    'dumb-valet': '/images/inventory/dumb-valet.jpg',
+    'boxes': '/images/inventory/boxes.avif',
+    'bulk-filler': '/images/inventory/bulk-filler.jpg',
+    'chair-kitchen-room': '/images/inventory/chair-kitchen-room.jpeg',
+    'credenza': '/images/inventory/credenza.jpg',
+    'desk-lamp': '/images/inventory/desk-lamp.webp',
+    'exercise-machine-treadmill': '/images/inventory/exercise-machine-treadmill.avif',
+    'hat-stand': '/images/inventory/hat-stand.png',
+    'kist': '/images/inventory/kist.webp',
+    'kitchen-chair': '/images/inventory/kitchen-chair.webp',
+    'mirror-pictures': '/images/inventory/mirror-pictures.jpg',
+    'normal-desk': '/images/inventory/normal-desk.webp',
+    'painting': '/images/inventory/painting.webp',
+    'pedestals': '/images/inventory/pedestals.jpg',
+    'printer': '/images/inventory/printer.jpeg',
+    'tall-boy': '/images/inventory/tall-boy.webp',
+    'trampoline': '/images/inventory/trampoline.webp',
+    'wheelbarrow': '/images/inventory/wheelbarrow.webp',
+    'whiteboard': '/images/inventory/whiteboard.jpeg',
     'fridge-double-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/360_F_1966774576_7a639r3giBMyZDRuqlB5HqiKzg7NhNOj.jpg',
     'fridge-s-door-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images-3.jpeg',
     'small-fridge-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-2201593742-612x612-1.jpg',
@@ -135,20 +154,29 @@ const REAL_RENDERS = {
     // Premium photorealistic fallbacks for unmatched items
     'bed-king': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=800&auto=format&fit=crop',
     'bed-single': 'https://images.unsplash.com/photo-1540518614846-7eded433c457?q=80&w=800&auto=format&fit=crop',
-    'washing-machine': 'https://images.unsplash.com/photo-1626806819282-2c1dc61a5e0c?q=80&w=800&auto=format&fit=crop',
+    'washing-machine': '/images/inventory/washing-machine.webp',
     'dishwasher': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=800&auto=format&fit=crop',
     'microwave': 'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?q=80&w=800&auto=format&fit=crop',
     'fridge-double': 'https://images.unsplash.com/photo-1571175432248-c8a7cc02be46?q=80&w=800&auto=format&fit=crop',
     'coffee-table': 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=800&auto=format&fit=crop',
-    'sideboard': 'https://images.unsplash.com/photo-1595428774754-3e9134047f28?q=80&w=800&auto=format&fit=crop',
+    'sideboard': '/images/inventory/sideboard.jpeg',
     'dining-table': 'https://images.unsplash.com/photo-1577145946459-39a243444415?q=80&w=800&auto=format&fit=crop',
     'generic-box': 'https://images.unsplash.com/photo-1566576721346-d4a3b4eaad21?q=80&w=800&auto=format&fit=crop',
     'treadmill': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800&auto=format&fit=crop',
     'outdoor-chair': 'https://images.unsplash.com/photo-1596434445336-9791485698b5?q=80&w=800&auto=format&fit=crop',
+    'guitar': '/images/inventory/guitar.avif',
+    'huge-gas-heaters': '/images/inventory/huge-gas-heaters.webp',
+    'pedestal': '/images/inventory/pedestal.png',
+    'sewing-machine': '/images/inventory/sewing-machine.jpg',
+    'water-cooler': '/images/inventory/water-cooler.jpg',
+    'water-machine': '/images/inventory/water-machine.webp',
 }
 
 const getInventoryImage = (item) => {
     const id = item.id.toLowerCase();
+    
+    // 0. EXACT MATCH IN REAL_RENDERS
+    if (REAL_RENDERS[id]) return REAL_RENDERS[id];
     
     // 1. LOCAL OVERRIDE (Priority)
     const localPath = `/images/inventory/${id}.png`;
@@ -430,34 +458,30 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                 </div>
 
                 <div className="flex items-center justify-between pt-2 md:pt-4 border-t border-slate-50">
-                    <div className="flex items-center gap-1 md:gap-2">
+                    {quantity > 0 ? (
+                        <div className="flex items-center justify-between w-full">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+                                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-all"
+                            >
+                                <Minus size={16} />
+                            </button>
+                            <span className="text-base font-black text-slate-900 w-12 text-center">{quantity}</span>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
+                                className="w-10 h-10 rounded-xl bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-all shadow-md shadow-red-200 active:scale-95"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                    ) : (
                         <button
-                            onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
-                            className={clsx(
-                                "w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center transition-all",
-                                quantity > 0 
-                                    ? "bg-slate-100 text-slate-500 hover:bg-slate-200" 
-                                    : "opacity-0 pointer-events-none"
-                            )}
+                            onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
+                            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all active:scale-[0.98]"
                         >
-                            <Minus size={14} className="md:w-[18px] md:h-[18px]" />
+                            <Plus size={14} className="stroke-[3]" /> Add to Move
                         </button>
-                        {quantity > 0 && (
-                            <span className="text-sm md:text-lg font-black text-slate-900 w-6 md:w-8 text-center">{quantity}</span>
-                        )}
-                    </div>
-
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
-                        className={clsx(
-                            "w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-95",
-                            quantity > 0
-                                ? "bg-red-600 text-white hover:bg-red-700 shadow-red-200"
-                                : "bg-white border-2 border-slate-100 text-slate-400 hover:border-red-600 hover:text-red-600"
-                        )}
-                    >
-                        <Plus size={20} className="md:w-[24px] md:h-[24px]" />
-                    </button>
+                    )}
                 </div>
             </div>
 

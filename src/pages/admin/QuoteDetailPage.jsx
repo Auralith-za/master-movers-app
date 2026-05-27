@@ -7,12 +7,22 @@ import {
     Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
-import { calculateQuote } from '../../features/inventory/store/moveStore'
+import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
+import { calculateQuote, useMoveStore } from '../../features/inventory/store/moveStore'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
 import clsx from 'clsx'
+
+const orderedCategories = (() => {
+    const list = [...CATEGORIES];
+    const index = list.indexOf("Special Handling Items");
+    if (index > -1) {
+        list.splice(index, 1);
+        list.push("Special Handling Items");
+    }
+    return list;
+})();
 
 export default function QuoteDetailPage() {
     const { id } = useParams()
@@ -23,6 +33,9 @@ export default function QuoteDetailPage() {
     const [editForm, setEditForm] = useState({})
     const [activities, setActivities] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
+    
+    const [selectedCategory, setSelectedCategory] = useState(orderedCategories[0])
+    const [showCatalog, setShowCatalog] = useState(false)
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [newNote, setNewNote] = useState('')
     const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '' })
@@ -86,10 +99,12 @@ export default function QuoteDetailPage() {
             setQuote(data)
             
             // Fix items_json if it's nested or legacy
-            const rawItems = data.items_json?.items || data.items_json || {}
+            const rawItems = data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {})
+            const rawSpecialWrapping = data.items_json?.special_wrapping || {}
             setEditForm({
                 ...data,
                 items_json: rawItems,
+                special_wrapping: rawSpecialWrapping,
                 custom_products: data.custom_products || []
             })
         } catch (error) {
@@ -173,10 +188,20 @@ export default function QuoteDetailPage() {
             isSharedLoad: editForm.is_shared_load || false
         }
 
-        const accessDetails = editForm.access_details || {}
-        
-        return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, editForm.manual_service_charges || {})
-    }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, isEditing])
+        // Include individual item wrapping fees into calculation!
+        const manualServiceCharges = { ...(editForm.manual_service_charges || {}) }
+        let individualWrappingCost = 0
+        if (editForm.special_wrapping) {
+            Object.entries(editForm.special_wrapping).forEach(([itemId, wrap]) => {
+                if (wrap?.enabled && wrap?.fee) {
+                    individualWrappingCost += (parseFloat(wrap.fee) || 0) * (inventory[itemId] || 0)
+                }
+            })
+        }
+        manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost
+
+        return calculateQuote(inventory, moveDetails, editForm.access_details, INVENTORY_ITEMS, manualServiceCharges)
+    }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, isEditing])
 
     const handleUpdateQuantity = (itemId, newQty) => {
         const updatedItems = { ...editForm.items_json }
@@ -236,7 +261,10 @@ export default function QuoteDetailPage() {
                 status: editForm.status,
                 rejection_reason: editForm.rejection_reason,
                 team_notes: editForm.team_notes,
-                items_json: editForm.items_json,
+                items_json: {
+                    items: editForm.items_json,
+                    special_wrapping: editForm.special_wrapping || {}
+                },
                 total_price: finalPrice,
                 total_volume: finalVolume,
                 customer_comments: editForm.customer_comments,
@@ -272,7 +300,15 @@ export default function QuoteDetailPage() {
                 alert('Quote created successfully!')
                 navigate(`/admin/quotes/${newId}`)
             } else {
-                setQuote({ ...editForm, total_price: finalPrice, total_volume: finalVolume })
+                setQuote({ 
+                    ...editForm, 
+                    items_json: {
+                        items: editForm.items_json,
+                        special_wrapping: editForm.special_wrapping || {}
+                    },
+                    total_price: finalPrice, 
+                    total_volume: finalVolume 
+                })
                 await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`)
                 setIsEditing(false)
                 alert('Quote updated successfully!')
@@ -379,8 +415,8 @@ export default function QuoteDetailPage() {
     if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>
     if (!quote) return <div className="p-8 text-center"><p className="text-red-500">Quote not found</p></div>
 
-    const displayInventory = isEditing ? editForm.items_json : (quote.items_json?.items || quote.items_json || {})
-    const isManualEditable = quote.status === 'lead' || quote.status === 'new' || quote.status === 'processing'
+    const displayInventory = isEditing ? (editForm.items_json || {}) : (quote?.items_json?.items || quote?.items_json || {})
+    const isManualEditable = quote?.status === 'lead' || quote?.status === 'new' || quote?.status === 'processing'
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto px-4">
@@ -475,7 +511,7 @@ export default function QuoteDetailPage() {
                                             onChange={e => setEditForm({...editForm, client_name: e.target.value})}
                                         />
                                     ) : (
-                                        <p className="text-sm font-medium text-slate-900">{quote.client_name}</p>
+                                        <p className="text-sm font-medium text-slate-900">{quote?.client_name}</p>
                                     )}
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -484,7 +520,7 @@ export default function QuoteDetailPage() {
                                         {isEditing ? (
                                             <input className="w-full text-xs border border-gray-100 rounded p-2" value={editForm.client_email || ''} onChange={e => setEditForm({...editForm, client_email: e.target.value})} />
                                         ) : (
-                                            <p className="text-xs text-slate-600">{quote.client_email}</p>
+                                            <p className="text-xs text-slate-600">{quote?.client_email}</p>
                                         )}
                                     </div>
                                     <div>
@@ -492,7 +528,7 @@ export default function QuoteDetailPage() {
                                         {isEditing ? (
                                             <input className="w-full text-xs border border-gray-100 rounded p-2" value={editForm.client_phone || ''} onChange={e => setEditForm({...editForm, client_phone: e.target.value})} />
                                         ) : (
-                                            <p className="text-xs text-slate-600">{quote.client_phone}</p>
+                                            <p className="text-xs text-slate-600">{quote?.client_phone}</p>
                                         )}
                                     </div>
                                 </div>
@@ -512,7 +548,7 @@ export default function QuoteDetailPage() {
                                             <option value="boxes_and_packing">Full Packaging (Boxes + Packing)</option>
                                         </select>
                                     ) : (
-                                        <span className="text-xs font-bold text-slate-900 uppercase">{quote.packaging_option}</span>
+                                        <span className="text-xs font-bold text-slate-900 uppercase">{quote?.packaging_option}</span>
                                     )}
                                 </div>
                                 {editForm.packaging_option !== 'none' && isEditing && (
@@ -590,58 +626,99 @@ export default function QuoteDetailPage() {
                                 </h3>
                             </div>
                             {isEditing && (
-                                <div className="relative">
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500">
-                                        <Plus size={16} className="text-slate-400" />
-                                        <input 
-                                            placeholder="Add item..." 
-                                            className="bg-transparent border-none outline-none text-sm w-40"
-                                            value={searchQuery}
-                                            onChange={e => setSearchQuery(e.target.value)}
-                                        />
-                                    </div>
-                                    {filteredItems.length > 0 && searchQuery.length >= 2 && (
-                                        <div className="absolute right-0 top-full mt-1 w-64 bg-white shadow-xl border border-gray-100 rounded-lg z-50 p-1 overflow-hidden">
-                                            {filteredItems.map(item => (
-                                                <button 
-                                                    key={item.id}
-                                                    onClick={() => handleAddItem(item)}
-                                                    className="w-full text-left p-2 hover:bg-slate-50 text-sm rounded transition-colors flex justify-between items-center"
-                                                >
-                                                    <span>{item.name} ({item.volume}ft³)</span>
-                                                    <Plus size={14} className="text-slate-300" />
-                                                </button>
-                                            ))}
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500">
+                                            <Plus size={16} className="text-slate-400" />
+                                            <input 
+                                                placeholder="Add item..." 
+                                                className="bg-transparent border-none outline-none text-sm w-40"
+                                                value={searchQuery}
+                                                onChange={e => setSearchQuery(e.target.value)}
+                                            />
                                         </div>
-                                    )}
-
-                                    {selectedItemForVariation && (
-                                        <div className="absolute top-full right-0 w-64 bg-slate-900 text-white rounded-lg shadow-xl mt-1 z-50 p-4 animate-in fade-in zoom-in-95">
-                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Select Variation</h4>
-                                            <p className="text-xs font-bold mb-3">{selectedItemForVariation.name}</p>
-                                            <div className="space-y-1">
-                                                {selectedItemForVariation.variationOptions.map(opt => (
+                                        {filteredItems.length > 0 && searchQuery.length >= 2 && (
+                                            <div className="absolute right-0 top-full mt-1 w-64 bg-white shadow-xl border border-gray-100 rounded-lg z-50 p-1 overflow-hidden">
+                                                {filteredItems.map(item => (
                                                     <button 
-                                                        key={opt}
-                                                        onClick={() => handleAddItem(selectedItemForVariation, opt)}
-                                                        className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold hover:bg-white/10 rounded transition-colors flex justify-between items-center"
+                                                        key={item.id}
+                                                        onClick={() => handleAddItem(item)}
+                                                        className="w-full text-left p-2 hover:bg-slate-50 text-sm rounded transition-colors flex justify-between items-center"
                                                     >
-                                                        {opt}
-                                                        <Plus size={10} />
+                                                        <span>{item.name} ({item.volume}ft³)</span>
+                                                        <Plus size={14} className="text-slate-300" />
                                                     </button>
                                                 ))}
                                             </div>
-                                            <button onClick={() => setSelectedItemForVariation(null)} className="w-full mt-4 text-[9px] uppercase font-black text-slate-500 hover:text-white">Cancel</button>
-                                        </div>
-                                    )}
+                                        )}
+
+                                        {selectedItemForVariation && (
+                                            <div className="absolute top-full right-0 w-64 bg-slate-900 text-white rounded-lg shadow-xl mt-1 z-50 p-4 animate-in fade-in zoom-in-95">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Select Variation</h4>
+                                                <p className="text-xs font-bold mb-3">{selectedItemForVariation.name}</p>
+                                                <div className="space-y-1">
+                                                    {selectedItemForVariation.variationOptions.map(opt => (
+                                                        <button 
+                                                            key={opt}
+                                                            onClick={() => handleAddItem(selectedItemForVariation, opt)}
+                                                            className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold hover:bg-white/10 rounded transition-colors flex justify-between items-center"
+                                                        >
+                                                            {opt}
+                                                            <Plus size={10} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <button onClick={() => setSelectedItemForVariation(null)} className="w-full mt-4 text-[9px] uppercase font-black text-slate-500 hover:text-white">Cancel</button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
+
+                        {/* Catalog / Room Selector */}
+                        {isEditing && (
+                            <div className="p-6 bg-slate-50/50 border-b border-gray-100 space-y-4">
+                                <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+                                    {orderedCategories.map(cat => (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setSelectedCategory(cat)}
+                                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
+                                                selectedCategory === cat
+                                                    ? 'bg-primary-600 text-white shadow-sm shadow-primary-900/10'
+                                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+                                                                {INVENTORY_ITEMS.filter(item => item.category === selectedCategory && (searchQuery.length < 2 || item.name.toLowerCase().includes(searchQuery.toLowerCase()))).map(item => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => handleAddItem(item)}
+                                            className="flex items-center justify-between p-2.5 bg-white border border-slate-100 hover:border-primary-500 rounded-xl text-left transition-all hover:shadow-sm"
+                                        >
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <span className="text-xs font-bold text-slate-700 truncate">{item.name}</span>
+                                            </div>
+                                            <Plus size={14} className="text-slate-400 flex-shrink-0 ml-1.5" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-500">
                                         <th className="px-6 py-3 font-medium">Item Name</th>
+                                        <th className="px-6 py-3 font-medium text-center">Special Wrapping</th>
                                         <th className="px-6 py-3 font-medium w-32 text-center">Quantity</th>
                                         <th className="px-6 py-3 font-medium w-24 text-right">Action</th>
                                     </tr>
@@ -650,6 +727,7 @@ export default function QuoteDetailPage() {
                                     {Object.entries(displayInventory).map(([itemId, qty]) => {
                                         const [id] = itemId.split('_')
                                         const item = INVENTORY_ITEMS.find(i => i.id === id)
+                                        const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, fee: 0 }
                                         return (
                                             <tr key={itemId} className="hover:bg-slate-50/50">
                                                 <td className="px-6 py-4 flex items-center gap-3">
@@ -658,6 +736,59 @@ export default function QuoteDetailPage() {
                                                         <p className="font-bold text-slate-900">{item?.name || itemId}</p>
                                                         <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'}</p>
                                                     </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {isEditing ? (
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={wrapInfo.enabled || false}
+                                                                    onChange={(e) => {
+                                                                        const enabled = e.target.checked
+                                                                        const updatedWrap = {
+                                                                            ...(editForm.special_wrapping || {}),
+                                                                            [itemId]: {
+                                                                                ...wrapInfo,
+                                                                                enabled,
+                                                                                fee: enabled ? (wrapInfo.fee || 600) : 0
+                                                                            }
+                                                                        }
+                                                                        setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                    }}
+                                                                    className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                                                                />
+                                                                Wrap
+                                                            </label>
+                                                            {wrapInfo.enabled && (
+                                                                <div className="relative mt-1 flex items-center justify-center">
+                                                                    <span className="absolute left-2 text-[10px] font-bold text-slate-400">R</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={wrapInfo.fee || ''}
+                                                                        placeholder="Fee"
+                                                                        onChange={(e) => {
+                                                                            const fee = parseFloat(e.target.value) || 0
+                                                                            const updatedWrap = {
+                                                                                ...(editForm.special_wrapping || {}),
+                                                                                [itemId]: { ...wrapInfo, fee }
+                                                                            }
+                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                        }}
+                                                                        className="w-20 pl-5 pr-1 py-0.5 text-xs border border-slate-200 rounded text-center focus:border-primary-500 outline-none"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        wrapInfo.enabled ? (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                                                Wrapped (+R {wrapInfo.fee})
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-xs">—</span>
+                                                        )
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     {isEditing ? (
@@ -806,7 +937,7 @@ export default function QuoteDetailPage() {
                                             onChange={e => setEditForm({...editForm, pickup_address: e.target.value, pickup_city: e.target.city})}
                                         />
                                     ) : (
-                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote.pickup_address}</p>
+                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.pickup_address}</p>
                                     )}
                                 </div>
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
@@ -822,7 +953,7 @@ export default function QuoteDetailPage() {
                                             />
                                         </div>
                                     ) : (
-                                        <p className="text-sm font-bold text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</p>
+                                        <p className="text-sm font-bold text-slate-800">{new Date(quote?.move_date || Date.now()).toLocaleDateString()}</p>
                                     )}
                                 </div>
                             </div>
@@ -836,7 +967,7 @@ export default function QuoteDetailPage() {
                                             onChange={e => setEditForm({...editForm, dropoff_address: e.target.value, dropoff_city: e.target.city})}
                                         />
                                     ) : (
-                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote.dropoff_address}</p>
+                                        <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.dropoff_address}</p>
                                     )}
                                 </div>
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
@@ -847,7 +978,7 @@ export default function QuoteDetailPage() {
                                             <input 
                                                 type="number"
                                                 className="w-16 font-bold text-slate-800 text-sm border-none bg-transparent p-0 outline-none"
-                                                value={Number(isEditing ? editForm.distance_km : quote.distance_km).toFixed(1)}
+                                                value={Number(isEditing ? editForm.distance_km : (quote?.distance_km || 0)).toFixed(1)}
                                                 onChange={e => setEditForm({...editForm, distance_km: parseFloat(e.target.value) || 0})}
                                             />
                                             <span className="text-sm text-slate-400">km</span>
@@ -906,6 +1037,7 @@ export default function QuoteDetailPage() {
                                                 <option value="panhandle">Panhandle</option>
                                                 <option value="loading_bay">Loading Bay</option>
                                                 <option value="secure_complex">Inside Complex</option>
+                                                <option value="shuttle">Shuttle Required</option>
                                             </select>
                                         </div>
                                     </div>
@@ -942,7 +1074,38 @@ export default function QuoteDetailPage() {
                                         </label>
                                     </div>
 
+                                    {editForm.access_details?.[loc]?.specialConditions?.longCarry && (
+                                        <div className="mt-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100 animate-in fade-in slide-in-from-top-1">
+                                            <label className="text-[9px] uppercase font-black text-indigo-600 tracking-widest mb-1.5 block">Distance from Truck (meters)</label>
+                                            <div className="flex items-center gap-2">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="e.g. 45"
+                                                    value={editForm.access_details?.[loc]?.longCarryDistance || ''}
+                                                    onChange={(e) => {
+                                                        const details = { ...editForm.access_details }
+                                                        details[loc] = { ...details[loc], longCarryDistance: parseFloat(e.target.value) || 0 }
+                                                        setEditForm({...editForm, access_details: details})
+                                                    }}
+                                                    disabled={!isEditing}
+                                                    className="w-24 bg-white border border-gray-200 rounded px-2 py-1 text-xs focus:border-indigo-500 outline-none"
+                                                />
+                                                <span className="text-xs text-slate-400 font-bold uppercase">meters</span>
+                                            </div>
+                                            <p className="text-[8px] text-indigo-500 font-bold mt-1 uppercase">30-50m is R450. 50m and over needs shuttle (R2500).</p>
+                                        </div>
+                                    )}
+
                                     <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-200/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Shuttle Required?</span>
+                                            <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.shuttle || false} onChange={e => {
+                                                const details = { ...editForm.access_details };
+                                                const cond = details[loc].specialConditions || {};
+                                                details[loc] = { ...details[loc], specialConditions: { ...cond, shuttle: e.target.checked } };
+                                                setEditForm({...editForm, access_details: details});
+                                            }} disabled={!isEditing} />
+                                        </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase">Hoisting Req?</span>
                                             <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.hoisting || false} onChange={e => {
@@ -978,7 +1141,7 @@ export default function QuoteDetailPage() {
                         <div className="relative z-10">
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : quote.total_price)?.toLocaleString()}</span>
+                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : (quote?.total_price || 0))?.toLocaleString()}</span>
                                 {isEditing && (
                                     <span className="text-emerald-400 text-xs font-bold animate-pulse">Live</span>
                                 )}
@@ -987,11 +1150,11 @@ export default function QuoteDetailPage() {
                             <div className="mt-8 space-y-3 pt-6 border-t border-white/10">
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Assigned Vehicle</span>
-                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">{(isEditing ? recalculatedData?.breakdown?.vehicleType : quote.breakdown_json?.vehicleType) || 'Standard'}</span>
+                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">{(isEditing ? recalculatedData?.breakdown?.vehicleType : quote?.breakdown_json?.vehicleType) || 'Standard'}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Inventory Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : quote.total_volume)?.toFixed(2)} m³</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} m³</span>
                                 </div>
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
@@ -1001,7 +1164,7 @@ export default function QuoteDetailPage() {
                                 )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : (quote.total_price * 0.15 / 1.15)) || 0).toLocaleString()}</span>
+                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : ((quote?.total_price || 0) * 0.15 / 1.15)) || 0).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -1037,11 +1200,11 @@ export default function QuoteDetailPage() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl font-black">
-                                {quote.client_name?.charAt(0)}
+                                {quote?.client_name?.charAt(0) || 'M'}
                             </div>
                             <div>
-                                <h4 className="font-bold text-slate-900 tracking-tight">{quote.client_name}</h4>
-                                <p className="text-[11px] text-slate-400 font-bold uppercase">{quote.client_email}</p>
+                                <h4 className="font-bold text-slate-900 tracking-tight">{quote?.client_name || 'Manual Lead'}</h4>
+                                <p className="text-[11px] text-slate-400 font-bold uppercase">{quote?.client_email || 'No Email'}</p>
                             </div>
                         </div>
                         <div className="space-y-3">
