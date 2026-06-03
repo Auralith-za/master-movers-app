@@ -7,6 +7,7 @@ import Button from '../components/ui/Button'
 export default function NewLandingPage() {
     const [showContent, setShowContent] = useState(false);
     const [showCTA, setShowCTA] = useState(false);
+    const videoRef = React.useRef(null);
 
     useEffect(() => {
         // Prevent scrolling on the landing page
@@ -14,8 +15,16 @@ export default function NewLandingPage() {
 
         // Show logo content with a subtle entry fade (500ms)
         // Show the call to action button shortly after (1200ms)
-        const timer1 = setTimeout(() => setShowContent(true), 500);
-        const timer2 = setTimeout(() => setShowCTA(true), 1200);
+        const timer1 = setTimeout(() => setShowContent(true), 1500);
+        const timer2 = setTimeout(() => setShowCTA(true), 2500);
+
+        // Force programmatic video play on mobile devices
+        if (videoRef.current) {
+            videoRef.current.play().catch(err => {
+                console.log("Autoplay prevented:", err);
+            });
+        }
+
         return () => {
             document.body.style.overflow = 'unset';
             clearTimeout(timer1);
@@ -29,11 +38,14 @@ export default function NewLandingPage() {
             {/* 1. Full-Screen Cinematic Video Background */}
             <div className="fixed inset-0 z-0 bg-white">
                 <video
+                    ref={videoRef}
                     src="/images/untitled-design-3.mp4"
                     autoPlay
                     muted
                     playsInline
+                    webkit-playsinline="true"
                     loop={true}
+                    preload="auto"
                     className="w-full h-full object-cover mix-blend-multiply opacity-90"
                 />
                 {/* Soft top and bottom overlays for text readability */}
@@ -61,7 +73,7 @@ export default function NewLandingPage() {
                             }}
                             className="text-center"
                         >
-                            <div className="text-5xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-col md:flex-row justify-center items-center md:items-baseline gap-y-2 md:gap-x-8">
+                            <div className="text-4xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-col md:flex-row justify-center items-center md:items-baseline gap-y-2 md:gap-x-8">
                                 <span className="text-red-600">Master</span>
                                 <span className="text-slate-900">Movers</span>
                             </div>
