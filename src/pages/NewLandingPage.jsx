@@ -9,12 +9,10 @@ export default function NewLandingPage() {
     const [showCTA, setShowCTA] = useState(false);
 
     useEffect(() => {
-        // Timeline for the cinematic sequence
-        // 0s: Video starts (truck entering from left heading right)
-        // 5.5s: Truck rear is passing center (the reveal moment)
-        // 8s: CTA appears
-        const timer1 = setTimeout(() => setShowContent(true), 5500);
-        const timer2 = setTimeout(() => setShowCTA(true), 8000);
+        // Show logo content with a subtle entry fade (500ms)
+        // Show the call to action button shortly after (1200ms)
+        const timer1 = setTimeout(() => setShowContent(true), 500);
+        const timer2 = setTimeout(() => setShowCTA(true), 1200);
         return () => {
             clearTimeout(timer1);
             clearTimeout(timer2);
@@ -27,11 +25,11 @@ export default function NewLandingPage() {
             {/* 1. Full-Screen Cinematic Video Background */}
             <div className="fixed inset-0 z-0 bg-white">
                 <video
-                    src="https://cloudsplash.co.za/wp/wp-content/uploads/2026/03/Moving_Truck_Video_Generation.mp4"
+                    src="https://assets.mixkit.co/videos/preview/mixkit-young-couple-moving-cardboard-boxes-in-new-house-39886-large.mp4"
                     autoPlay
                     muted
                     playsInline
-                    loop={false}
+                    loop={true}
                     className="w-full h-full object-cover mix-blend-multiply opacity-90"
                 />
                 {/* Blend overlays to mask studio lights/edges and ensure total whiteness */}
