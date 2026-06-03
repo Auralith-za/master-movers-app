@@ -32,11 +32,9 @@ export default function NewLandingPage() {
                     loop={true}
                     className="w-full h-full object-cover mix-blend-multiply opacity-90"
                 />
-                {/* Blend overlays to mask studio lights/edges and ensure total whiteness */}
-                <div className="absolute inset-x-0 top-0 h-[25%] bg-gradient-to-b from-white via-white/80 to-transparent pointer-events-none" />
-                <div className="absolute inset-x-0 bottom-0 h-[15%] bg-gradient-to-t from-white to-transparent pointer-events-none" />
-                <div className="absolute inset-y-0 left-0 w-[15%] bg-gradient-to-r from-white to-transparent pointer-events-none" />
-                <div className="absolute inset-y-0 right-0 w-[15%] bg-gradient-to-l from-white to-transparent pointer-events-none" />
+                {/* Soft top and bottom overlays for text readability */}
+                <div className="absolute inset-x-0 top-0 h-[15%] bg-gradient-to-b from-white/70 to-transparent pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 h-[12%] bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
             </div>
 
             <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center pt-24 pb-40">
@@ -64,17 +62,19 @@ export default function NewLandingPage() {
                                 <span className="text-slate-900">Movers</span>
                             </div>
 
-                            <motion.h2
-                                initial={{ opacity: 0, x: -50 }}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
                                 animate={{
                                     opacity: showContent ? 1 : 0,
-                                    x: showContent ? 0 : -50
+                                    y: showContent ? 0 : 20
                                 }}
                                 transition={{ delay: 0.5, duration: 1.2 }}
-                                className="text-lg md:text-5xl font-light text-slate-400 tracking-tight px-4"
+                                className="inline-block mt-4"
                             >
-                                Start your moving journey with <span className="text-slate-900 font-medium whitespace-nowrap">Master Movers</span>
-                            </motion.h2>
+                                <span className="inline-flex items-center gap-2 px-6 py-2.5 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-full shadow-lg text-sm md:text-lg text-slate-700 tracking-wide font-medium">
+                                    Start your moving journey with <span className="text-red-600 font-black whitespace-nowrap">Master Movers</span>
+                                </span>
+                            </motion.div>
                         </motion.div>
                     </div>
 
@@ -109,8 +109,6 @@ export default function NewLandingPage() {
                 </div>
             </main>
 
-            {/* Final Cinematic Border Overlay - Lower z-index to stay below Navbar (z-50) */}
-            <div className="fixed inset-0 border-[15px] md:border-[30px] border-white pointer-events-none z-30 opacity-100" />
         </div>
     )
 
