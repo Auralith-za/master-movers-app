@@ -34,7 +34,7 @@ export default function MoveWizard() {
     }, [location.pathname]);
 
     return (
-        <div className="max-w-6xl mx-auto pb-20">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 pb-20">
             {/* Stepper Header */}
             <div className="mb-8 max-w-4xl mx-auto text-center md:text-left">
                 <h1 className="text-3xl font-extrabold text-slate-900 mb-2">{isAdmin ? 'Create Manual Quote' : 'Plan Your Move'}</h1>

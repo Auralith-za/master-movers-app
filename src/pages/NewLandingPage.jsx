@@ -18,11 +18,40 @@ export default function NewLandingPage() {
         const timer1 = setTimeout(() => setShowContent(true), 1500);
         const timer2 = setTimeout(() => setShowCTA(true), 2500);
 
-        // Force programmatic video play on mobile devices
+        // Force programmatic video play on mobile and desktop
         if (videoRef.current) {
-            videoRef.current.play().catch(err => {
-                console.log("Autoplay prevented:", err);
-            });
+            videoRef.current.muted = true;
+            videoRef.current.setAttribute('muted', 'true');
+            videoRef.current.setAttribute('playsinline', 'true');
+            videoRef.current.setAttribute('webkit-playsinline', 'true');
+            
+            const attemptPlay = () => {
+                videoRef.current.play().catch(err => {
+                    console.log("Autoplay blocked, waiting for interaction:", err);
+                });
+            };
+
+            attemptPlay();
+
+            // Fallback play trigger on user interaction if blocked
+            const playOnInteraction = () => {
+                if (videoRef.current) {
+                    videoRef.current.play().catch(e => console.log("Interaction play failed:", e));
+                }
+                document.removeEventListener('click', playOnInteraction);
+                document.removeEventListener('touchstart', playOnInteraction);
+            };
+
+            document.addEventListener('click', playOnInteraction);
+            document.addEventListener('touchstart', playOnInteraction);
+
+            return () => {
+                document.body.style.overflow = 'unset';
+                clearTimeout(timer1);
+                clearTimeout(timer2);
+                document.removeEventListener('click', playOnInteraction);
+                document.removeEventListener('touchstart', playOnInteraction);
+            };
         }
 
         return () => {
@@ -43,10 +72,13 @@ export default function NewLandingPage() {
                     autoPlay
                     muted
                     playsInline
-                    webkit-playsinline="true"
-                    loop={true}
+                    loop
                     preload="auto"
                     className="w-full h-full object-cover mix-blend-multiply opacity-90"
+                    onCanPlay={(e) => {
+                        e.target.muted = true;
+                        e.target.play().catch(err => console.log("Video onCanPlay play prevented:", err));
+                    }}
                 />
                 {/* Soft top and bottom overlays for text readability */}
                 <div className="absolute inset-x-0 top-0 h-[15%] bg-gradient-to-b from-white/70 to-transparent pointer-events-none" />
@@ -56,7 +88,7 @@ export default function NewLandingPage() {
             <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center justify-center py-6">
 
                 {/* 2. Seamless Brand Reveal Container */}
-                <div className="relative flex flex-col items-center w-full">
+                <div className="relative flex flex-col items-center w-full -mt-20 md:mt-0">
 
                     {/* The Logo (Revealed by the truck passing) */}
                     <div className="relative z-10">
@@ -73,7 +105,7 @@ export default function NewLandingPage() {
                             }}
                             className="text-center"
                         >
-                            <div className="text-4xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-col md:flex-row justify-center items-center md:items-baseline gap-y-2 md:gap-x-8">
+                            <div className="text-[11vw] xs:text-5xl sm:text-6xl md:text-[10rem] font-black tracking-tighter leading-none select-none flex flex-row justify-center items-center md:items-baseline gap-x-2 md:gap-x-8 whitespace-nowrap">
                                 <span className="text-red-600">Master</span>
                                 <span className="text-slate-900">Movers</span>
                             </div>
@@ -85,7 +117,7 @@ export default function NewLandingPage() {
                                     y: showContent ? 0 : 20
                                 }}
                                 transition={{ delay: 0.5, duration: 1.2 }}
-                                className="inline-block mt-4"
+                                className="inline-block mt-4 md:mt-16"
                             >
                                 <span className="inline-flex flex-wrap justify-center items-center gap-1.5 px-5 py-2.5 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl md:rounded-full shadow-lg text-xs md:text-lg text-slate-700 tracking-wide font-medium max-w-[90vw] md:max-w-none text-center">
                                     <span>Start your moving journey with</span>
@@ -96,7 +128,7 @@ export default function NewLandingPage() {
                     </div>
 
                     {/* 3. The Call to Action (Final Reveal) */}
-                    <div className="mt-6 md:mt-10 flex flex-col items-center gap-6 relative z-20 w-full max-w-4xl">
+                    <div className="mt-8 md:mt-16 flex flex-col items-center gap-4 relative z-20 w-full max-w-4xl">
                         <AnimatePresence>
                             {showCTA && (
                                 <motion.div
