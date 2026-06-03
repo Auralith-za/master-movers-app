@@ -86,18 +86,18 @@ export const PRICING_CONSTANTS = {
  */
 export const getCityCode = (cityName) => {
     if (!cityName) return null;
-    const name = cityName.toLowerCase();
+    const name = cityName.toLowerCase().trim();
     
-    if (name.includes('johannesburg') || name.includes('sandton') || name.includes('midrand') || name.includes('pretoria') || name.includes('germiston') || name.includes('randburg') || name.includes('roodepoort') || name.includes('benoni') || name.includes('boksburg') || name.includes('alexandra') || name.includes('edenvale') || name.includes('kempton park') || name.includes('springs') || name.includes('alberton') || name.includes('soweto')) {
+    if (name.includes('johannesburg') || name.includes('sandton') || name.includes('midrand') || name.includes('pretoria') || name.includes('germiston') || name.includes('randburg') || name.includes('roodepoort') || name.includes('benoni') || name.includes('boksburg') || name.includes('alexandra') || name.includes('edenvale') || name.includes('kempton park') || name.includes('springs') || name.includes('alberton') || name.includes('soweto') || name === 'jhb' || name.includes('jhb')) {
         return CITY_CODES.JHB;
     }
-    if (name.includes('cape town') || name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') || name.includes('paarl') || name.includes('epping')) {
+    if (name.includes('cape town') || name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') || name.includes('paarl') || name.includes('epping') || name === 'cpt' || name.includes('cpt')) {
         return CITY_CODES.CPT;
     }
-    if (name.includes('durban') || name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') || name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof')) {
+    if (name.includes('durban') || name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') || name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof') || name === 'dbn' || name.includes('dbn')) {
         return CITY_CODES.DBN;
     }
-    if (name.includes('knysna') || name.includes('george') || name.includes('plettenberg bay') || name.includes('mossel bay') || name.includes('garden route') || name.includes('sedgefield') || name.includes('wilderness') || name.includes('great brak') || name.includes('riversdale') || name.includes('still bay') || name.includes('oudtshoorn') || name.includes('de rust') || name.includes('uniondale') || name.includes('ladismith') || name.includes('barrydale') || name.includes('swellendam') || name.includes('heidelberg') || name.includes('albertinia') || name.includes('herbertsdale')) {
+    if (name.includes('knysna') || name.includes('george') || name.includes('plettenberg bay') || name.includes('mossel bay') || name.includes('garden route') || name.includes('sedgefield') || name.includes('wilderness') || name.includes('great brak') || name.includes('riversdale') || name.includes('still bay') || name.includes('oudtshoorn') || name.includes('de rust') || name.includes('uniondale') || name.includes('ladismith') || name.includes('barrydale') || name.includes('swellendam') || name.includes('heidelberg') || name.includes('albertinia') || name.includes('herbertsdale') || name === 'gr' || name.includes('gr')) {
         return CITY_CODES.GR;
     }
     

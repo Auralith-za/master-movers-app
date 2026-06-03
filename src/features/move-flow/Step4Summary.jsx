@@ -86,6 +86,33 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [rejectReason, setRejectReason] = useState('')
     const isStep4Initialized = React.useRef(false)
 
+    const [isCalculating, setIsCalculating] = useState(false)
+    const [calcMessage, setCalcMessage] = useState('Analyzing inventory volume...')
+
+    React.useEffect(() => {
+        if (!isCalculating) return;
+        const messages = [
+            'Analyzing inventory volume...',
+            'Calibrating route distance...',
+            'Optimizing vehicle allocation...',
+            'Finalizing move proposal...'
+        ];
+        let idx = 0;
+        const msgInterval = setInterval(() => {
+            idx = (idx + 1) % messages.length;
+            setCalcMessage(messages[idx]);
+        }, 400);
+
+        const timer = setTimeout(() => {
+            setIsCalculating(false);
+        }, 1800);
+
+        return () => {
+            clearInterval(msgInterval);
+            clearTimeout(timer);
+        };
+    }, [isCalculating]);
+
     // Calculate Totals
     const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove } = useMemo(() => {
         try {
@@ -109,6 +136,41 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             })
         }
     }, [moveDetails.contactName, searchParams, submitQuote, submissionType])
+
+    if (isCalculating) {
+        return (
+            <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-slate-950 text-white overflow-hidden">
+                {/* Background Lifestyle Image */}
+                <div 
+                    className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay"
+                    style={{ backgroundImage: "url('/images/lifestyle_moving.png')" }}
+                />
+                
+                {/* Visual Glass Box */}
+                <div className="relative z-10 bg-slate-900/80 backdrop-blur-md p-10 rounded-3xl border border-slate-700/50 max-w-md w-full text-center shadow-2xl flex flex-col items-center gap-6">
+                    <div className="w-16 h-16 rounded-full border-4 border-t-red-600 border-r-red-600 border-b-slate-800 border-l-slate-800 animate-spin" />
+                    
+                    <div>
+                        <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Generating Quote</h3>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest leading-none mt-1">Calibrating MasterMovers Engine</p>
+                    </div>
+
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-red-600 h-full rounded-full animate-[loading-bar_1.8s_ease-out_forwards]" style={{ width: '0%' }} />
+                    </div>
+
+                    <p className="text-red-400 font-bold uppercase tracking-wider text-xs h-6">{calcMessage}</p>
+                </div>
+
+                <style>{`
+                    @keyframes loading-bar {
+                        0% { width: 0%; }
+                        100% { width: 100%; }
+                    }
+                `}</style>
+            </div>
+        );
+    }
 
     const handleProceed = async () => {
         if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
@@ -425,10 +487,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         />
                                         <div>
                                             <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Payflex (Interest Free)</p>
-                                            <p className="text-[9px] text-indigo-600 font-bold uppercase">7% Surcharge applies</p>
+                                            <p className="text-[9px] text-indigo-600 font-bold uppercase">Service fees apply</p>
                                         </div>
                                     </div>
-                                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">+7%</span>
+                                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Service Fee</span>
                                 </label>
                             </div>
                         </div>

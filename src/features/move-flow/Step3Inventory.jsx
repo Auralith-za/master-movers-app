@@ -11,6 +11,18 @@ import { Input } from '../../components/ui/Input'
 import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
 import { LeadCaptureModal } from './Step1Details'
 
+const categoryEmojis = {
+    "Special Handling Items": "🎹",
+    "Lounge / Living Room": "🛋️",
+    "Dining Room": "🍽️",
+    "Bedrooms": "🛏️",
+    "Appliances": "🔌",
+    "Office / Study": "💼",
+    "General Furniture": "🪑",
+    "Outdoor & Patio": "⛱️",
+    "Boxes & Loose Items": "📦"
+};
+
 const orderedCategories = (() => {
     const list = [...CATEGORIES];
     const index = list.indexOf("Special Handling Items");
@@ -59,16 +71,18 @@ export default function Step3Inventory() {
     }, [currentVehicleName, lastVehicleName])
 
     const getQuantity = (itemId) => {
+        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
         return Object.entries(inventory)
-            .filter(([idKey]) => idKey === itemId || idKey.startsWith(`${itemId}_`))
+            .filter(([idKey]) => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`))
             .reduce((sum, [_, qty]) => sum + qty, 0);
     }
 
     const handleAddItem = (itemId) => {
-        const item = INVENTORY_ITEMS.find(i => i.id === itemId);
+        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
+        const item = INVENTORY_ITEMS.find(i => i.id === resolvedId);
         if (!item) return;
 
-        const currentQty = getQuantity(item.id);
+        const currentQty = getQuantity(resolvedId);
 
         if (item.variationOptions && item.variationOptions.length > 0) {
             setVariationModalItem(item);
@@ -92,7 +106,7 @@ export default function Step3Inventory() {
                     title: 'Photo Verification Needed',
                     message: 'This item requires a photo for accurate quoting. Please add it to your inventory and remember to send us a photo!',
                     onConfirm: () => {
-                        addItem(item.id);
+                        addItem(resolvedId);
                         setWarningModal({ show: false });
                     }
                 });
@@ -100,11 +114,12 @@ export default function Step3Inventory() {
             }
         }
 
-        addItem(item.id);
+        addItem(resolvedId);
     }
 
     const handleRemoveItem = (itemId) => {
-        const idKeys = Object.keys(inventory).filter(idKey => idKey === itemId || idKey.startsWith(`${itemId}_`));
+        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
+        const idKeys = Object.keys(inventory).filter(idKey => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`));
         if (idKeys.length > 0) {
             const parts = idKeys[0].split('_');
             removeItem(parts[0], parts[1] || null);
@@ -116,11 +131,15 @@ export default function Step3Inventory() {
 
     const filteredItems = INVENTORY_ITEMS.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesCategory = activeCategory ? item.category === activeCategory : true
+        const matchesCategory = searchTerm ? true : (activeCategory ? item.category === activeCategory : true)
         return matchesSearch && matchesCategory
     })
 
     const handleProceed = () => {
+        if (totalVolume === 0) {
+            alert("Oops! Please add at least one item to your inventory before proceeding.")
+            return
+        }
         if (totalVolume > VOLUME_THRESHOLD_FT3 && !showVolumeModal) {
             setShowVolumeModal(true)
         } else {
@@ -343,18 +362,22 @@ export default function Step3Inventory() {
 
                         {/* Categories */}
                         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                            {orderedCategories.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setActiveCategory(cat)}
-                                    className={`px-4 py-2 rounded-full text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
-                                        ? 'bg-red-600 text-white'
-                                        : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
+                            {orderedCategories.map(cat => {
+                                const isActive = activeCategory === cat;
+                                return (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setActiveCategory(cat)}
+                                        className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300 border-2 ${
+                                            isActive
+                                                ? 'bg-red-600 border-red-600 text-white shadow-md'
+                                                : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300'
                                         }`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
+                                    >
+                                        {cat}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {/* Items Grid - 2 columns on mobile */}
@@ -430,10 +453,6 @@ export default function Step3Inventory() {
                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                             </button>
 
-                            <div className="text-center md:text-left flex-1 md:ml-4">
-                                <p className="text-slate-900 font-black uppercase tracking-tight text-xl mb-1">Inventory Complete?</p>
-                                <p className="text-slate-500 text-sm">Review your move summary and final pricing.</p>
-                            </div>
                             <Button 
                                 size="lg" 
                                 className="w-full md:w-auto px-10 py-5 text-sm uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all h-14"

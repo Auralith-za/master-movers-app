@@ -13,7 +13,7 @@ const REAL_RENDERS = {
     'large-statues': '/images/inventory/large-statues.png',
     'small-statues': '/images/inventory/small-statues.png',
     'large-pot-plants': '/images/inventory/large-pot-plants.png',
-    'armchair-single': '/images/inventory/armchair-single.png',
+    'armchair-single': '/inventory/armchair-single.webp',
     'tv-large': '/images/inventory/tv-large.png',
     'tv-small': '/images/inventory/tv-small.png',
     'flatron-tv': '/images/inventory/flatron-tv.png',
@@ -49,11 +49,12 @@ const REAL_RENDERS = {
     'queen-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/CreamArchieChenilleBed.jpg',
     'single-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/wood-bed-isolated-on-white-600nw-2669527981.jpg.webp',
     'headboard-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/white-queen-furniture-of-america-bedroom-sets-idf7147whqndm-1d_600.jpg.avif',
+    'single-bed-headboard': '/inventory/single-bed-headboard.png',
     'bunk-beds': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images-2.jpeg',
     'baby-cot': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/Valecia-Cotbed-Image.jpg',
     'pram': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/p01-joie-pram-chrome-2-cashew-right-angle.jpg',
     'wardrobe-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/rustic-wooden-armoire-with-clothing_191095-80018.jpg.avif',
-    'compactum': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/224859845-1200-1600.webp',
+    'compactum': '/inventory/compactum.png',
     'chest-of-drawers': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/224168512-1200-1600.webp',
     'dressing-table': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/cle207_5.jpg',
     'cheval-mirror': '/images/inventory/cheval-mirror.webp',
@@ -80,7 +81,7 @@ const REAL_RENDERS = {
     'fridge-double-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/360_F_1966774576_7a639r3giBMyZDRuqlB5HqiKzg7NhNOj.jpg',
     'fridge-s-door-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images-3.jpeg',
     'small-fridge-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-2201593742-612x612-1.jpg',
-    'bar-fridge-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/ds.jpeg',
+    'bar-fridge-spec': '/inventory/barfridge.webp',
     'deep-freeze-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/KKCF07-W-ECOM-01.jpg.webp',
     'washing-machine-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/high-quality-washing-machine-with-open-door-on-transparent-background-free-png.png',
     'dishwasher-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/gray-dishwasher-on-white-background-600nw-1800440836.jpg.webp',
@@ -173,6 +174,11 @@ const REAL_RENDERS = {
 }
 
 const getInventoryImage = (item) => {
+    // 0. Custom cropped database images (Priority)
+    if (item.image && item.image.startsWith('/inventory/')) {
+        return item.image;
+    }
+
     const id = item.id.toLowerCase();
     
     // 0. EXACT MATCH IN REAL_RENDERS
@@ -225,12 +231,13 @@ const getInventoryImage = (item) => {
     if (id.includes('double-bed-base') || id.includes('double bed base')) return REAL_RENDERS['double-bed-base'];
     if (id.includes('queen-bed-base') || id.includes('queen bed base')) return REAL_RENDERS['queen-bed-base'];
     if (id.includes('single-bed-base') || id.includes('single bed base')) return REAL_RENDERS['single-bed-base'];
+    if (id === 'single-bed-headboard' || id.includes('single-bed-headboard')) return REAL_RENDERS['single-bed-headboard'];
     if (id.includes('headboard')) return REAL_RENDERS['headboard-spec'];
     if (id.includes('bunk')) return REAL_RENDERS['bunk-beds'];
     if (id.includes('cot')) return REAL_RENDERS['baby-cot'];
     if (id.includes('pram')) return REAL_RENDERS['pram'];
     if (id.includes('wardrobe')) return REAL_RENDERS['wardrobe-spec'];
-    if (id.includes('compactum')) return REAL_RENDERS['compactum'];
+    if (id === 'compactum' || id.includes('compactum')) return REAL_RENDERS['compactum'];
     if (id.includes('chest of drawer') || id.includes('chest-of-drawer')) return REAL_RENDERS['chest-of-drawers'];
     if (id.includes('dressing table')) return REAL_RENDERS['dressing-table'];
     if (id.includes('cheval mirror')) return REAL_RENDERS['cheval-mirror'];
@@ -458,30 +465,34 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                 </div>
 
                 <div className="flex items-center justify-between pt-2 md:pt-4 border-t border-slate-50">
-                    {quantity > 0 ? (
-                        <div className="flex items-center justify-between w-full">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
-                                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-all"
-                            >
-                                <Minus size={16} />
-                            </button>
-                            <span className="text-base font-black text-slate-900 w-12 text-center">{quantity}</span>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
-                                className="w-10 h-10 rounded-xl bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-all shadow-md shadow-red-200 active:scale-95"
-                            >
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    ) : (
+                    <div className="flex items-center gap-1 md:gap-2">
                         <button
-                            onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
-                            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all active:scale-[0.98]"
+                            onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+                            className={clsx(
+                                "w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center transition-all",
+                                quantity > 0 
+                                    ? "bg-slate-100 text-slate-500 hover:bg-slate-200" 
+                                    : "opacity-0 pointer-events-none"
+                            )}
                         >
-                            <Plus size={14} className="stroke-[3]" /> Add to Move
+                            <Minus size={14} className="md:w-[18px] md:h-[18px]" />
                         </button>
-                    )}
+                        {quantity > 0 && (
+                            <span className="text-sm md:text-lg font-black text-slate-900 w-6 md:w-8 text-center">{quantity}</span>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
+                        className={clsx(
+                            "w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-95",
+                            quantity > 0
+                                ? "bg-red-600 text-white hover:bg-red-700 shadow-red-200"
+                                : "bg-white border-2 border-slate-100 text-slate-400 hover:border-red-600 hover:text-red-600"
+                        )}
+                    >
+                        <Plus size={20} className="md:w-[24px] md:h-[24px]" />
+                    </button>
                 </div>
             </div>
 

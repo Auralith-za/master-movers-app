@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus, Loader2, Phone } from 'lucide-react'
 import { LeadCaptureModal } from './Step1Details'
 import clsx from 'clsx'
+import { PACKAGING_RATES } from '../inventory/data/pricingRates'
 
 const PROPERTY_TYPES = [
     { id: 'house', label: 'House', icon: Home },
@@ -332,7 +333,7 @@ export default function Step2Access() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">ST 7 Boxes (R{moveDetails.packagingOption === 'boxes_only' ? '59.50' : '146.00'} ea)</label>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">ST 7 Boxes (R{(moveDetails.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(2)} ea)</label>
                                             <Tooltip text="Standard medium box for general household items." />
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -353,10 +354,10 @@ export default function Step2Access() {
                                             </button>
                                         </div>
                                     </div>
-
+ 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Linen Boxes (R{moveDetails.packagingOption === 'boxes_only' ? '146.00' : '175.00'} ea)</label>
+                                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Linen Boxes (R{(moveDetails.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(2)} ea)</label>
                                             <Tooltip text="Large boxes for bedding, pillows, and hanging clothes." />
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -378,10 +379,12 @@ export default function Step2Access() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="mt-6 flex items-center gap-2 text-slate-500 bg-white/50 p-3 rounded-xl border border-slate-100">
-                                    <Truck size={14} className="text-red-600" />
-                                    <p className="text-[10px] font-bold uppercase tracking-tight">Delivery Fee of R220.00 will be included in the total.</p>
-                                </div>
+                                {moveDetails.packagingOption === 'boxes_only' && (
+                                    <div className="mt-6 flex items-center gap-2 text-slate-500 bg-white/50 p-3 rounded-xl border border-slate-100">
+                                        <Truck size={14} className="text-red-600" />
+                                        <p className="text-[10px] font-bold uppercase tracking-tight">Delivery Fee of R{PACKAGING_RATES.sendMeBoxesOnly.deliveryFee.toFixed(2)} will be included in the total.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

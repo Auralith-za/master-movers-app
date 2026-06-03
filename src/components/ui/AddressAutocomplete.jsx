@@ -65,7 +65,8 @@ export default function AddressAutocomplete({
                     target: {
                         name: name,
                         value: place.formatted_address,
-                        city: city
+                        city: city,
+                        isGoogleSelect: true
                     }
                 }
                 onChange(event)

@@ -1008,17 +1008,25 @@ export default function QuoteDetailPage() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-[9px] uppercase font-bold text-slate-400">Floor Level</label>
-                                            <input 
-                                                type="number"
-                                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-indigo-500 outline-none"
+                                            <select 
+                                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-indigo-500 outline-none bg-white font-medium"
                                                 value={editForm.access_details?.[loc]?.floorLevel || 0}
                                                 onChange={e => {
+                                                    const val = e.target.value;
+                                                    const parsedVal = val === 'double_volume' || val === 'multiple_stairs' ? val : parseInt(val) || 0;
                                                     const details = { ...editForm.access_details }
-                                                    details[loc] = { ...details[loc], floorLevel: parseInt(e.target.value) || 0 }
+                                                    details[loc] = { ...details[loc], floorLevel: parsedVal }
                                                     setEditForm({...editForm, access_details: details})
                                                 }}
                                                 disabled={!isEditing}
-                                            />
+                                            >
+                                                <option value={0}>Ground Floor</option>
+                                                <option value={1}>1st Floor</option>
+                                                <option value={2}>2nd Floor</option>
+                                                <option value={3}>3rd Floor</option>
+                                                <option value="double_volume">Double Volume</option>
+                                                <option value="multiple_stairs">Multiple Flights of Stairs</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="text-[9px] uppercase font-bold text-slate-400">Truck Parking</label>

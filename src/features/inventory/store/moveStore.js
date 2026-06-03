@@ -423,13 +423,15 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let packagingCost = 0
     if (moveDetails.packagingOption !== 'none') {
-        const rates = moveDetails.packagingOption === 'boxes_only' 
+        const isBoxesOnly = moveDetails.packagingOption === 'boxes_only'
+        const rates = isBoxesOnly 
             ? PACKAGING_RATES.sendMeBoxesOnly 
             : PACKAGING_RATES.boxesAndPacking
             
         const st7Cost = (moveDetails.st7Boxes || 0) * rates.st7
         const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
-        packagingCost = st7Cost + linenCost + rates.deliveryFee
+        const deliveryFee = isBoxesOnly ? (rates.deliveryFee || 0) : 0
+        packagingCost = st7Cost + linenCost + deliveryFee
     }
 
     const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0

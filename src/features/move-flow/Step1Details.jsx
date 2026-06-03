@@ -130,15 +130,31 @@ export default function Step1Details() {
     const location = useLocation()
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
+    const [addressError, setAddressError] = React.useState(null)
+    const [isValidating, setIsValidating] = React.useState(false)
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
 
     const handleChange = (e) => {
         const { name, value, city } = e.target
         const updates = { [name]: value }
+        
+        // If change comes from google autocomplete select
+        if (e.target.isGoogleSelect) {
+            if (name === 'pickupAddress') updates.pickupAddressVerified = true
+            if (name === 'dropoffAddress') updates.dropoffAddressVerified = true
+        } else {
+            // If they typed manually, reset verified flag
+            if (name === 'pickupAddress') updates.pickupAddressVerified = false
+            if (name === 'dropoffAddress') updates.dropoffAddressVerified = false
+        }
+
         if (city) {
             if (name === 'pickupAddress') updates.pickupCity = city
             if (name === 'dropoffAddress') updates.dropoffCity = city
+        }
+        if (name === 'pickupAddress' || name === 'dropoffAddress') {
+            setAddressError(null)
         }
         setMoveDetails(updates)
     }
@@ -148,7 +164,9 @@ export default function Step1Details() {
         if (moveDetails.pickupAddress && moveDetails.dropoffAddress) {
             const cityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress) || 'JHB';
             
-            // Silently calculate in background without showing loading state
+            setIsValidating(true)
+            setAddressError(null)
+            
             calculateTripDistances(
                 moveDetails.pickupAddress,
                 moveDetails.dropoffAddress,
@@ -160,18 +178,42 @@ export default function Step1Details() {
                         tripBreakdown: breakdown,
                         totalBillableDistance: totalDistance
                     })
+                    setAddressError(null)
                 })
                 .catch((error) => {
                     console.error("Background calculation error:", error)
-                    // Fail silently - user can still proceed
+                    setAddressError(error.message || "Invalid address. Please select a valid Google Maps address from the suggestions.")
                 })
+                .finally(() => {
+                    setIsValidating(false)
+                })
+        } else {
+            setAddressError(null)
         }
     }, [moveDetails.pickupAddress, moveDetails.dropoffAddress])
 
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        // Basic validation could go here
+        
+        if (moveDetails.pickupAddress && !moveDetails.pickupAddressVerified) {
+            setAddressError("Oops! Please fix the Pickup Address. You must select one of the options that appears from Google Maps.")
+            return
+        }
+        if (moveDetails.dropoffAddress && !moveDetails.dropoffAddressVerified) {
+            setAddressError("Oops! Please fix the Dropoff Address. You must select one of the options that appears from Google Maps.")
+            return
+        }
+        if (addressError) {
+            return
+        }
+        if (isValidating) {
+            return
+        }
+        if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
+            setAddressError("Both pickup and dropoff addresses are required.")
+            return
+        }
         navigate(`${basePath}/access`)
     }
 
@@ -344,40 +386,30 @@ export default function Step1Details() {
                                 />
                             </div>
                         </div>
+                        
+                        {addressError && (
+                            <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-xl text-red-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                                <span>⚠️ {addressError}</span>
+                            </div>
+                        )}
+                        {isValidating && (
+                            <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-xl text-blue-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2 animate-in fade-in">
+                                <Loader2 className="animate-spin text-blue-500" size={16} />
+                                <span>Verifying addresses with Google Maps...</span>
+                            </div>
+                        )}
                     </div>
 
                 </div>
 
-                <div className="bg-gray-50 px-8 py-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <button
-                        type="button"
-                        onClick={async () => {
-                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
-                                setIsSubmittingLead(true)
-                                try {
-                                    await submitQuote({ status: 'lead', request_call_back: true })
-                                    alert("Request Sent! One of our agents will call you back shortly. 📞")
-                                } catch (err) {
-                                    console.error("Callback submission error:", err)
-                                    alert("Request Sent! (Note: Offline mode) We will call you shortly.")
-                                } finally {
-                                    setIsSubmittingLead(false)
-                                }
-                                return
-                            }
-                            setShowLeadModal(true)
-                        }}
-                        disabled={isSubmittingLead}
-                        className="flex flex-col items-center md:items-start p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group w-full md:max-w-xs text-left"
+                <div className="bg-gray-50 px-8 py-8 border-t border-gray-100 flex justify-end">
+                    <Button 
+                        type="submit" 
+                        size="lg" 
+                        disabled={!!addressError || isValidating}
+                        className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <div className="flex items-center gap-3 mb-1">
-                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
-                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"Old School?"</span>
-                        </div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
-                    </button>
-                    <Button type="submit" size="lg" className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all">
-                        Next Step <Truck className="ml-3" size={20} />
+                        {isValidating ? 'Verifying...' : 'Next Step'} <Truck className="ml-3" size={20} />
                     </Button>
                 </div>
 
