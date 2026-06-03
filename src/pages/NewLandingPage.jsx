@@ -41,7 +41,7 @@ export default function NewLandingPage() {
                 <div className="absolute inset-x-0 bottom-0 h-[12%] bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
             </div>
 
-            <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center pt-24 pb-40">
+            <main className="relative z-10 w-full max-w-7xl px-4 flex flex-col items-center justify-center py-6">
 
                 {/* 2. Seamless Brand Reveal Container */}
                 <div className="relative flex flex-col items-center w-full">
@@ -83,7 +83,7 @@ export default function NewLandingPage() {
                     </div>
 
                     {/* 3. The Call to Action (Final Reveal) */}
-                    <div className="mt-16 md:mt-28 flex flex-col items-center gap-10 relative z-20 w-full max-w-4xl">
+                    <div className="mt-6 md:mt-10 flex flex-col items-center gap-6 relative z-20 w-full max-w-4xl">
                         <AnimatePresence>
                             {showCTA && (
                                 <motion.div
