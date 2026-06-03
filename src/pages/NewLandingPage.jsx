@@ -9,11 +9,15 @@ export default function NewLandingPage() {
     const [showCTA, setShowCTA] = useState(false);
 
     useEffect(() => {
+        // Prevent scrolling on the landing page
+        document.body.style.overflow = 'hidden';
+
         // Show logo content with a subtle entry fade (500ms)
         // Show the call to action button shortly after (1200ms)
         const timer1 = setTimeout(() => setShowContent(true), 500);
         const timer2 = setTimeout(() => setShowCTA(true), 1200);
         return () => {
+            document.body.style.overflow = 'unset';
             clearTimeout(timer1);
             clearTimeout(timer2);
         };
