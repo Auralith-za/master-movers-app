@@ -61,7 +61,7 @@ export default function NewLandingPage() {
                             }}
                             className="text-center"
                         >
-                            <div className="text-5xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-wrap justify-center items-baseline gap-x-4 md:gap-x-8">
+                            <div className="text-5xl md:text-[10rem] font-black tracking-tighter mb-4 md:mb-8 select-none flex flex-col md:flex-row justify-center items-center md:items-baseline gap-y-2 md:gap-x-8">
                                 <span className="text-red-600">Master</span>
                                 <span className="text-slate-900">Movers</span>
                             </div>
@@ -75,8 +75,9 @@ export default function NewLandingPage() {
                                 transition={{ delay: 0.5, duration: 1.2 }}
                                 className="inline-block mt-4"
                             >
-                                <span className="inline-flex items-center gap-2 px-6 py-2.5 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-full shadow-lg text-sm md:text-lg text-slate-700 tracking-wide font-medium">
-                                    Start your moving journey with <span className="text-red-600 font-black whitespace-nowrap">Master Movers</span>
+                                <span className="inline-flex flex-wrap justify-center items-center gap-1.5 px-5 py-2.5 bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl md:rounded-full shadow-lg text-xs md:text-lg text-slate-700 tracking-wide font-medium max-w-[90vw] md:max-w-none text-center">
+                                    <span>Start your moving journey with</span>
+                                    <span className="text-red-600 font-black">Master Movers</span>
                                 </span>
                             </motion.div>
                         </motion.div>
