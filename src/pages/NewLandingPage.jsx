@@ -25,7 +25,7 @@ export default function NewLandingPage() {
             {/* 1. Full-Screen Cinematic Video Background */}
             <div className="fixed inset-0 z-0 bg-white">
                 <video
-                    src="https://assets.mixkit.co/videos/preview/mixkit-young-couple-moving-cardboard-boxes-in-new-house-39886-large.mp4"
+                    src="/images/untitled-design-3.mp4"
                     autoPlay
                     muted
                     playsInline
