@@ -426,7 +426,7 @@ export default function Step1Details() {
                     >
                         <div className="flex items-center gap-3 mb-1">
                             {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
-                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"Sure you're not Old School?"</span>
+                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"I am Old School"</span>
                         </div>
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
