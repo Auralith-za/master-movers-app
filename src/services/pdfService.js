@@ -106,8 +106,11 @@ export const generateProfessionalQuote = (data) => {
 
             currentY = doc.lastAutoTable.finalY + 12;
 
-            // --- Costs Section ---
-            if (currentY > 215) {
+            // --- Costs Section & Terms Page Control ---
+            // We want both the cost summary table and the Terms & Conditions to stay on the same page.
+            // Together they take up about 75-80mm. Standard page height is 297mm.
+            // If we are past 180mm, push them both to a clean page.
+            if (currentY > 180) {
                 doc.addPage();
                 currentY = 20;
             }
@@ -120,16 +123,15 @@ export const generateProfessionalQuote = (data) => {
             
             currentY += 8;
 
+            const serviceFees = subTotal || 0;
+            const finalSubtotal = total ? (total / 1.15) : serviceFees;
+            const discountAmount = serviceFees - finalSubtotal;
+
             const costs = [
-                ['Transport Base Cost', `R ${breakdown.transport?.toFixed(2) || '0.00'}`],
-                ['Volume Handling', `R ${breakdown.volume?.toFixed(2) || '0.00'}`],
-                ...(breakdown.access > 0 ? [['Access & Special Services', `R ${breakdown.access.toFixed(2)}`]] : []),
-                ...(breakdown.crew > 0 ? [['Specialist Crew Surcharge', `R ${breakdown.crew.toFixed(2)}`]] : []),
-                ...(breakdown.extraDistance > 0 ? [['Depot Distance Surcharge', `R ${breakdown.extraDistance.toFixed(2)}`]] : []),
-                ...(breakdown.packaging > 0 ? [['Protective Packaging', `R ${breakdown.packaging.toFixed(2)}`]] : []),
-                ['Documentation Fee', 'R 175.00'],
-                ['Subtotal Excl. VAT', `R ${subTotal?.toFixed(2) || '0.00'}`],
-                ['VAT (15%)', `R ${vat?.toFixed(2) || '0.00'}`],
+                ['Service Fees (Excl. VAT)', `R ${serviceFees.toFixed(2)}`],
+                ...(discountAmount > 0.01 ? [['Discount Applied', `- R ${discountAmount.toFixed(2)}`]] : []),
+                ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],
+                ['VAT (15%)', `R ${(total - finalSubtotal).toFixed(2)}`],
                 ['TOTAL AMOUNT DUE', `R ${total?.toFixed(2) || '0.00'}`]
             ];
 
@@ -156,11 +158,6 @@ export const generateProfessionalQuote = (data) => {
             doc.text('PAY IN 4 WITH PAYFLEX AVAILABLE (INTEREST-FREE)', 150, currentY + 5.5, { align: 'center' });
 
             currentY += 16;
-
-            if (currentY > 240) {
-                doc.addPage();
-                currentY = 20;
-            }
 
             // --- Terms & Payment ---
             doc.setTextColor(...slate900);
@@ -197,8 +194,11 @@ export const generateProfessionalQuote = (data) => {
         };
 
         img.onload = () => {
-            // Draw Logo on top left
-            doc.addImage(img, 'PNG', 20, 12, 35, 11);
+            // Draw Logo on top left in original aspect ratio
+            const ratio = img.width / img.height || 1;
+            const targetHeight = 12;
+            const targetWidth = targetHeight * ratio;
+            doc.addImage(img, 'PNG', 20, 12, targetWidth, targetHeight);
 
             // Draw header text on top right
             doc.setTextColor(...slate900);

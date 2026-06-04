@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle } from 'lucide-react'
 import { getCityCode } from '../inventory/data/pricingRates'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
@@ -402,7 +402,34 @@ export default function Step1Details() {
 
                 </div>
 
-                <div className="bg-gray-50 px-8 py-8 border-t border-gray-100 flex justify-end">
+                <div className="bg-gray-50 px-8 py-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                                setIsSubmittingLead(true)
+                                try {
+                                    await submitQuote({ status: 'lead', request_call_back: true })
+                                    alert("Request Sent! One of our agents will call you back shortly. 📞")
+                                } catch (err) {
+                                    console.error("Callback submission error:", err)
+                                    alert("Request Sent! (Note: Offline mode) We will call you shortly.")
+                                } finally {
+                                    setIsSubmittingLead(false)
+                                }
+                                return
+                            }
+                            setShowLeadModal(true)
+                        }}
+                        disabled={isSubmittingLead}
+                        className="flex flex-col items-center md:items-start p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-red-600 hover:bg-red-50 transition-all group w-full md:max-w-xs text-left"
+                    >
+                        <div className="flex items-center gap-3 mb-1">
+                            {isSubmittingLead ? <Loader2 className="animate-spin text-red-600" size={18} /> : <Phone size={18} className="text-red-600 group-hover:animate-bounce" />}
+                            <span className="font-black text-slate-900 uppercase tracking-widest text-xs italic">"Sure you're not Old School?"</span>
+                        </div>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
+                    </button>
                     <Button 
                         type="submit" 
                         size="lg" 
