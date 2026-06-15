@@ -3,40 +3,48 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 serve(async (req) => {
     try {
-        // PayFast details
+        // PayFast sends ITN as application/x-www-form-urlencoded (form data)
         const formData = await req.formData()
         const paymentStatus = formData.get('payment_status')
-        const customStr1 = formData.get('m_payment_id') // We stored Quote ID here
+        const mPaymentId = formData.get('m_payment_id')   // Quote ID stored here
+        const pfPaymentId = formData.get('pf_payment_id') // PayFast transaction reference
+        const amountGross = formData.get('amount_gross')
 
-        console.log(`Received PayFast ITN: ${paymentStatus} for Quote ${customStr1}`)
+        console.log(`PayFast ITN received — status: ${paymentStatus}, quoteId: ${mPaymentId}, pfPaymentId: ${pfPaymentId}`)
 
         if (paymentStatus === 'COMPLETE') {
-            // Initialize Supabase Client (Admin Mode)
             const supabaseAdmin = createClient(
                 Deno.env.get('SUPABASE_URL') ?? '',
                 Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
             )
 
-            // Update Quote
-            const { error } = await supabaseAdmin
+            const { data, error } = await supabaseAdmin
                 .from('quotes')
                 .update({
+                    status: 'booked_paid',          // ← was missing before
                     payment_status: 'paid',
                     payment_method: 'payfast',
-                    transaction_id: formData.get('pf_payment_id')
+                    transaction_id: pfPaymentId,
+                    amount_paid: amountGross ? Number(amountGross) : undefined
                 })
-                .eq('id', customStr1)
+                .eq('id', mPaymentId)
+                .select()
 
             if (error) {
-                console.error('Database Update Error:', error)
+                console.error('PayFast ITN DB update error:', error)
                 throw error
             }
+
+            console.log(`✅ Quote ${mPaymentId} → booked_paid via PayFast ITN`, data)
+        } else {
+            console.log(`PayFast ITN: payment NOT complete. Status: ${paymentStatus}`)
         }
 
+        // PayFast requires a 200 OK text response
         return new Response("OK", { status: 200 })
 
     } catch (error) {
-        console.error(error)
+        console.error('PayFast ITN error:', error)
         return new Response("Error", { status: 500 })
     }
 })

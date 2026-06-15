@@ -106,7 +106,9 @@ serve(async (req) => {
             items: [],
             merchant: {
                 redirectConfirmUrl: successUrl,
-                redirectCancelUrl: failUrl
+                redirectCancelUrl: failUrl,
+                // Server-side webhook — PayFlex POSTs here when payment is approved/declined
+                notificationUrl: `${Deno.env.get('SUPABASE_URL') ?? 'https://yrrskvzdpcdnwojstvcw.supabase.co'}/functions/v1/payflex-callback`
             },
             merchantReference: String(quoteId),
             taxAmount: 0,

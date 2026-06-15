@@ -32,8 +32,9 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const nameFirst = quote.client_name?.split(' ')[0] || 'Client'
     const emailAddress = quote.client_email || ''
     const mPaymentId = quote.id || 'TEST-ID'
-    const amount = Number(quote.total_price || quote.total).toFixed(2)
-    const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}`
+    // Use nullish coalescing (??) not || so that a discounted total of 0 still works correctly
+    const amount = Number(quote.total_price ?? quote.total ?? 0).toFixed(2)
+    const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}${quote.coupon_code ? ` (Coupon: ${quote.coupon_code})` : ''}`
 
     // PayFast URL encoder helper (spaces to +, uppercase hex)
     // Encodes standard sub-delims (! ' ( ) *) as browsers do in form submissions.
