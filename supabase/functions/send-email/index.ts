@@ -244,39 +244,44 @@ serve(async (req) => {
             innerHtml = `
                 <h1>Booking Confirmation</h1>
                 <p>Dear ${quoteData?.client_name || 'Valued Customer'},</p>
-                <p><strong>Excellent news!</strong> Your payment has been processed successfully, and your upcoming move with Master Movers is officially booked and secured.</p>
+                <p><strong>Excellent news!</strong> Your payment has been processed successfully and your upcoming move with Master Movers is officially booked and secured.</p>
                 
                 <div class="highlight-box" style="border-left-color: #10b981; background-color: #ecfdf5;">
-                    <p style="margin-bottom: 5px; font-weight: 700; color: #065f46;">Payment Confirmed:</p>
-                    <p style="font-size: 24px; font-weight: 900; color: #059669; margin: 0;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</p>
+                    <p style="margin-bottom: 5px; font-weight: 700; color: #065f46;">✅ Payment Confirmed:</p>
+                    <p style="font-size: 28px; font-weight: 900; color: #059669; margin: 0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size: 13px; font-weight: 500; color: #6b7280;">(Incl. VAT)</span></p>
                 </div>
 
+                <!-- Quote Summary -->
                 <table class="details-table">
-                    <tr>
-                        <td class="label">Booking Ref:</td>
-                        <td class="value">MM-${ref}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Move Date:</td>
-                        <td class="value">${quoteData?.move_date || 'TBD'}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Collection From:</td>
-                        <td class="value">${quoteData?.pickup_address || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Delivery To:</td>
-                        <td class="value">${quoteData?.dropoff_address || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Payment Method:</td>
-                        <td class="value" style="text-transform: uppercase;">${quoteData?.payment_method || 'Paid'}</td>
-                    </tr>
+                    <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-size:16px;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
+                    <tr><td class="label">Payment Method:</td><td class="value" style="text-transform: uppercase;">${quoteData?.payment_method || 'Card/EFT'}</td></tr>
                 </table>
 
-                <p>An official receipt PDF has been attached to this email for your records.</p>
-                <p>Our operations planning team will contact you 48 hours prior to your move date to coordinate arrival times, crew details, and vehicle dispatching.</p>
-                <p>Thank you for moving with the masters!</p>
+                <!-- Pricing Breakdown -->
+                <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:24px;">
+                    <p style="font-weight:800;font-size:13px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin:0 0 14px 0;">Price Breakdown</p>
+                    <table style="width:100%;border-collapse:collapse;">
+                        <tr style="border-bottom:1px solid #e2e8f0;">
+                            <td style="padding:8px 0;font-size:13px;color:#64748b;">Subtotal (excl. VAT)</td>
+                            <td style="padding:8px 0;font-size:13px;text-align:right;color:#0f172a;">R ${(Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #e2e8f0;">
+                            <td style="padding:8px 0;font-size:13px;color:#64748b;">VAT (15%)</td>
+                            <td style="padding:8px 0;font-size:13px;text-align:right;color:#0f172a;">R ${(Number(quoteData?.total_price || 0) - Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:12px 0 4px;font-size:15px;font-weight:900;color:#0f172a;">Total Paid</td>
+                            <td style="padding:12px 0 4px;font-size:18px;font-weight:900;text-align:right;color:#059669;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>Our operations planning team will contact you <strong>48 hours before your move date</strong> to confirm arrival times, crew details, and vehicle dispatching.</p>
+                <p>If you have any questions in the meantime, call us on <strong>+27 11 493 7569</strong> or reply to this email.</p>
+                <p>Thank you for moving with the masters! 🚛</p>
             `
         } else if (type === 'contact_message') {
             subject = `New Website Message from ${contactData?.name || 'Inquirer'}`
