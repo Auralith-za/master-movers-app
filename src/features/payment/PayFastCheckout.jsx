@@ -27,6 +27,16 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const returnUrl = `${baseUrl}/payment/success?m_payment_id=${mPaymentId}&gateway=payfast`
     const cancelUrl = `${baseUrl}/payment/cancel?m_payment_id=${mPaymentId}`
 
+    // Dynamically build Notify URL from Supabase URL
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    const notifyUrl = supabaseUrl
+        ? `${supabaseUrl}/functions/v1/payfast-itn`
+        : 'https://yrrskvzdpcdnwojstvcw.supabase.co/functions/v1/payfast-itn'
+
+    const payfastActionUrl = isSandbox
+        ? 'https://sandbox.payfast.co.za/eng/process'
+        : 'https://www.payfast.co.za/eng/process'
+
     // PayFast URL encoder helper (spaces to +, uppercase hex)
     // Encodes standard sub-delims (! ' ( ) *) as browsers do in form submissions.
     const pfCleanEncode = (val) => {
