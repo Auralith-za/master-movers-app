@@ -401,7 +401,7 @@ export default function Step1Details() {
                             if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
                                 setIsSubmittingLead(true)
                                 try {
-                                    await submitQuote({ status: 'lead', request_call_back: true })
+                                    await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
                                     alert("Request Sent! One of our agents will call you back shortly. 📞")
                                 } catch (err) {
                                     console.error("Callback submission error:", err)

@@ -12,7 +12,7 @@ serve(async (req) => {
     }
 
     try {
-        const { quoteId, gateway } = await req.json()
+        const { quoteId, gateway, status } = await req.json()
 
         if (!quoteId) {
             return new Response(
@@ -27,13 +27,15 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // Allow caller to set a specific status (e.g. 'payment_cancelled') or default to 'booked_paid'
+        const newStatus = status || 'booked_paid'
+        const updatePayload = newStatus === 'payment_cancelled'
+            ? { status: 'payment_cancelled', payment_status: 'cancelled' }
+            : { status: 'booked_paid', payment_status: 'paid', payment_method: gateway || 'card' }
+
         const { data, error } = await supabaseAdmin
             .from('quotes')
-            .update({
-                status: 'booked_paid',
-                payment_status: 'paid',
-                payment_method: gateway || 'card'
-            })
+            .update(updatePayload)
             .eq('id', quoteId)
             .select()
 
@@ -50,7 +52,7 @@ serve(async (req) => {
             )
         }
 
-        console.log(`✅ Quote ${quoteId} confirmed as booked_paid via ${gateway}`)
+        console.log(`✅ Quote ${quoteId} → ${newStatus} via ${gateway || 'direct'}`)
         return new Response(
             JSON.stringify({ success: true, quote: data[0] }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

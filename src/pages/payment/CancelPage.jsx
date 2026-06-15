@@ -1,9 +1,36 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { XCircle } from 'lucide-react'
 import Button from '../../components/ui/Button'
 
 export default function CancelPage() {
+    const [searchParams] = useSearchParams()
+
+    useEffect(() => {
+        const quoteId = searchParams.get('m_payment_id')
+        if (!quoteId) return
+
+        // Mark the quote as payment_cancelled on the backend using the service-role edge function
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+        fetch(`${supabaseUrl}/functions/v1/confirm-payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ quoteId, status: 'payment_cancelled' })
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                console.log('✅ Quote marked as payment_cancelled:', quoteId)
+            } else {
+                console.warn('Cancel update result:', result)
+            }
+        })
+        .catch(err => console.error('Cancel update error:', err))
+    }, [])
+
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-xl text-center">

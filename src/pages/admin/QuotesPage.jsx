@@ -43,6 +43,7 @@ export default function QuotesPage() {
             case 'on_hold': return 'bg-orange-50 text-orange-700 ring-orange-600/20'
             case 'rejected': return 'bg-red-50 text-red-700 ring-red-600/10'
             case 'lead': return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+            case 'payment_cancelled': return 'bg-red-100 text-red-800 ring-red-600/30'
             default: return 'bg-slate-50 text-slate-700 ring-slate-600/20'
         }
     }
