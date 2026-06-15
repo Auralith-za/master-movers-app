@@ -4,6 +4,7 @@ import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Label from '../components/ui/Label'
 import { emailService } from '../services/emailService'
+import { trackLeadConversion } from '../lib/gtag'
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -38,6 +39,8 @@ export default function ContactPage() {
             })
 
             if (res.success) {
+                // 🎯 Google Ads — fire lead conversion on successful contact form submit
+                trackLeadConversion({ label: 'Contact Form Submit', value: 0 })
                 alert("Message sent successfully! Our team will get back to you shortly.")
                 setFormData({
                     firstName: '',

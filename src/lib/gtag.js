@@ -41,16 +41,17 @@ export const trackPurchaseConversion = ({ value = 0, currency = 'ZAR', transacti
 }
 
 // ─── Google Ads: Lead / Call-back Conversion ──────────────────────────────────
-// Fires when a customer submits a call-back request or quote lead
+// Label: AW-930634357/XJmACObty78cEPW04bsD (Request Call Back Web App)
+// Fires on: contact form submit, phone button click, call-back requests (Steps 1-4)
 export const trackLeadConversion = ({ label = 'Call Back Request', value = 0 } = {}) => {
     if (typeof window.gtag === 'undefined') return
     console.log(`[Google Ads] 📞 Lead conversion fired — "${label}"`)
     window.gtag('event', 'conversion', {
-        send_to: `${GA_TRACKING_ID}/lead`,
+        send_to: 'AW-930634357/XJmACObty78cEPW04bsD',  // ← exact label from Google Ads
         value: Number(value),
         currency: 'ZAR',
     })
-    // Also fire as GA4 generate_lead event
+    // Also fire as GA4 generate_lead event for Analytics
     window.gtag('event', 'generate_lead', {
         currency: 'ZAR',
         value: Number(value),

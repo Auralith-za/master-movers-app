@@ -1,10 +1,17 @@
 import React from 'react';
 import { Phone } from 'lucide-react';
+import { trackLeadConversion } from '../lib/gtag';
 
 export default function FloatingCallButton() {
+    const handleCallClick = () => {
+        // Fire Google Ads lead conversion every time someone taps the call button
+        trackLeadConversion({ label: 'Phone Button Click', value: 0 })
+    }
+
     return (
         <a 
             href="tel:+27114937569" 
+            onClick={handleCallClick}
             className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 bg-red-600 text-white px-6 py-4 rounded-full shadow-2xl hover:bg-red-700 transition-all hover:scale-105 active:scale-95 group"
         >
             <div className="relative">
