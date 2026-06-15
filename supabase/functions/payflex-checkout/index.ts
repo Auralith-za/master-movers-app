@@ -26,7 +26,7 @@ serve(async (req) => {
         // 2. Select the correct endpoint
         const gatewayUrl = isProduction
             ? 'https://api.payflex.co.za/payment/v2/checkout'
-            : 'https://sandbox-api.payflex.co.za/payment/v2/checkout'
+            : 'https://api.uat.payflex.co.za/payment/v2/checkout'
 
         // 3. Build callback/redirect URLs
         const originUrl = req.headers.get('origin') || 'http://localhost:5173'

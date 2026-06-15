@@ -39,10 +39,16 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}`
 
     // PayFast URL encoder helper (spaces to +, uppercase hex)
+    // Encodes standard sub-delims (! ' ( ) *) as browsers do in form submissions.
     const pfCleanEncode = (val) => {
         if (val === undefined || val === null) return ''
         return encodeURIComponent(String(val).trim())
             .replace(/%20/g, '+')
+            .replace(/!/g, '%21')
+            .replace(/'/g, '%27')
+            .replace(/\(/g, '%28')
+            .replace(/\)/g, '%29')
+            .replace(/\*/g, '%2A')
             .replace(/%[0-9a-fA-F]{2}/g, m => m.toUpperCase())
     }
 
@@ -74,6 +80,14 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
 
     const signature = md5(sigString)
 
+    // Log the generated signature for easier debugging in browser console
+    console.log('--- PAYFAST SIGNATURE DEBUG ---')
+    console.log('Is Sandbox:', isSandbox)
+    console.log('Passed Quote:', quote)
+    console.log('Signature String:', sigString)
+    console.log('Calculated MD5 Signature:', signature)
+    console.log('--------------------------------')
+
     const handlePayClick = (e) => {
         formRef.current.submit()
     }
@@ -82,23 +96,23 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
         <div className="w-full">
             {/* Hidden PayFast Form */}
             <form ref={formRef} action={payfastActionUrl} method="POST">
-                <input type="hidden" name="merchant_id" value={merchantId} />
-                <input type="hidden" name="merchant_key" value={merchantKey} />
-                <input type="hidden" name="return_url" value={returnUrl} />
-                <input type="hidden" name="cancel_url" value={cancelUrl} />
-                <input type="hidden" name="notify_url" value={notifyUrl} />
+                {merchantId && <input type="hidden" name="merchant_id" value={merchantId} />}
+                {merchantKey && <input type="hidden" name="merchant_key" value={merchantKey} />}
+                {returnUrl && <input type="hidden" name="return_url" value={returnUrl} />}
+                {cancelUrl && <input type="hidden" name="cancel_url" value={cancelUrl} />}
+                {notifyUrl && <input type="hidden" name="notify_url" value={notifyUrl} />}
 
                 {/* Client Details */}
-                <input type="hidden" name="name_first" value={nameFirst} />
-                <input type="hidden" name="email_address" value={emailAddress} />
+                {nameFirst && <input type="hidden" name="name_first" value={nameFirst} />}
+                {emailAddress && <input type="hidden" name="email_address" value={emailAddress} />}
 
                 {/* Transaction Details */}
-                <input type="hidden" name="m_payment_id" value={mPaymentId} />
-                <input type="hidden" name="amount" value={amount} />
-                <input type="hidden" name="item_name" value={itemName} />
+                {mPaymentId && <input type="hidden" name="m_payment_id" value={mPaymentId} />}
+                {amount && <input type="hidden" name="amount" value={amount} />}
+                {itemName && <input type="hidden" name="item_name" value={itemName} />}
 
                 {/* Signature */}
-                <input type="hidden" name="signature" value={signature} />
+                {signature && <input type="hidden" name="signature" value={signature} />}
             </form>
 
             <Button
