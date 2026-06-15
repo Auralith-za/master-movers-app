@@ -217,7 +217,7 @@ export const useMoveStore = create(
             submitQuoteActivity: async (quoteId, activityType, details) => {
                 try {
                     const { error } = await supabase
-                        .from('quote_activity')
+                        .from('quote_activities')
                         .insert([{ quote_id: quoteId, activity_type: activityType, details }])
                     return { success: !error, error }
                 } catch (err) {

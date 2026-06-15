@@ -8,27 +8,34 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     // Merchant ID: 10000100
     // Merchant Key: 46f0cd694581a
 
-    // In production these would come from env vars
-    const merchantId = '10000100'
-    const merchantKey = '46f0cd694581a'
+    // PayFast Details from environment variables or sandbox fallbacks
+    const merchantId = import.meta.env.VITE_PAYFAST_MERCHANT_ID || '10000100'
+    const merchantKey = import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '46f0cd694581a'
+    const isSandbox = import.meta.env.VITE_TEST_MODE !== 'false'
 
     // URLs
     const baseUrl = window.location.origin
     const returnUrl = `${baseUrl}/payment/success`
     const cancelUrl = `${baseUrl}/payment/cancel`
-    const notifyUrl = 'https://your-project.functions.supabase.co/payfast-itn' // Placeholder
+
+    // Dynamically build Notify URL from Supabase URL
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    const notifyUrl = supabaseUrl
+        ? `${supabaseUrl.replace('.supabase.co', '.functions.supabase.co')}/payfast-itn`
+        : 'https://yrrskvzdpcdnwojstvcw.functions.supabase.co/payfast-itn'
+
+    const payfastActionUrl = isSandbox
+        ? 'https://sandbox.payfast.co.za/eng/process'
+        : 'https://www.payfast.co.za/eng/process'
 
     const handlePayClick = (e) => {
-        // Check if we strictly need to save first? 
-        // Ideally checking out implies the quote is saved. 
-        // The parent component handles the saving to Supabase before rendering this or triggering this.
         formRef.current.submit()
     }
 
     return (
         <div className="w-full">
             {/* Hidden PayFast Form */}
-            <form ref={formRef} action="https://sandbox.payfast.co.za/eng/process" method="POST">
+            <form ref={formRef} action={payfastActionUrl} method="POST">
                 <input type="hidden" name="merchant_id" value={merchantId} />
                 <input type="hidden" name="merchant_key" value={merchantKey} />
                 <input type="hidden" name="return_url" value={returnUrl} />
@@ -40,8 +47,8 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
                 <input type="hidden" name="amount" value={Number(quote.total_price || quote.total).toFixed(2)} />
                 <input type="hidden" name="item_name" value={`Move: ${quote.pickup_address} to ${quote.dropoff_address}`} />
 
-                {/* Client Details (Optional but good for pre-populating) */}
-                <input type="hidden" name="name_first" value={quote.client_name?.split(' ')[0]} />
+                {/* Client Details */}
+                <input type="hidden" name="name_first" value={quote.client_name?.split(' ')[0] || 'Client'} />
                 <input type="hidden" name="email_address" value={quote.client_email} />
             </form>
 

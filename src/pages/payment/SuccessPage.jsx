@@ -5,6 +5,8 @@ import Button from '../../components/ui/Button'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { supabase } from '../../lib/supabaseClient'
 import { event } from '../../lib/gtag'
+import { emailService } from '../../services/emailService'
+import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 
 export default function SuccessPage() {
     const [searchParams] = useSearchParams()
@@ -13,6 +15,36 @@ export default function SuccessPage() {
 
     // Capture reference from URL (PayFast returns m_payment_id)
     const reference = searchParams.get('m_payment_id') || `MM-${Math.floor(1000 + Math.random() * 9000)}`
+
+    const sendConfirmationEmail = async (quote) => {
+        if (!quote) return
+        try {
+            const total = quote.total_price || quote.total || 0
+            const subTotal = total / 1.15
+            const vat = total - subTotal
+
+            await emailService.sendQuoteEmail({
+                type: 'booking_confirmation',
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                moveDate: quote.move_date,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                total: total,
+                vat: vat,
+                subTotal: subTotal,
+                inventory: quote.items_json || {},
+                breakdown: quote.trip_breakdown || {},
+                inventoryItems: INVENTORY_ITEMS,
+                paymentMethod: quote.payment_method || 'card/eft'
+            })
+            console.log("Payment confirmation email triggered.")
+        } catch (error) {
+            console.error("Error triggering confirmation email:", error)
+        }
+    }
 
     useEffect(() => {
         // 1. Capture details from store BEFORE resetting
@@ -27,20 +59,29 @@ export default function SuccessPage() {
         // 2. Proactively update database status to 'booked_paid'
         // Try priority: 1. URL Param (from PayFast) 2. Last Saved Quote from Store
         const quoteId = searchParams.get('m_payment_id') || lastSavedQuote?.id
+        const gateway = searchParams.get('gateway') || 'payfast'
 
         console.log("SuccessPage: Attempting status update for Quote ID:", quoteId)
 
         if (quoteId) {
             supabase
                 .from('quotes')
-                .update({ status: 'booked_paid' })
+                .update({ 
+                    status: 'booked_paid',
+                    payment_status: 'paid',
+                    payment_method: gateway
+                })
                 .eq('id', quoteId)
-                .then(({ error }) => {
+                .select()
+                .then(({ data, error }) => {
                     if (error) {
                         console.error("Error updating paid status in DB:", error)
                         alert("Note: We've recorded your payment locally, but there was a sync issue with the server. Our team will verify this manually.")
                     } else {
-                        console.log("SUCCESS: Quote status verified and updated to booked_paid")
+                        console.log("SUCCESS: Quote status verified and updated to booked_paid", data)
+                        if (data && data.length > 0) {
+                            sendConfirmationEmail(data[0])
+                        }
                     }
                 })
         } else {

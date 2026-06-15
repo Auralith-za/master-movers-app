@@ -20,7 +20,8 @@ export const generateProfessionalQuote = (data) => {
             vat,
             subTotal,
             inventoryItems = [], // The raw catalog for lookups
-            isSharedLoad = false
+            isSharedLoad = false,
+            shouldSave = true
         } = data;
 
         const doc = new jsPDF();
@@ -189,8 +190,10 @@ export const generateProfessionalQuote = (data) => {
             doc.text('MasterMovers NextGen - Professional Moving & Logistics Solutions', 105, 285, { align: 'center' });
             doc.text('MasterMovers.co.za | +27 11 493 7569 | info@mastermovers.co.za', 105, 289, { align: 'center' });
 
-            doc.save(`MasterMovers_Quote_${quoteId || 'New'}.pdf`);
-            resolve();
+            if (shouldSave) {
+                doc.save(`MasterMovers_Quote_${quoteId || 'New'}.pdf`);
+            }
+            resolve(doc);
         };
 
         img.onload = () => {

@@ -1,10 +1,62 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { MapPin, Phone, Mail, Clock } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Label from '../components/ui/Label'
+import { emailService } from '../services/emailService'
 
 export default function ContactPage() {
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        message: ''
+    })
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const handleChange = (e) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value
+        })
+    }
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault()
+        if (!formData.firstName || !formData.email || !formData.message) {
+            alert("Please fill in all required fields (First Name, Email, and Message).")
+            return
+        }
+        setIsSubmitting(true)
+        try {
+            const res = await emailService.sendContactEmail({
+                name: `${formData.firstName} ${formData.lastName}`.trim(),
+                email: formData.email,
+                phone: formData.phone,
+                message: formData.message
+            })
+
+            if (res.success) {
+                alert("Message sent successfully! Our team will get back to you shortly.")
+                setFormData({
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    phone: '',
+                    message: ''
+                })
+            } else {
+                throw new Error(res.error || "Failed to send message")
+            }
+        } catch (error) {
+            console.error("Contact form error:", error)
+            alert("Failed to send message: " + error.message)
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
     return (
         <div className="bg-white min-h-screen">
             {/* Hero Section */}
@@ -23,7 +75,6 @@ export default function ContactPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                     {/* Contact Info */}
                     <div>
@@ -115,33 +166,72 @@ export default function ContactPage() {
                     {/* Contact Form */}
                     <div className="bg-slate-50 p-8 rounded-2xl shadow-sm border border-slate-100">
                         <h2 className="text-2xl font-bold text-slate-900 mb-6">Send us a Message</h2>
-                        <form className="space-y-4">
+                        <form className="space-y-4" onSubmit={handleFormSubmit}>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>First Name</Label>
-                                    <Input placeholder="John" />
+                                    <Label htmlFor="firstName">First Name</Label>
+                                    <Input
+                                        id="firstName"
+                                        name="firstName"
+                                        placeholder="John"
+                                        value={formData.firstName}
+                                        onChange={handleChange}
+                                        required
+                                    />
                                 </div>
                                 <div>
-                                    <Label>Last Name</Label>
-                                    <Input placeholder="Doe" />
+                                    <Label htmlFor="lastName">Last Name</Label>
+                                    <Input
+                                        id="lastName"
+                                        name="lastName"
+                                        placeholder="Doe"
+                                        value={formData.lastName}
+                                        onChange={handleChange}
+                                    />
                                 </div>
                             </div>
                             <div>
-                                <Label>Email Address</Label>
-                                <Input type="email" placeholder="john@example.com" />
+                                <Label htmlFor="email">Email Address</Label>
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="john@example.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                />
                             </div>
                             <div>
-                                <Label>Phone Number</Label>
-                                <Input type="tel" placeholder="+27 ..." />
+                                <Label htmlFor="phone">Phone Number</Label>
+                                <Input
+                                    id="phone"
+                                    name="phone"
+                                    type="tel"
+                                    placeholder="+27 ..."
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                />
                             </div>
                             <div>
-                                <Label>Message</Label>
+                                <Label htmlFor="message">Message</Label>
                                 <textarea
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400 min-h-[120px]"
+                                    id="message"
+                                    name="message"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400 min-h-[120px] text-sm"
                                     placeholder="How can we help you?"
+                                    value={formData.message}
+                                    onChange={handleChange}
+                                    required
                                 ></textarea>
                             </div>
-                            <Button className="w-full justify-center">Send Message</Button>
+                            <Button
+                                type="submit"
+                                className="w-full justify-center"
+                                isLoading={isSubmitting}
+                            >
+                                Send Message
+                            </Button>
                         </form>
                     </div>
                 </div>

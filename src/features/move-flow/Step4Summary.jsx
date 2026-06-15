@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles } from 'lucide-react'
 import { PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { generateProfessionalQuote } from '../../services/pdfService'
+import { emailService } from '../../services/emailService'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
 import { event } from '../../lib/gtag'
@@ -172,6 +173,29 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         );
     }
 
+    const sendProposalEmail = async (savedQuote) => {
+        const targetQuote = savedQuote || lastSavedQuote
+        if (!targetQuote) return
+
+        emailService.sendQuoteEmail({
+            type: 'quote_proposal',
+            quoteId: targetQuote.id,
+            clientName: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+            clientEmail: moveDetails.contactEmail,
+            clientPhone: moveDetails.contactPhone,
+            moveDate: moveDetails.moveDate,
+            pickupAddress: moveDetails.pickupAddress,
+            dropoffAddress: moveDetails.dropoffAddress,
+            total: total,
+            vat: vat,
+            subTotal: subTotal,
+            inventory: inventory,
+            breakdown: breakdown,
+            inventoryItems: INVENTORY_ITEMS,
+            paymentMethod: moveDetails.paymentMethod || 'eft'
+        }).catch(err => console.error("Non-blocking quote email error:", err))
+    }
+
     const handleProceed = async () => {
         if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
             alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString()}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
@@ -186,6 +210,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 submission_type: submissionType
             })
             
+            if (result.success && result.data?.[0]) {
+                sendProposalEmail(result.data[0])
+            }
+
             if (submissionType === 'admin' && result.success) {
                 alert('Manual Quote Created Successfully!')
                 navigate(`/admin/quotes/${result.data?.[0]?.id || ''}`)
@@ -233,6 +261,9 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 })
                 if (result.success) {
                     alert("We have received your request! A consultant will call you shortly.")
+                    if (result.data?.[0]) {
+                        sendProposalEmail(result.data[0])
+                    }
                 } else {
                     console.warn("Callback update failed:", result.error)
                     alert("Request Sent! We will call you shortly to discuss your move.")
@@ -258,6 +289,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             setSearchParams({ saved: 'true' })
             alert("Request Sent! We will call you shortly to discuss your move.")
 
+            if (result.success && result.data?.[0]) {
+                sendProposalEmail(result.data[0])
+            }
+
             if (!result.success) {
                 console.warn("Callback save failed (non-blocking):", result.error)
             }
@@ -282,6 +317,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 submission_type: submissionType,
                 ...extraData
             })
+
+            if (result.success && result.data?.[0]) {
+                sendProposalEmail(result.data[0])
+            }
 
             // Non-blocking success
             if (!result.success) {
@@ -582,7 +621,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                             <PayflexCheckout
                                                 quote={{
                                                     id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                    total_price: total
+                                                    total_price: total,
+                                                    client_name: moveDetails.contactName,
+                                                    client_email: moveDetails.contactEmail,
+                                                    client_phone: moveDetails.contactPhone
                                                 }}
                                             />
                                         </div>

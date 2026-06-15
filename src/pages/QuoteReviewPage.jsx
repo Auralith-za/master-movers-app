@@ -253,7 +253,10 @@ export default function QuoteReviewPage() {
                                     <PayflexCheckout 
                                         quote={{
                                             id: quote.id,
-                                            total_price: quote.total_price
+                                            total_price: quote.total_price,
+                                            client_name: quote.client_name,
+                                            client_email: quote.client_email,
+                                            client_phone: quote.client_phone
                                         }}
                                     />
                                 </div>
