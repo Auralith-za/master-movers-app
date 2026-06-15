@@ -72,7 +72,7 @@ class ErrorBoundary extends React.Component {
 
 function Step4SummaryContent({ submissionType = 'standard' }) {
     const navigate = useNavigate()
-    const { moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote, manualServiceCharges, updateManualServiceCharge } = useMoveStore()
+    const { moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote, manualServiceCharges, updateManualServiceCharge, setMoveDetails } = useMoveStore()
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
@@ -595,39 +595,43 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
                                     <div className="grid grid-cols-1 gap-6">
                                         {/* PayFast Option */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 px-2">
-                                                <div className="w-1 h-4 bg-red-600 rounded-full" />
-                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Card / Instant EFT</h4>
+                                        {moveDetails.paymentMethod === 'eft' && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 px-2">
+                                                    <div className="w-1 h-4 bg-red-600 rounded-full" />
+                                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Card / Instant EFT</h4>
+                                                </div>
+                                                <PayFastCheckout
+                                                    quote={{
+                                                        id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
+                                                        total_price: total,
+                                                        pickup_address: moveDetails.pickupAddress,
+                                                        dropoff_address: moveDetails.dropoffAddress,
+                                                        client_name: moveDetails.contactName,
+                                                        client_email: moveDetails.contactEmail
+                                                    }}
+                                                />
                                             </div>
-                                            <PayFastCheckout
-                                                quote={{
-                                                    id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                    total_price: total,
-                                                    pickup_address: moveDetails.pickupAddress,
-                                                    dropoff_address: moveDetails.dropoffAddress,
-                                                    client_name: moveDetails.contactName,
-                                                    client_email: moveDetails.contactEmail
-                                                }}
-                                            />
-                                        </div>
+                                        )}
 
                                         {/* Payflex Option */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 px-2">
-                                                <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Interest-Free Credit</h4>
+                                        {moveDetails.paymentMethod === 'payflex' && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 px-2">
+                                                    <div className="w-1 h-4 bg-indigo-600 rounded-full" />
+                                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Interest-Free Credit</h4>
+                                                </div>
+                                                <PayflexCheckout
+                                                    quote={{
+                                                        id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
+                                                        total_price: total,
+                                                        client_name: moveDetails.contactName,
+                                                        client_email: moveDetails.contactEmail,
+                                                        client_phone: moveDetails.contactPhone
+                                                    }}
+                                                />
                                             </div>
-                                            <PayflexCheckout
-                                                quote={{
-                                                    id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                    total_price: total,
-                                                    client_name: moveDetails.contactName,
-                                                    client_email: moveDetails.contactEmail,
-                                                    client_phone: moveDetails.contactPhone
-                                                }}
-                                            />
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

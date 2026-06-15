@@ -1,17 +1,20 @@
 import React, { useRef } from 'react'
 import Button from '../../components/ui/Button'
+import { md5 } from './md5'
 
 export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const formRef = useRef(null)
 
-    // PayFast Sandbox Details
+    // PayFast Sandbox Details:
     // Merchant ID: 10000100
     // Merchant Key: 46f0cd694581a
 
-    // PayFast Details from environment variables or sandbox fallbacks
-    const merchantId = import.meta.env.VITE_PAYFAST_MERCHANT_ID || '10000100'
-    const merchantKey = import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '46f0cd694581a'
     const isSandbox = import.meta.env.VITE_TEST_MODE !== 'false'
+
+    // Credentials: Force default sandbox if in sandbox mode; use Env or Live defaults otherwise
+    const merchantId = isSandbox ? '10000100' : (import.meta.env.VITE_PAYFAST_MERCHANT_ID || '17687227')
+    const merchantKey = isSandbox ? '46f0cd694581a' : (import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '0btdkli273lqs')
+    const passphrase = isSandbox ? '' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')
 
     // URLs
     const baseUrl = window.location.origin
@@ -28,6 +31,49 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
         ? 'https://sandbox.payfast.co.za/eng/process'
         : 'https://www.payfast.co.za/eng/process'
 
+    // Form field variables
+    const nameFirst = quote.client_name?.split(' ')[0] || 'Client'
+    const emailAddress = quote.client_email || ''
+    const mPaymentId = quote.id || 'TEST-ID'
+    const amount = Number(quote.total_price || quote.total).toFixed(2)
+    const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}`
+
+    // PayFast URL encoder helper (spaces to +, uppercase hex)
+    const pfCleanEncode = (val) => {
+        if (val === undefined || val === null) return ''
+        return encodeURIComponent(String(val).trim())
+            .replace(/%20/g, '+')
+            .replace(/%[0-9a-fA-F]{2}/g, m => m.toUpperCase())
+    }
+
+    // Build the signature string in the exact HTML Form parameter sequence:
+    // 1. Merchant Details: merchant_id, merchant_key, return_url, cancel_url, notify_url
+    // 2. Buyer Details: name_first, email_address
+    // 3. Transaction Details: m_payment_id, amount, item_name
+    const fields = [
+        { name: 'merchant_id', value: merchantId },
+        { name: 'merchant_key', value: merchantKey },
+        { name: 'return_url', value: returnUrl },
+        { name: 'cancel_url', value: cancelUrl },
+        { name: 'notify_url', value: notifyUrl },
+        { name: 'name_first', value: nameFirst },
+        { name: 'email_address', value: emailAddress },
+        { name: 'm_payment_id', value: mPaymentId },
+        { name: 'amount', value: amount },
+        { name: 'item_name', value: itemName }
+    ]
+
+    let sigString = fields
+        .filter(f => f.value !== undefined && f.value !== null && String(f.value).trim() !== '')
+        .map(f => `${f.name}=${pfCleanEncode(f.value)}`)
+        .join('&')
+
+    if (passphrase) {
+        sigString += `&passphrase=${pfCleanEncode(passphrase)}`
+    }
+
+    const signature = md5(sigString)
+
     const handlePayClick = (e) => {
         formRef.current.submit()
     }
@@ -42,14 +88,17 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
                 <input type="hidden" name="cancel_url" value={cancelUrl} />
                 <input type="hidden" name="notify_url" value={notifyUrl} />
 
-                {/* Transaction Details */}
-                <input type="hidden" name="m_payment_id" value={quote.id || 'TEST-ID'} />
-                <input type="hidden" name="amount" value={Number(quote.total_price || quote.total).toFixed(2)} />
-                <input type="hidden" name="item_name" value={`Move: ${quote.pickup_address} to ${quote.dropoff_address}`} />
-
                 {/* Client Details */}
-                <input type="hidden" name="name_first" value={quote.client_name?.split(' ')[0] || 'Client'} />
-                <input type="hidden" name="email_address" value={quote.client_email} />
+                <input type="hidden" name="name_first" value={nameFirst} />
+                <input type="hidden" name="email_address" value={emailAddress} />
+
+                {/* Transaction Details */}
+                <input type="hidden" name="m_payment_id" value={mPaymentId} />
+                <input type="hidden" name="amount" value={amount} />
+                <input type="hidden" name="item_name" value={itemName} />
+
+                {/* Signature */}
+                <input type="hidden" name="signature" value={signature} />
             </form>
 
             <Button
@@ -76,3 +125,4 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
         </div>
     )
 }
+
