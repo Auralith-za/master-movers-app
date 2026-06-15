@@ -6,6 +6,7 @@ import { Label } from '../../components/ui/Label'
 import { Input } from '../../components/ui/Input'
 import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus, Loader2, Phone } from 'lucide-react'
 import { LeadCaptureModal } from './Step1Details'
+import { emailService } from '../../services/emailService'
 import clsx from 'clsx'
 import { PACKAGING_RATES } from '../inventory/data/pricingRates'
 
@@ -450,6 +451,15 @@ export default function Step2Access() {
                                 setIsSubmittingLead(true)
                                 try {
                                     await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    emailService.sendCallbackEmail({
+                                        name: moveDetails.contactName,
+                                        email: moveDetails.contactEmail,
+                                        phone: moveDetails.contactPhone,
+                                        step: 'Step 2 — Site Access',
+                                        pickup: moveDetails.pickupAddress || '',
+                                        dropoff: moveDetails.dropoffAddress || '',
+                                        moveDate: moveDetails.moveDate || ''
+                                    })
                                     alert("Request Sent! One of our agents will call you back shortly. 📞")
                                 } catch (err) {
                                     console.error("Callback submission error:", err)

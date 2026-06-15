@@ -6,6 +6,7 @@ import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'
 import { Button } from '../../components/ui/Button'
 import { motion } from 'framer-motion'
+import { emailService } from '../../services/emailService'
 import { Search, Trash2, Truck, RotateCcw, Phone, Loader2, Sparkles } from 'lucide-react'
 import { Input } from '../../components/ui/Input'
 import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
@@ -432,6 +433,15 @@ export default function Step3Inventory() {
                                         setIsSubmittingLead(true)
                                         try {
                                             await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                            emailService.sendCallbackEmail({
+                                                name: moveDetails.contactName,
+                                                email: moveDetails.contactEmail,
+                                                phone: moveDetails.contactPhone,
+                                                step: 'Step 3 — Inventory',
+                                                pickup: moveDetails.pickupAddress || '',
+                                                dropoff: moveDetails.dropoffAddress || '',
+                                                moveDate: moveDetails.moveDate || ''
+                                            })
                                             alert("Request Sent! One of our agents will call you back shortly. 📞")
                                         } catch (err) {
                                             console.error("Callback submission error:", err)

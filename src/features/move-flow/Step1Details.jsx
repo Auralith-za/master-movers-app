@@ -4,6 +4,7 @@ import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
+import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle } from 'lucide-react'
 import { getCityCode } from '../inventory/data/pricingRates'
@@ -401,7 +402,17 @@ export default function Step1Details() {
                             if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
                                 setIsSubmittingLead(true)
                                 try {
-                                    await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    const result = await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    // Send urgent callback alert to all admins
+                                    emailService.sendCallbackEmail({
+                                        name: moveDetails.contactName,
+                                        email: moveDetails.contactEmail,
+                                        phone: moveDetails.contactPhone,
+                                        step: 'Step 1 — Details',
+                                        pickup: moveDetails.pickupAddress || '',
+                                        dropoff: moveDetails.dropoffAddress || '',
+                                        moveDate: moveDetails.moveDate || ''
+                                    })
                                     alert("Request Sent! One of our agents will call you back shortly. 📞")
                                 } catch (err) {
                                     console.error("Callback submission error:", err)

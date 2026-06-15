@@ -116,8 +116,33 @@ export const emailService = {
     },
 
     /**
-     * Send a generic email (e.g. payment_link) directly via edge function
+     * Send urgent callback notification to ALL admins
+     * Called from Step 1, 2, 3 and 4 when customer requests a call back
      */
+    sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'callback_notification',
+                    contactData: { name, email, phone, step, pickup, dropoff, moveDate }
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Callback email failed')
+            console.log('📞 Callback notification sent to all admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendCallbackEmail error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
     sendEmail: async ({ type, to, quoteData, paymentLink }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''

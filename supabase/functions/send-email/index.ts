@@ -313,6 +313,31 @@ serve(async (req) => {
                 
                 <p>Please follow up with the customer directly at your earliest convenience.</p>
             `
+        } else if (type === 'callback_notification') {
+            subject = `📞 URGENT: Call Back Request — ${contactData?.name || 'Customer'}`
+            recipients = adminEmails // Admin-only alert
+
+            innerHtml = `
+                <h1 style="color:#e31837;">📞 Callback Request</h1>
+                <p>A customer has requested a call back via the website. Please contact them as soon as possible.</p>
+
+                <div class="highlight-box" style="border-left-color:#e31837; background:#fff5f5;">
+                    <p style="font-weight:900;font-size:18px;color:#0f172a;margin:0 0 4px;">${contactData?.name || 'Unknown Customer'}</p>
+                    <p style="margin:0;font-size:15px;color:#e31837;font-weight:700;">${contactData?.phone || 'No phone provided'}</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong>${contactData?.phone || '—'}</strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value">${contactData?.email || '—'}</td></tr>
+                    <tr><td class="label">Step:</td><td class="value">${contactData?.step || 'Quote Flow'}</td></tr>
+                    <tr><td class="label">From:</td><td class="value">${contactData?.pickup || '—'}</td></tr>
+                    <tr><td class="label">To:</td><td class="value">${contactData?.dropoff || '—'}</td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${contactData?.moveDate || 'TBD'}</td></tr>
+                </table>
+
+                <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
+            `
         } else if (type === 'payment_link') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM'
             subject = `Complete Your Master Movers Booking [Ref: MM-${ref}]`
