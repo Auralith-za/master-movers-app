@@ -83,7 +83,6 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [showAllItems, setShowAllItems] = useState(false)
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [showLeadModal, setShowLeadModal] = useState(false)
-    const [showDebug, setShowDebug] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
     const isStep4Initialized = React.useRef(false)
 
@@ -661,78 +660,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                                 <MapPin size={18} className="text-red-600" /> Move Route
                             </h3>
-                            <button 
-                                onClick={() => setShowDebug(!showDebug)}
-                                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 text-slate-400 rounded-md hover:bg-slate-900 hover:text-white transition-all"
-                            >
-                                {showDebug ? 'Hide Calc' : 'Test: View Calc'}
-                            </button>
                         </div>
-
-                        {showDebug && (
-                            <div className="mb-6 p-4 bg-slate-900 rounded-xl text-white font-mono text-[10px] space-y-3 animate-in zoom-in-95 duration-200">
-                                <div className="space-y-1 border-b border-white/10 pb-2">
-                                    <div className="flex justify-between">
-                                        <span className="text-white/50 uppercase">Transport Cost:</span>
-                                        <span className="text-emerald-400 font-bold">R {breakdown.transport.toFixed(2)}</span>
-                                    </div>
-                                    <div className="text-[9px] text-slate-500 italic">
-                                        Calculation: {breakdown.distance.toFixed(1)}km × R{breakdown.transportRate.toFixed(2)}/km
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1 border-b border-white/10 pb-2">
-                                    <div className="flex justify-between">
-                                        <span className="text-white/50 uppercase">Volume Cost:</span>
-                                        <span className="text-emerald-400 font-bold">R {breakdown.volume.toFixed(2)}</span>
-                                    </div>
-                                    <div className="text-[9px] text-slate-500 italic">
-                                        Calculation: {totalVolume.toFixed(2)}ft³ × R{breakdown.volumeRate.toFixed(2)}/ft³
-                                    </div>
-                                </div>
-
-                                {breakdown.crew > 0 && (
-                                    <div className="space-y-1 border-b border-white/10 pb-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-white/50 uppercase">Specialist Crew:</span>
-                                            <span className="text-emerald-400 font-bold">R {breakdown.crew.toFixed(2)}</span>
-                                        </div>
-                                        <div className="text-[9px] text-slate-500 italic">Heavy Item Surcharge (2x R700)</div>
-                                    </div>
-                                )}
-
-                                {breakdown.extraDistance > 0 && (
-                                    <div className="space-y-1 border-b border-white/10 pb-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-white/50 uppercase">Extra Distance:</span>
-                                            <span className="text-emerald-400 font-bold">R {breakdown.extraDistance.toFixed(2)}</span>
-                                        </div>
-                                        <div className="text-[9px] text-slate-500 italic uppercase tracking-wider">{breakdown.detailedExtraDistance}</div>
-                                    </div>
-                                )}
-
-                                {breakdown.access > 0 && (
-                                    <div className="space-y-1 border-b border-white/10 pb-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-white/50 uppercase">Access & Services:</span>
-                                            <span className="text-emerald-400 font-bold">R {breakdown.access.toFixed(2)}</span>
-                                        </div>
-                                        <div className="text-[9px] text-slate-500 italic uppercase tracking-wider">{breakdown.detailedAccess}</div>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <span className="text-white/50 uppercase block">Vehicle:</span>
-                                        <span className="text-emerald-400 font-bold">{breakdown.vehicleType}</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-white/50 uppercase block">Mode:</span>
-                                        <span className="text-emerald-400 font-bold">{breakdown.isSharedLoad ? 'SHARED' : 'DEDICATED'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                         <div className="space-y-4 pl-4 border-l-2 border-gray-100 relative">
                             <div className="relative">
                                 <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-red-600 border-2 border-white ring-1 ring-gray-200" />
