@@ -105,16 +105,20 @@ export const calculateTripDistances = async (pickupAddress, dropoffAddress, city
             // 3. Dropoff (2) -> Depot (2)
             const dropoffToDepotElement = response.rows[2].elements[2];
 
-            if (!depotToPickupElement || depotToPickupElement.status !== 'OK') {
-                reject(new Error("The Pickup Address could not be verified by Google Maps. Please type and select a valid address from the dropdown suggestions."));
-                return;
-            }
-            if (!pickupToDropoffElement || pickupToDropoffElement.status !== 'OK') {
-                reject(new Error("No driving route found between your Pickup and Dropoff Address. Please ensure both addresses are correct."));
-                return;
-            }
-            if (!dropoffToDepotElement || dropoffToDepotElement.status !== 'OK') {
-                reject(new Error("The Dropoff Address could not be verified by Google Maps. Please type and select a valid address from the dropdown suggestions."));
+            if (!depotToPickupElement || depotToPickupElement.status !== 'OK' ||
+                !pickupToDropoffElement || pickupToDropoffElement.status !== 'OK' ||
+                !dropoffToDepotElement || dropoffToDepotElement.status !== 'OK') {
+                console.warn("Address verification failed. Using default fallback distance.");
+                resolve({
+                    totalDistance: 50,
+                    breakdown: {
+                        depotToPickup: 15,
+                        pickupToDropoff: 20,
+                        dropoffToDepot: 15
+                    },
+                    depotUsed: depotLocation,
+                    isApiDenied: true
+                });
                 return;
             }
 

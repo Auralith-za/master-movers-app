@@ -196,14 +196,6 @@ export default function Step1Details() {
     const handleSubmit = (e) => {
         e.preventDefault()
         
-        if (moveDetails.pickupAddress && !moveDetails.pickupAddressVerified) {
-            setAddressError("Oops! Please fix the Pickup Address. You must select one of the options that appears from Google Maps.")
-            return
-        }
-        if (moveDetails.dropoffAddress && !moveDetails.dropoffAddressVerified) {
-            setAddressError("Oops! Please fix the Dropoff Address. You must select one of the options that appears from Google Maps.")
-            return
-        }
         if (addressError) {
             return
         }

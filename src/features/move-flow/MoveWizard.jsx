@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
+import { useMoveStore } from '../inventory/store/moveStore'
 import Step1Details from './Step1Details'
 import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
@@ -10,6 +11,7 @@ import Step4Summary from './Step4Summary'
 export default function MoveWizard() {
     const location = useLocation()
     const navigate = useNavigate()
+    const { moveDetails, inventory } = useMoveStore()
 
     // Determine if we're in test mode or admin mode based on current path
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
@@ -27,6 +29,48 @@ export default function MoveWizard() {
     const currentStepIndex = STEPS.findIndex(s => s.path === location.pathname) !== -1
         ? STEPS.findIndex(s => s.path === location.pathname)
         : 0;
+
+    const isStepCompleted = (stepId) => {
+        if (stepId === 'details') return true;
+
+        const step1Ok = !!(
+            moveDetails?.pickupAddress &&
+            moveDetails?.dropoffAddress &&
+            moveDetails?.moveDate &&
+            moveDetails?.contactName &&
+            moveDetails?.surname &&
+            moveDetails?.contactPhone &&
+            moveDetails?.contactEmail &&
+            moveDetails?.contactEmail.includes('@') &&
+            moveDetails?.contactEmail.includes('.')
+        );
+
+        if (stepId === 'access') return step1Ok;
+        if (stepId === 'inventory') return step1Ok;
+
+        const hasInventory = Object.keys(inventory || {}).length > 0;
+        if (stepId === 'summary') return step1Ok && hasInventory;
+
+        return false;
+    };
+
+    // Auto-redirect invalid step paths
+    React.useEffect(() => {
+        const currentStep = STEPS[currentStepIndex];
+        if (currentStep) {
+            if (currentStep.id === 'access' && !isStepCompleted('access')) {
+                navigate(basePath, { replace: true });
+            } else if (currentStep.id === 'inventory' && !isStepCompleted('inventory')) {
+                navigate(basePath, { replace: true });
+            } else if (currentStep.id === 'summary' && !isStepCompleted('summary')) {
+                if (!isStepCompleted('inventory')) {
+                    navigate(basePath, { replace: true });
+                } else {
+                    navigate(`${basePath}/inventory`, { replace: true });
+                }
+            }
+        }
+    }, [location.pathname, moveDetails, inventory, currentStepIndex, basePath, navigate]);
 
     // Scroll to top on step change
     React.useEffect(() => {
@@ -57,12 +101,20 @@ export default function MoveWizard() {
                         {STEPS.map((step, idx) => {
                             const isCompleted = idx < currentStepIndex;
                             const isActive = idx === currentStepIndex;
+                            const isAllowed = isStepCompleted(step.id);
 
                             return (
                                 <div
                                     key={step.id}
-                                    className="flex flex-col items-center group cursor-pointer"
-                                    onClick={() => navigate(step.path)}
+                                    className={clsx(
+                                        "flex flex-col items-center group",
+                                        isAllowed ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                                    )}
+                                    onClick={() => {
+                                        if (isAllowed) {
+                                            navigate(step.path);
+                                        }
+                                    }}
                                 >
                                     {/* Dot / Indicator */}
                                     <div className={clsx(
@@ -81,7 +133,9 @@ export default function MoveWizard() {
                                     {/* Label */}
                                     <span className={clsx(
                                         "text-[10px] uppercase tracking-widest font-black transition-all duration-300 md:block hidden",
-                                        isActive ? "text-slate-900 opacity-100" : "text-slate-400 opacity-50 group-hover:opacity-100"
+                                        isActive ? "text-slate-900 opacity-100" : 
+                                            isAllowed ? "text-slate-400 opacity-50 group-hover:opacity-100" : 
+                                                "text-slate-300 opacity-40"
                                     )}>
                                         {step.label}
                                     </span>
