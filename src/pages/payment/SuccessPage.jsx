@@ -57,22 +57,41 @@ export default function SuccessPage() {
         const gateway = searchParams.get('gateway') || 'payfast'
 
         if (quoteId) {
-            supabase
-                .from('quotes')
-                .update({ status: 'booked_paid', payment_status: 'paid', payment_method: gateway })
-                .eq('id', quoteId)
-                .select()
-                .then(({ data, error }) => {
-                    if (!error && data?.length > 0) {
-                        setQuoteRecord(data[0])
-                        sendConfirmationEmail(data[0])
-                        trackPurchaseConversion({
-                            value: data[0]?.total_price || 0,
-                            currency: 'ZAR',
-                            transactionId: quoteId
-                        })
-                    }
-                })
+            // Use the confirm-payment edge function (service role) — bypasses RLS
+            // which would silently block the anon-key client from updating the status
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            fetch(`${supabaseUrl}/functions/v1/confirm-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({ quoteId, gateway })
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.success && result.quote) {
+                    setQuoteRecord(result.quote)
+                    sendConfirmationEmail(result.quote)
+                    trackPurchaseConversion({
+                        value: result.quote.total_price || 0,
+                        currency: 'ZAR',
+                        transactionId: quoteId
+                    })
+                    console.log('✅ Payment confirmed on backend:', quoteId)
+                } else {
+                    console.warn('confirm-payment returned:', result)
+                    // Fallback: still try to fetch the record for display
+                    supabase.from('quotes').select('*').eq('id', quoteId).single()
+                        .then(({ data }) => { if (data) setQuoteRecord(data) })
+                }
+            })
+            .catch(err => {
+                console.error('confirm-payment call failed:', err)
+                // Fallback display only
+                supabase.from('quotes').select('*').eq('id', quoteId).single()
+                    .then(({ data }) => { if (data) setQuoteRecord(data) })
+            })
         }
 
         event({ action: 'purchase', category: 'Sales', label: 'Payment Completed', value: 1 })
