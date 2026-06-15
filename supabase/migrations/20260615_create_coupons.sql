@@ -12,8 +12,14 @@ CREATE TABLE IF NOT EXISTS public.coupons (
 
 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Allow anon read active coupons" ON public.coupons
-  FOR SELECT USING (is_active = true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'Allow anon read active coupons'
+  ) THEN
+    CREATE POLICY "Allow anon read active coupons" ON public.coupons
+      FOR SELECT USING (is_active = true);
+  END IF;
+END $$;
 
 INSERT INTO public.coupons (code, discount_percent, description, is_active, max_uses)
 VALUES 

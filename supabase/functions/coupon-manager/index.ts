@@ -10,14 +10,66 @@ serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
     try {
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        const supabase = createClient(supabaseUrl, serviceKey)
 
-        // Auto-setup: create coupons table if not exists (runs via Postgres connection)
         const body = await req.json().catch(() => ({}))
         const { action, code, discount_percent, description, max_uses, expires_at, coupon_id } = body
+
+        // ── SETUP: Create table + seed via direct Postgres REST ──────────
+        if (action === 'setup') {
+            // Use the pg REST endpoint available to service role
+            const setupSql = `
+                CREATE TABLE IF NOT EXISTS public.coupons (
+                  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+                  code text NOT NULL UNIQUE,
+                  discount_percent integer NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
+                  description text DEFAULT '',
+                  is_active boolean DEFAULT true,
+                  max_uses integer DEFAULT NULL,
+                  times_used integer DEFAULT 0,
+                  expires_at timestamptz DEFAULT NULL,
+                  created_at timestamptz DEFAULT now()
+                );
+                ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+                DO $$ BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'anon_read_active') THEN
+                    CREATE POLICY anon_read_active ON public.coupons FOR SELECT USING (is_active = true);
+                  END IF;
+                END $$;
+                INSERT INTO public.coupons (code, discount_percent, description) VALUES
+                  ('TESTMOVE10', 10, '10% off for testing'),
+                  ('LAUNCH20', 20, '20% launch discount'),
+                  ('STAFF50', 50, 'Staff 50% testing discount')
+                ON CONFLICT (code) DO NOTHING;
+            `
+            const pgRes = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'apikey': serviceKey },
+                body: JSON.stringify({ sql: setupSql })
+            })
+
+            // Fallback: Try via Supabase's query API
+            const queryRes = await fetch(`${supabaseUrl.replace('supabase.co', 'supabase.co')}/pg/query`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: setupSql })
+            }).catch(() => null)
+
+            // Just try inserting the seed data - table may already exist from dashboard
+            const seed = await supabase.from('coupons').upsert([
+                { code: 'TESTMOVE10', discount_percent: 10, description: '10% off for testing' },
+                { code: 'LAUNCH20', discount_percent: 20, description: '20% launch discount' },
+                { code: 'STAFF50', discount_percent: 50, description: 'Staff 50% testing discount' }
+            ], { onConflict: 'code' })
+
+            return new Response(JSON.stringify({
+                success: true,
+                seed_result: seed.error ? seed.error.message : 'seeded',
+                note: 'If table does not exist, please create it via Supabase Dashboard SQL editor using the migration file'
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
 
         // ── VALIDATE COUPON (public) ──────────────────────────────────────
         if (action === 'validate') {
@@ -33,12 +85,10 @@ serve(async (req) => {
             if (error) throw error
             if (!data) return new Response(JSON.stringify({ valid: false, error: 'Invalid or expired coupon code.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-            // Check expiry
             if (data.expires_at && new Date(data.expires_at) < new Date()) {
                 return new Response(JSON.stringify({ valid: false, error: 'This coupon has expired.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
             }
 
-            // Check usage limit
             if (data.max_uses !== null && data.times_used >= data.max_uses) {
                 return new Response(JSON.stringify({ valid: false, error: 'This coupon has reached its usage limit.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
             }
@@ -49,13 +99,6 @@ serve(async (req) => {
                 description: data.description,
                 code: data.code
             }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
-
-        // ── APPLY COUPON (increment usage) ───────────────────────────────
-        if (action === 'apply') {
-            if (!code) throw new Error('No coupon code provided')
-            await supabase.from('coupons').update({ times_used: supabase.raw('times_used + 1') }).eq('code', code.trim().toUpperCase())
-            return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
         // ── LIST ALL COUPONS (admin) ──────────────────────────────────────
