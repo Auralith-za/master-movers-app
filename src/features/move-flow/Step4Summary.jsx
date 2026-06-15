@@ -9,6 +9,7 @@ import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
+import CouponInput from '../payment/CouponInput'
 import { event } from '../../lib/gtag'
 import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
 import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
@@ -88,6 +89,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
     const [isCalculating, setIsCalculating] = useState(false)
     const [calcMessage, setCalcMessage] = useState('Analyzing inventory volume...')
+    const [appliedCoupon, setAppliedCoupon] = useState(null)
 
     React.useEffect(() => {
         if (!isCalculating) return;
@@ -122,6 +124,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
+
+    // Apply coupon discount on top of calculated total
+    const couponDiscount = appliedCoupon ? (total * appliedCoupon.discount_percent) / 100 : 0
+    const discountedTotal = Math.max(0, total - couponDiscount)
 
     // Auto-save on mount if not already saved
     React.useEffect(() => {
@@ -440,14 +446,31 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <p className="text-slate-400 text-sm mt-1">Based on provided inventory & distance.</p>
                             </div>
                             <div className="text-right">
-                                <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div className="text-xs text-slate-400 uppercase tracking-widest">Incl. VAT</div>
+                                {appliedCoupon ? (
+                                    <>
+                                        <div className="text-lg font-bold text-slate-500 line-through">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-3xl font-bold text-emerald-400">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">-{appliedCoupon.discount_percent}% Applied!</div>
+                                    </>
+                                ) : (
+                                    <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                )}
+                                <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Incl. VAT</div>
                                 <div className="text-[10px] text-slate-500 mt-1 italic">* Pricing valid for 7 days from date of issue.</div>
                             </div>
                         </div>
                     </div>
 
                     <div className="p-6 space-y-4">
+                        {/* Coupon discount line */}
+                        {appliedCoupon && (
+                            <div className="flex justify-between items-center py-2 border-b border-emerald-100 bg-emerald-50 -mx-6 px-6">
+                                <span className="text-emerald-700 font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
+                                    🏷️ Coupon: {appliedCoupon.code}
+                                </span>
+                                <span className="font-black text-emerald-600">- R {couponDiscount.toFixed(2)}</span>
+                            </div>
+                        )}
                         {/* Base Transport row removed as per request */}
                         {packagingCost > 0 && (
                             <div className="space-y-2 py-4 border-b border-gray-100">
@@ -484,6 +507,16 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </ul>
                             </div>
                         )}
+
+                        {/* Coupon Input */}
+                        <div className="pt-3 border-t border-gray-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Promo Code</p>
+                            <CouponInput
+                                appliedCoupon={appliedCoupon}
+                                onApply={(coupon) => setAppliedCoupon(coupon)}
+                                onRemove={() => setAppliedCoupon(null)}
+                            />
+                        </div>
 
                         {/* Payment Method Selection */}
                         <div className="pt-4 border-t border-gray-100 space-y-3">
@@ -603,7 +636,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                 <PayFastCheckout
                                                     quote={{
                                                         id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                        total_price: total,
+                                                        total_price: discountedTotal,
                                                         pickup_address: moveDetails.pickupAddress,
                                                         dropoff_address: moveDetails.dropoffAddress,
                                                         client_name: moveDetails.contactName,
@@ -623,7 +656,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                 <PayflexCheckout
                                                     quote={{
                                                         id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                        total_price: total,
+                                                        total_price: discountedTotal,
                                                         client_name: moveDetails.contactName,
                                                         client_email: moveDetails.contactEmail,
                                                         client_phone: moveDetails.contactPhone
