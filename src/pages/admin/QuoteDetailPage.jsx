@@ -322,13 +322,19 @@ export default function QuoteDetailPage() {
     }
 
     const handleSendEmailUpdate = async () => {
-        if (!quote.client_email) {
-            alert('Client email is missing.');
-            return;
+        // Use saved email OR fall back to the edit form value (unsaved new quote)
+        let emailTo = quote.client_email || editForm.client_email
+
+        if (!emailTo) {
+            emailTo = prompt('No email address on this quote. Enter the client email to send to:')
+            if (!emailTo) return
+            // Save it to the quote immediately
+            setEditForm(prev => ({ ...prev, client_email: emailTo }))
+            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', quote.id)
         }
 
-        const confirmSend = confirm(`Send automated proposal email with PDF to ${quote.client_email}?`);
-        if (!confirmSend) return;
+        const confirmSend = confirm(`Send automated proposal email with PDF to ${emailTo}?`)
+        if (!confirmSend) return
 
         try {
             const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
@@ -336,39 +342,43 @@ export default function QuoteDetailPage() {
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
                 quoteId: quote.id,
-                clientName: quote.client_name,
-                clientEmail: quote.client_email,
-                clientPhone: quote.client_phone,
-                pickupAddress: quote.pickup_address,
-                dropoffAddress: quote.dropoff_address,
-                moveDate: quote.move_date,
+                clientName: quote.client_name || editForm.client_name,
+                clientEmail: emailTo,
+                clientPhone: quote.client_phone || editForm.client_phone,
+                pickupAddress: quote.pickup_address || editForm.pickup_address,
+                dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
+                moveDate: quote.move_date || editForm.move_date,
                 inventory: inventoryForPdf,
                 total: quote.total_price,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
                 subTotal: (quote.total_price || 0) / 1.15,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: quote.items_json?.breakdown || null
-            });
+            })
             
             if (result.success) {
-                await logActivity('email', `Automated proposal email (PDF attached) sent to ${quote.client_email}.`);
-                alert('Email sent successfully!');
+                await logActivity('email', `Proposal email (PDF attached) sent to ${emailTo}.`)
+                alert('Email sent successfully!')
             } else {
-                alert('Failed to send email: ' + result.error);
+                alert('Failed to send email: ' + result.error)
             }
         } catch (error) {
-            console.error('Email error:', error);
-            alert('Failed to trigger email automation: ' + error.message);
+            console.error('Email error:', error)
+            alert('Failed to trigger email automation: ' + error.message)
         }
     }
 
     const handleResendQuote = async () => {
-        if (!quote.client_email) {
-            alert('Client email is missing.');
-            return;
+        let emailTo = quote.client_email || editForm.client_email
+
+        if (!emailTo) {
+            emailTo = prompt('No email address on this quote. Enter the client email to send to:')
+            if (!emailTo) return
+            setEditForm(prev => ({ ...prev, client_email: emailTo }))
+            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', quote.id)
         }
 
-        if (!confirm(`Regenerate and email quote PDF to ${quote.client_email}?`)) return
+        if (!confirm(`Regenerate and email quote PDF to ${emailTo}?`)) return
         
         try {
             const inventoryForPdf = quote.items_json?.items || quote.items_json || {}

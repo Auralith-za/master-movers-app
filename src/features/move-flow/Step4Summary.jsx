@@ -223,7 +223,26 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             })
             
             if (result.success && result.data?.[0]) {
-                sendProposalEmail(result.data[0])
+                const savedQuote = result.data[0]
+
+                // 1. Instant admin alert — no PDF, fires immediately so sales team can follow up
+                if (submissionType !== 'admin') {
+                    emailService.sendPendingQuoteAlert({
+                        id: savedQuote.id,
+                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                        client_email: moveDetails.contactEmail,
+                        client_phone: moveDetails.contactPhone,
+                        move_date: moveDetails.moveDate,
+                        pickup_address: moveDetails.pickupAddress,
+                        dropoff_address: moveDetails.dropoffAddress,
+                        total_price: discountedTotal || total,
+                        move_type: moveDetails.moveType || '',
+                        payment_method: moveDetails.paymentMethod || 'not selected'
+                    }).catch(err => console.error('Non-blocking admin alert error:', err))
+                }
+
+                // 2. Customer proposal email with PDF (separate — may take a moment)
+                sendProposalEmail(savedQuote)
             }
 
             if (submissionType === 'admin' && result.success) {

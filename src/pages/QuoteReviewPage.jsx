@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
@@ -8,7 +8,10 @@ import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
 
 export default function QuoteReviewPage() {
-    const { id } = useParams();
+    const { id: pathId } = useParams();
+    const [searchParams] = useSearchParams();
+    // Support both /quote/review/:id (path param) AND /quote-review?id=UUID (query param from email)
+    const id = pathId || searchParams.get('id');
     const [quote, setQuote] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isTermsOpen, setIsTermsOpen] = useState(false);

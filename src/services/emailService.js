@@ -116,6 +116,59 @@ export const emailService = {
     },
 
     /**
+     * Admin-only booking confirmed alert — no PDF, fires instantly after payment
+     * Separate from the customer email so admins always get notified
+     */
+    sendBookingConfirmedAlert: async (quoteData) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({ type: 'booking_confirmed_alert', quoteData })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Booking alert failed')
+            console.log('✅ Booking confirmed admin alert sent to all admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendBookingConfirmedAlert error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
+    /**
+     * Send instant admin-only alert when a customer reaches Step 4 (pending quote)
+     * No PDF needed — fires immediately so sales team can follow up
+     */
+    sendPendingQuoteAlert: async (quoteData) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'pending_quote_alert',
+                    quoteData
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Pending quote alert failed')
+            console.log('🔔 Pending quote admin alert sent')
+            return { success: true }
+        } catch (error) {
+            console.error('sendPendingQuoteAlert error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
+    /**
      * Send urgent callback notification to ALL admins
      * Called from Step 1, 2, 3 and 4 when customer requests a call back
      */

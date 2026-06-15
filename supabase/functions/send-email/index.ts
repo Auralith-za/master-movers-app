@@ -183,7 +183,42 @@ serve(async (req) => {
         let recipients = typeof to === 'string' ? [to] : to
 
         // Compile standard layout or customer-facing details based on email type
-        if (type === 'quote_proposal') {
+        if (type === 'pending_quote_alert') {
+            // Admin-only: fires when customer reaches Step 4 (pending, not yet paid)
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
+            subject = `🔔 NEW PENDING QUOTE — ${quoteData?.client_name || 'Customer'} [MM-${ref}]`
+            recipients = adminEmails // Admin-only
+
+            innerHtml = `
+                <h1 style="color:#0f172a;">🔔 New Pending Quote</h1>
+                <p>A customer has completed their inventory and is <strong>viewing their quote on Step 4</strong>. They may need a follow-up call to convert to a booking.</p>
+
+                <div class="highlight-box" style="background:#eff6ff; border-left-color:#2563eb;">
+                    <p style="font-weight:900;font-size:22px;color:#1e40af;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#64748b;">(Incl. VAT)</span></p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Quote Total — Awaiting Payment</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                    <tr><td class="label">Move Type:</td><td class="value">${quoteData?.move_type || '—'}</td></tr>
+                    <tr><td class="label">Payment Method:</td><td class="value">${quoteData?.payment_method || 'Not selected'}</td></tr>
+                </table>
+
+                <div style="text-align:center;margin:30px 0;">
+                    <a href="https://fanciful-cupcake-cb7c87.netlify.app/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#2563eb;">
+                        View Quote in Admin →
+                    </a>
+                </div>
+
+                <p style="font-size:13px;color:#64748b;">Call the customer on <strong>${quoteData?.client_phone || '—'}</strong> to assist with payment or answer questions.</p>
+            `
+        } else if (type === 'quote_proposal') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM-NEW'
             subject = `Your Master Movers Move Proposal [Ref: ${ref}]`
             
@@ -229,6 +264,43 @@ serve(async (req) => {
                 <div style="text-align: center; margin-top: 30px;">
                     <a href="${originUrl}/quote-review?id=${quoteData?.id}" class="btn">View & Pay Proposal</a>
                 </div>
+            `
+        } else if (type === 'booking_confirmed_alert') {
+            // Admin-only booking alert — no PDF, instant, always fires
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
+            subject = `✅ BOOKING CONFIRMED — ${quoteData?.client_name || 'Customer'} [MM-${ref}] — R ${Number(quoteData?.total_price || 0).toFixed(2)}`
+            recipients = adminEmails
+
+            innerHtml = `
+                <h1 style="color:#059669;">✅ Booking Confirmed — Payment Received</h1>
+                <p>A customer has successfully paid. The move is officially booked.</p>
+
+                <div class="highlight-box" style="background:#ecfdf5; border-left-color:#059669;">
+                    <p style="font-weight:900;font-size:24px;color:#059669;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#64748b;">(Incl. VAT)</span></p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#065f46;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Payment Received via ${(quoteData?.payment_method || 'Card').toUpperCase()}</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;font-size:16px;">MM-${ref}</td></tr>
+                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value"><strong>${quoteData?.move_date || 'TBD'}</strong></td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                    <tr><td class="label">Payment Method:</td><td class="value" style="text-transform:uppercase;font-weight:700;">${quoteData?.payment_method || '—'}</td></tr>
+                    <tr><td class="label">Subtotal (excl. VAT):</td><td class="value">R ${(Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
+                    <tr><td class="label">VAT (15%):</td><td class="value">R ${(Number(quoteData?.total_price || 0) - Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
+                    <tr><td class="label" style="font-size:14px;color:#0f172a;">Total Paid:</td><td class="value" style="font-size:18px;font-weight:900;color:#059669;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</td></tr>
+                </table>
+
+                <div style="text-align:center;margin:30px 0;">
+                    <a href="https://fanciful-cupcake-cb7c87.netlify.app/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#059669;">
+                        View Booking in Admin →
+                    </a>
+                </div>
+
+                <p style="font-size:13px;color:#64748b;">Our operations team should contact the customer <strong>48 hours before the move date</strong> to confirm arrival times and crew details.</p>
             `
         } else if (type === 'booking_confirmation') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM-NEW'

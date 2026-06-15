@@ -73,6 +73,7 @@ function App() {
           <Route path="/payment/cancel" element={<CancelPage />} />
           <Route path="/locations/movers-durban" element={<MoversDurban />} />
           <Route path="/quote/review/:id" element={<QuoteReviewPage />} />
+          <Route path="/quote-review" element={<QuoteReviewPage />} />
           {/* Add other site pages here later */}
         </Route>
 
