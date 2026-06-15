@@ -57,9 +57,9 @@ export default function PayflexCheckout({ quote }) {
 
     return (
         <div className="w-full">
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 text-center">
+            <div className="bg-purple-50/60 border border-purple-200 rounded-2xl p-6 text-center">
                 <div className="flex flex-col items-center gap-2 mb-4">
-                    <span className="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                    <span className="bg-purple-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
                         Payflex Installments
                     </span>
                     <h4 className="text-2xl font-black text-slate-900 italic uppercase">
@@ -71,7 +71,7 @@ export default function PayflexCheckout({ quote }) {
                 <Button
                     variant="ghost"
                     size="lg"
-                    className="w-full bg-[#1A1A1A] hover:bg-slate-900 text-white shadow-xl shadow-indigo-100 font-black uppercase tracking-widest py-6"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-xl shadow-purple-200 font-black uppercase tracking-widest py-6"
                     onClick={handlePayflexClick}
                     isLoading={isLoading}
                 >

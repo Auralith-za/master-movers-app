@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Search, Filter, Eye, MessageCircle, Mail, Plus } from 'lucide-react'
+import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
@@ -95,6 +95,51 @@ export default function QuotesPage() {
         }
     }
 
+    const handleSendToPayLink = async (quote) => {
+        if (!quote.client_email) {
+            alert('Client email is missing — cannot send payment link.')
+            return
+        }
+
+        const SITE_URL = 'https://fanciful-cupcake-cb7c87.netlify.app'
+        const paymentLink = `${SITE_URL}/quote/review/${quote.id}`
+
+        const confirmed = confirm(
+            `Send payment link to ${quote.client_email}?\n\nLink: ${paymentLink}\n\nThe customer will be able to view their full quote summary and pay via PayFast or Payflex.`
+        )
+        if (!confirmed) return
+
+        try {
+            // Send via Resend email
+            const result = await emailService.sendEmail({
+                type: 'payment_link',
+                to: quote.client_email,
+                quoteData: quote,
+                paymentLink
+            })
+
+            // Also update status to pending_payment if still 'lead'
+            if (quote.status === 'lead' || quote.status === 'new') {
+                await supabase
+                    .from('quotes')
+                    .update({ status: 'pending_payment' })
+                    .eq('id', quote.id)
+                fetchQuotes()
+            }
+
+            alert(`✅ Payment link sent to ${quote.client_email}!`)
+        } catch (error) {
+            console.error('Send to pay error:', error)
+            // Fallback: just copy link to clipboard
+            try {
+                await navigator.clipboard.writeText(paymentLink)
+                alert(`Email failed — but the payment link has been copied to your clipboard!\n\n${paymentLink}`)
+            } catch {
+                alert(`Payment link (copy manually):\n${paymentLink}`)
+            }
+        }
+    }
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -184,7 +229,19 @@ export default function QuotesPage() {
                                         <div className="text-slate-900">{quote.pickup_address?.split(',')[0]}</div>
                                         <div className="text-slate-400 text-xs">to {quote.dropoff_address?.split(',')[0]}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">{quote.move_date}</td>
+                                    <td className="px-6 py-4 text-sm">
+                                        <div className="text-slate-700 font-medium">
+                                            {quote.created_at
+                                                ? new Date(quote.created_at).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: '2-digit' })
+                                                : '—'
+                                            }
+                                        </div>
+                                        {quote.move_date && (
+                                            <div className="text-xs text-slate-400 mt-0.5">
+                                                📅 Move: {quote.move_date}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 font-medium text-slate-900">
                                         {quote.total_price ? `R ${Number(quote.total_price).toFixed(2)}` : '-'}
                                     </td>
@@ -200,17 +257,27 @@ export default function QuotesPage() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {/* Send to Pay — only for pending/lead quotes */}
+                                            {(quote.status === 'pending_payment' || quote.status === 'lead' || quote.status === 'new') && (
+                                                <button
+                                                    onClick={() => handleSendToPayLink(quote)}
+                                                    className="p-1.5 text-emerald-700 bg-emerald-50 rounded hover:bg-emerald-100 flex items-center gap-1"
+                                                    title="Send Payment Link to Client"
+                                                >
+                                                    <CreditCard size={16} />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleAutomatedEmail(quote)}
                                                 className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100"
-                                                title="Send Automated Update Email"
+                                                title="Send Proposal Email"
                                             >
                                                 <Mail size={16} />
                                             </button>
                                             <a
                                                 href={`mailto:${quote.client_email}`}
                                                 className="p-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
-                                                title="Email"
+                                                title="Open Email Client"
                                             >
                                                 <Mail size={16} />
                                             </a>

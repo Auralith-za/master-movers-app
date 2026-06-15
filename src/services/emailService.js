@@ -113,5 +113,31 @@ export const emailService = {
             console.error("Failed to send contact email:", error)
             return { success: false, error: error.message }
         }
+    },
+
+    /**
+     * Send a generic email (e.g. payment_link) directly via edge function
+     */
+    sendEmail: async ({ type, to, quoteData, paymentLink }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const url = `${supabaseUrl}/functions/v1/send-email`
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({ type, to, quoteData, paymentLink })
+            })
+
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Email function error')
+            return { success: true, messageId: result.messageId }
+        } catch (error) {
+            console.error('sendEmail error:', error)
+            return { success: false, error: error.message }
+        }
     }
 }

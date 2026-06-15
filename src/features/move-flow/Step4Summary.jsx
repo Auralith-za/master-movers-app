@@ -129,12 +129,13 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const couponDiscount = appliedCoupon ? (total * appliedCoupon.discount_percent) / 100 : 0
     const discountedTotal = Math.max(0, total - couponDiscount)
 
-    // Auto-save on mount if not already saved
+    // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners
     React.useEffect(() => {
         if (moveDetails.contactName && !searchParams.get('saved') && !isStep4Initialized.current) {
             isStep4Initialized.current = true
-            // Mapping: standard -> new, test -> lead, admin -> lead
-            const initialStatus = (submissionType === 'test' || submissionType === 'admin') ? 'lead' : 'new'
+            // All public submissions save as 'lead' on arrival at Step 4 so admin can see them
+            // even if customer leaves without paying. Admin flow saves as 'lead' too.
+            const initialStatus = submissionType === 'admin' ? 'lead' : 'lead'
 
             submitQuote({
                 status: initialStatus,

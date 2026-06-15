@@ -166,7 +166,7 @@ serve(async (req) => {
     }
 
     try {
-        const { type, to, quoteData, contactData, pdfBase64, pdfFilename } = await req.json()
+        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, paymentLink } = await req.json()
 
         const resendApiKey = Deno.env.get('RESEND_API_KEY')
         const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'
@@ -312,6 +312,38 @@ serve(async (req) => {
                 </div>
                 
                 <p>Please follow up with the customer directly at your earliest convenience.</p>
+            `
+        } else if (type === 'payment_link') {
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM'
+            subject = `Complete Your Master Movers Booking [Ref: MM-${ref}]`
+            recipients = typeof to === 'string' ? [to] : (to || [quoteData?.client_email])
+
+            innerHtml = `
+                <h1>Your Move is Ready to Book!</h1>
+                <p>Dear ${quoteData?.client_name || 'Valued Customer'},</p>
+                <p>Your moving quote from Master Movers is saved and ready. Click the button below to view your full quote summary and complete your payment securely online.</p>
+
+                <div class="highlight-box">
+                    <p style="margin-bottom: 5px; font-weight: 700; color: #0f172a;">Quote Total:</p>
+                    <p style="font-size: 28px; font-weight: 900; color: #e31837; margin: 0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size: 13px; font-weight: 500; color: #6b7280;">(Incl. VAT)</span></p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
+                    <tr><td class="label">From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
+                    <tr><td class="label">To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
+                </table>
+
+                <p>We accept <strong>credit/debit card</strong> and <strong>Payflex interest-free instalments</strong> (4 payments over 6 weeks).</p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${paymentLink || '#'}" class="btn" style="font-size:16px;padding:18px 40px;">
+                        View Quote &amp; Pay Now →
+                    </a>
+                </div>
+
+                <p style="font-size:12px;color:#94a3b8;text-align:center;">This link is unique to your quote. If you have any questions, call us on <strong>+27 11 493 7569</strong>.</p>
             `
         } else {
             throw new Error(`Unsupported email type: ${type}`)
