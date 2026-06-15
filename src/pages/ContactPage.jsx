@@ -5,6 +5,7 @@ import Input from '../components/ui/Input'
 import Label from '../components/ui/Label'
 import { emailService } from '../services/emailService'
 import { trackLeadConversion } from '../lib/gtag'
+import { supabase } from '../lib/supabaseClient'
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -31,26 +32,33 @@ export default function ContactPage() {
         }
         setIsSubmitting(true)
         try {
+            const name = `${formData.firstName} ${formData.lastName}`.trim()
+
+            // 1. Save to DB (contact_submissions table) — always works regardless of email
+            await supabase.from('contact_submissions').insert({
+                name,
+                email: formData.email,
+                phone: formData.phone,
+                message: formData.message,
+                status: 'new'
+            })
+
+            // 2. Send admin email notification
             const res = await emailService.sendContactEmail({
-                name: `${formData.firstName} ${formData.lastName}`.trim(),
+                name,
                 email: formData.email,
                 phone: formData.phone,
                 message: formData.message
             })
 
-            if (res.success) {
-                // 🎯 Google Ads — fire lead conversion on successful contact form submit
-                trackLeadConversion({ label: 'Contact Form Submit', value: 0 })
-                alert("Message sent successfully! Our team will get back to you shortly.")
-                setFormData({
-                    firstName: '',
-                    lastName: '',
-                    email: '',
-                    phone: '',
-                    message: ''
-                })
-            } else {
-                throw new Error(res.error || "Failed to send message")
+            // 3. Fire Google Ads lead conversion
+            trackLeadConversion({ label: 'Contact Form Submit', value: 0 })
+
+            alert("Message sent successfully! Our team will get back to you shortly.")
+            setFormData({ firstName: '', lastName: '', email: '', phone: '', message: '' })
+
+            if (!res.success) {
+                console.warn('Email notification failed (submission still saved):', res.error)
             }
         } catch (error) {
             console.error("Contact form error:", error)
