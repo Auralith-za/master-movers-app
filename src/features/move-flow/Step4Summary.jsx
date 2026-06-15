@@ -327,7 +327,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             alert("Request Sent! We will call you shortly to discuss your move.")
 
             if (result.success && result.data?.[0]) {
-                sendProposalEmail(result.data[0])
+                const savedQuote = result.data[0]
+                // Send customer proposal email (with PDF)
+                sendProposalEmail(savedQuote)
+                // Send urgent admin callback alert (no PDF, instant)
+                emailService.sendCallbackEmail({
+                    name: moveDetails.contactName,
+                    email: moveDetails.contactEmail,
+                    phone: moveDetails.contactPhone,
+                    step: 'Step 4 — Quote Summary',
+                    pickup: moveDetails.pickupAddress || '',
+                    dropoff: moveDetails.dropoffAddress || '',
+                    moveDate: moveDetails.moveDate || ''
+                }).catch(err => console.error('Callback email error:', err))
             }
 
             if (!result.success) {
@@ -450,16 +462,18 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 </div>
             )}
 
-            <div className="mb-8 flex flex-col sm:flex-row items-center justify-between bg-white border border-slate-100 p-6 rounded-3xl shadow-sm gap-4">
-                <div className="flex items-center gap-4">
-                    <img src="/images/logo.png" alt="Master Movers" className="h-12 object-contain" />
-                    <div>
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Move Proposal</h2>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">Official Pricing & Summary</p>
+            <div className="mb-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-3xl shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <img src="/images/logo.png" alt="Master Movers" className="h-10 sm:h-12 object-contain shrink-0" />
+                        <div className="min-w-0">
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight leading-tight">Move Proposal</h2>
+                            <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5 hidden sm:block">Official Pricing &amp; Summary</p>
+                        </div>
                     </div>
-                </div>
-                <div className="bg-red-50 text-red-600 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-100">
-                    Step 4 of 4
+                    <div className="bg-red-50 text-red-600 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-100 shrink-0">
+                        Step 4 of 4
+                    </div>
                 </div>
             </div>
 

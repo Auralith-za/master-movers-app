@@ -100,6 +100,9 @@ function App() {
           <Route path="contact-submissions" element={<ContactSubmissionsPage />} />
           {/* Add more admin routes here */}
         </Route>
+
+        {/* Catch-all: any unknown/legacy URL → redirect to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   )
