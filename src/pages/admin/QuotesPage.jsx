@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabaseClient'
 import { Search, Filter, Eye, MessageCircle, Mail, Plus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
+import { emailService } from '../../services/emailService'
+import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 
 export default function QuotesPage() {
     const navigate = useNavigate()
@@ -54,29 +56,42 @@ export default function QuotesPage() {
     })
 
     const handleAutomatedEmail = async (quote) => {
-        if (!quote.client_email) return;
+        if (!quote.client_email) {
+            alert('Client email is missing.');
+            return;
+        }
         
-        const confirmSend = confirm(`Send automated status update to ${quote.client_email}?`);
+        const confirmSend = confirm(`Send automated proposal email with PDF to ${quote.client_email}?`);
         if (!confirmSend) return;
 
         try {
-            const { sendEmail } = useMoveStore.getState();
-            const result = await sendEmail({
-                to: quote.client_email,
-                subject: `Update: Master Movers Quote #${quote.id.toString().substring(0, 6)}`,
-                clientName: quote.client_name,
+            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            
+            const result = await emailService.sendQuoteEmail({
+                type: 'quote_proposal',
                 quoteId: quote.id,
-                status: quote.status,
-                reviewLink: `${window.location.origin}/quote/review/${quote.id}`
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                inventory: inventoryForPdf,
+                total: quote.total_price,
+                vat: (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: (quote.total_price || 0) / 1.15,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: quote.items_json?.breakdown || null
             });
 
             if (result.success) {
                 alert('Email sent successfully!');
             } else {
-                alert('Email automation request processed. Ensure mailbox is connected.');
+                alert('Failed to send email: ' + result.error);
             }
         } catch (error) {
-            alert('Error sending email.');
+            console.error('Email error:', error);
+            alert('Error sending email: ' + error.message);
         }
     }
 

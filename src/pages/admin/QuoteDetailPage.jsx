@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
 import { calculateQuote, useMoveStore } from '../../features/inventory/store/moveStore'
 import { generateProfessionalQuote } from '../../services/pdfService'
+import { emailService } from '../../services/emailService'
+import { getInventoryImage } from '../../features/inventory/components/InventoryItemCard'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
 import clsx from 'clsx'
@@ -325,59 +327,80 @@ export default function QuoteDetailPage() {
             return;
         }
 
-        const confirmSend = confirm(`Send an automated status update email to ${quote.client_email}?`);
+        const confirmSend = confirm(`Send automated proposal email with PDF to ${quote.client_email}?`);
         if (!confirmSend) return;
 
         try {
-            const { sendEmail } = useMoveStore.getState();
-            const payload = {
-                to: quote.client_email,
-                subject: `Update: Master Movers Quote #${quote.id.toString().substring(0, 6)}`,
-                clientName: quote.client_name,
+            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            
+            const result = await emailService.sendQuoteEmail({
+                type: 'quote_proposal',
                 quoteId: quote.id,
-                status: quote.status,
-                reviewLink: `${window.location.origin}/quote/review/${id}`
-            };
-
-            const result = await sendEmail(payload);
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                inventory: inventoryForPdf,
+                total: quote.total_price,
+                vat: (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: (quote.total_price || 0) / 1.15,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: quote.items_json?.breakdown || null
+            });
             
             if (result.success) {
-                await logActivity('email', `Automated update email sent to ${quote.client_email}.`);
+                await logActivity('email', `Automated proposal email (PDF attached) sent to ${quote.client_email}.`);
                 alert('Email sent successfully!');
             } else {
-                // Fallback for demo/missing backend: log it anyway but warn
-                await logActivity('email', `System attempted to send email to ${quote.client_email} (API pending).`);
-                alert('Email request processed. Please ensure your mailbox integration is active.');
+                alert('Failed to send email: ' + result.error);
             }
         } catch (error) {
             console.error('Email error:', error);
-            alert('Failed to trigger email automation.');
+            alert('Failed to trigger email automation: ' + error.message);
         }
     }
 
     const handleResendQuote = async () => {
-        if (!confirm('Regenerate and resend quote to client?')) return
-        
-        const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
-        const reviewLink = `${window.location.origin}/quote/review/${id}`
-        
-        generateProfessionalQuote({
-            quoteId: quote.id,
-            clientName: quote.client_name,
-            clientEmail: quote.client_email,
-            clientPhone: quote.client_phone,
-            pickupAddress: quote.pickup_address,
-            dropoffAddress: quote.dropoff_address,
-            moveDate: quote.move_date,
-            inventory: inventoryForPdf,
-            total: quote.total_price,
-            vat: (quote.total_price || 0) * 0.15 / 1.15,
-            subTotal: (quote.total_price || 0) / 1.15,
-            inventoryItems: INVENTORY_ITEMS
-        })
+        if (!quote.client_email) {
+            alert('Client email is missing.');
+            return;
+        }
 
-        await logActivity('system', `Quote PDF resubmitted to client. Payment Link: ${reviewLink}`)
-        alert('Quote resent successfully!')
+        if (!confirm(`Regenerate and email quote PDF to ${quote.client_email}?`)) return
+        
+        try {
+            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            const reviewLink = `${window.location.origin}/quote/review/${id}`
+            
+            const result = await emailService.sendQuoteEmail({
+                type: 'quote_proposal',
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                inventory: inventoryForPdf,
+                total: quote.total_price,
+                vat: (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: (quote.total_price || 0) / 1.15,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: quote.items_json?.breakdown || null
+            });
+
+            if (result.success) {
+                await logActivity('email', `Quote PDF resent to client at ${quote.client_email}. Payment Link: ${reviewLink}`);
+                alert('Quote resent successfully!');
+            } else {
+                alert('Failed to send email: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Email error:', error);
+            alert('Failed to resend quote: ' + error.message);
+        }
     }
 
     const copyPaymentLink = () => {
@@ -731,7 +754,22 @@ export default function QuoteDetailPage() {
                                         return (
                                             <tr key={itemId} className="hover:bg-slate-50/50">
                                                 <td className="px-6 py-4 flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-lg">{item?.image || '📦'}</div>
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100 flex-shrink-0">
+                                                        {item ? (
+                                                            <img 
+                                                                src={getInventoryImage(item)} 
+                                                                alt={item.name} 
+                                                                className="w-full h-full object-contain"
+                                                                style={{ mixBlendMode: 'multiply' }}
+                                                                onError={(e) => {
+                                                                    e.target.onerror = null;
+                                                                    e.target.src = "https://img.icons8.com/3d-fluency/100/box.png";
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <span className="text-lg">📦</span>
+                                                        )}
+                                                    </div>
                                                     <div>
                                                         <p className="font-bold text-slate-900">{item?.name || itemId}</p>
                                                         <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'}</p>
@@ -1178,31 +1216,7 @@ export default function QuoteDetailPage() {
                         </div>
                     </div>
 
-                    {/* PAYMENT LINK CARD */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-red-50 rounded-bl-full -mr-8 -mt-8" />
-                        <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <CreditCard size={18} className="text-red-500" /> Payment & Review
-                        </h3>
-                        <p className="text-xs text-slate-500 mb-6">Share this link with the client so they can review the quote, accept terms/sign, and pay online.</p>
-                        
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={copyPaymentLink}
-                                className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-all"
-                            >
-                                <Copy size={14} /> Copy Link
-                            </button>
-                            <a 
-                                href={`${window.location.origin}/quote/review/${id}`} 
-                                target="_blank"
-                                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200"
-                                title="Preview Link"
-                            >
-                                <ExternalLink size={16} />
-                            </a>
-                        </div>
-                    </div>
+
 
                     {/* CLIENT CARD */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

@@ -173,7 +173,7 @@ const REAL_RENDERS = {
     'water-machine': '/images/inventory/water-machine.webp',
 }
 
-const getInventoryImage = (item) => {
+export const getInventoryImage = (item) => {
     // 0. Custom cropped database images (Priority)
     if (item.image && item.image.startsWith('/inventory/')) {
         return item.image;
