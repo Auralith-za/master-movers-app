@@ -61,11 +61,6 @@ serve(async (req) => {
         console.log(`Initiating Payflex authentication for Quote ${quoteId}`)
         console.log('Gateway URL:', gatewayUrl)
 
-        // 5. Retrieve Bearer Token from Auth0
-        const tokenAudience = isProduction
-            ? 'https://auth-production.payflex.co.za'
-            : 'https://auth-dev.payflex.co.za'
-
         // 5. Retrieve Bearer Token — try multiple auth endpoints in order
         const tokenAudience = isProduction
             ? 'https://auth-production.payflex.co.za'
