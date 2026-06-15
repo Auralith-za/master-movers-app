@@ -13,29 +13,19 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const merchantKey = isSandbox ? '46f0cd694581a' : (import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '0btdkli273lqs')
     const passphrase = isSandbox ? 'jt7NOE43FZPn' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')
 
-    // URLs — embed the quote ID so SuccessPage can find the DB record after redirect
-    // (Zustand store is wiped when user leaves the site to PayFast)
-    const baseUrl = window.location.origin
-    const returnUrl = `${baseUrl}/payment/success?m_payment_id=${mPaymentId}&gateway=payfast`
-    const cancelUrl = `${baseUrl}/payment/cancel?m_payment_id=${mPaymentId}`
-
-    // Dynamically build Notify URL from Supabase URL
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-    const notifyUrl = supabaseUrl
-        ? `${supabaseUrl.replace('.supabase.co', '.functions.supabase.co')}/payfast-itn`
-        : 'https://yrrskvzdpcdnwojstvcw.functions.supabase.co/payfast-itn'
-
-    const payfastActionUrl = isSandbox
-        ? 'https://sandbox.payfast.co.za/eng/process'
-        : 'https://www.payfast.co.za/eng/process'
-
-    // Form field variables
+    // Form field variables — mPaymentId must be declared BEFORE the URL constants below
     const nameFirst = quote.client_name?.split(' ')[0] || 'Client'
     const emailAddress = quote.client_email || ''
     const mPaymentId = quote.id || 'TEST-ID'
     // Use nullish coalescing (??) not || so that a discounted total of 0 still works correctly
     const amount = Number(quote.total_price ?? quote.total ?? 0).toFixed(2)
     const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}${quote.coupon_code ? ` (Coupon: ${quote.coupon_code})` : ''}`
+
+    // URLs — embed the quote ID so SuccessPage can find the DB record after redirect
+    // (Zustand store is wiped when user leaves the site to PayFast)
+    const baseUrl = window.location.origin
+    const returnUrl = `${baseUrl}/payment/success?m_payment_id=${mPaymentId}&gateway=payfast`
+    const cancelUrl = `${baseUrl}/payment/cancel?m_payment_id=${mPaymentId}`
 
     // PayFast URL encoder helper (spaces to +, uppercase hex)
     // Encodes standard sub-delims (! ' ( ) *) as browsers do in form submissions.
