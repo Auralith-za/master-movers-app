@@ -22,17 +22,17 @@ export const event = ({ action, category, label, value }) => {
 }
 
 // ─── Google Ads: Purchase Conversion ─────────────────────────────────────────
-// Fires when a customer completes a payment (PayFast or PayFlex success page)
+// Label: AW-930634357/00CyCNqZr78cEPW04bsD (from Google Ads dashboard — Purchase action)
 export const trackPurchaseConversion = ({ value = 0, currency = 'ZAR', transactionId = '' } = {}) => {
     if (typeof window.gtag === 'undefined') return
     console.log(`[Google Ads] 🛒 Purchase conversion fired — R${value} (${transactionId})`)
     window.gtag('event', 'conversion', {
-        send_to: `${GA_TRACKING_ID}/purchase`,
+        send_to: 'AW-930634357/00CyCNqZr78cEPW04bsD',  // ← exact label from Google Ads
         value: Number(value),
         currency: currency,
         transaction_id: transactionId,
     })
-    // Also fire as a standard GA4 purchase event
+    // Also fire as a standard GA4 purchase event for Analytics
     window.gtag('event', 'purchase', {
         transaction_id: transactionId,
         value: Number(value),
