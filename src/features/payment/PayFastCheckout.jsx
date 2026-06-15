@@ -14,7 +14,7 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     // Credentials: Force default sandbox if in sandbox mode; use Env or Live defaults otherwise
     const merchantId = isSandbox ? '10000100' : (import.meta.env.VITE_PAYFAST_MERCHANT_ID || '17687227')
     const merchantKey = isSandbox ? '46f0cd694581a' : (import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '0btdkli273lqs')
-    const passphrase = isSandbox ? '' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')
+    const passphrase = isSandbox ? 'jt7NOE43FZPn' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')
 
     // URLs
     const baseUrl = window.location.origin

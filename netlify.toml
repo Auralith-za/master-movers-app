@@ -7,7 +7,7 @@
   VITE_SUPABASE_URL = "https://yrrskvzdpcdnwojstvcw.supabase.co"
   VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlycnNrdnpkcGNkbndvanN0dmN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyOTYwMzIsImV4cCI6MjA4Mzg3MjAzMn0.vS1vN6WFOrbNK7uAsPNocbH9UPzGWOE4lBNQ2nbah24"
   VITE_GOOGLE_MAPS_API_KEY = "AIzaSyDfn_E99p4UAKIenX2lOVQH0BpHw07yxO0"
-  VITE_TEST_MODE = "true"
+  VITE_TEST_MODE = "false"
 
 [[redirects]]
   from = "/*"

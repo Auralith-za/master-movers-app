@@ -56,20 +56,56 @@ serve(async (req) => {
             }
         }
 
-        console.log(`Initiating Payflex checkout for Quote ${quoteId}, Amount: R${amount}`)
+        console.log(`Initiating Payflex authentication for Quote ${quoteId}`)
 
-        // 5. Call Payflex API using Basic Auth
-        const authHeader = `Basic ${btoa(merchantId + ':' + apiKey)}`
+        // 5. Retrieve Bearer Token from Auth0
+        const tokenAudience = isProduction ? 'https://auth-production.payflex.co.za' : 'https://auth-dev.payflex.co.za'
+        const authResponse = await fetch('https://payflex.eu.auth0.com/oauth/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                client_id: merchantId,
+                client_secret: apiKey,
+                audience: tokenAudience,
+                grant_type: 'client_credentials'
+            })
+        })
+
+        const authBody = await authResponse.json()
+        if (!authResponse.ok) {
+            console.error("Payflex Auth0 Authentication failed:", authBody)
+            throw new Error(authBody.error_description || authBody.error || "Failed to authenticate with Payflex Identity Server.")
+        }
+
+        const accessToken = authBody.access_token
+        if (!accessToken) {
+            throw new Error("No access token returned from Payflex Identity Server.")
+        }
+
+        console.log(`Successfully authenticated! Creating Payflex checkout session at ${gatewayUrl}...`)
+
+        // 6. Call Payflex API using Bearer Token
         const response = await fetch(gatewayUrl, {
             method: 'POST',
             headers: {
-                'Authorization': authHeader,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
         })
 
-        const result = await response.json()
+        // Check content-type first or handle non-JSON error pages gracefully
+        const contentType = response.headers.get("content-type") || ""
+        let result;
+        if (contentType.includes("application/json")) {
+            result = await response.json()
+        } else {
+            const rawBody = await response.text()
+            console.error(`Non-JSON response received from Payflex (Status: ${response.status}):`, rawBody)
+            throw new Error(`Payflex gateway returned an invalid response (HTTP ${response.status}).`)
+        }
 
         if (!response.ok) {
             console.error("Payflex API Error:", result)
