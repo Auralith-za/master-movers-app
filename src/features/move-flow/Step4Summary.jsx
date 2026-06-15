@@ -130,19 +130,25 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const discountedTotal = Math.max(0, total - couponDiscount)
 
     // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners
+    // Uses forceNew:true so it ALWAYS inserts a fresh record regardless of any
+    // previously saved quote still sitting in the Zustand store from the same session.
     React.useEffect(() => {
-        if (moveDetails.contactName && !searchParams.get('saved') && !isStep4Initialized.current) {
+        if (moveDetails.contactName && !isStep4Initialized.current) {
             isStep4Initialized.current = true
-            // All public submissions save as 'lead' on arrival at Step 4 so admin can see them
-            // even if customer leaves without paying. Admin flow saves as 'lead' too.
-            const initialStatus = submissionType === 'admin' ? 'lead' : 'lead'
-
+            console.log('[Step4] Auto-saving as lead on arrival...')
             submitQuote({
-                status: initialStatus,
-                submission_type: submissionType
+                status: 'lead',
+                submission_type: submissionType,
+                forceNew: submissionType !== 'admin'  // Always new record for public users
+            }).then(result => {
+                if (result.success) {
+                    console.log('[Step4] Lead captured:', result.data?.[0]?.id)
+                } else {
+                    console.warn('[Step4] Lead save failed:', result.error)
+                }
             })
         }
-    }, [moveDetails.contactName, searchParams, submitQuote, submissionType])
+    }, [moveDetails.contactName, submitQuote, submissionType])
 
     if (isCalculating) {
         return (

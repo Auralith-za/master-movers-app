@@ -61,7 +61,7 @@ export default function AboutUsPage() {
         <ModernPageLayout
             heroTitle="About MasterMovers"
             heroSubtitle="Decades of experience. Next-generation technology. We are South Africa's most trusted moving network."
-            heroImage="https://images.unsplash.com/photo-1521791136064-7986c2953d75?auto=format&fit=crop&q=80&w=2000"
+            heroImage="/images/hero_truck.jpg"
             sections={aboutSections}
             ctaHeading="Experience the Difference"
             ctaSubheading="Join thousands of satisfied South Africans who have moved with us."

@@ -44,7 +44,7 @@ export default function ResidentialMoversPage() {
         <ModernPageLayout
             heroTitle="Residential Movers"
             heroSubtitle="Moving home is a big life event. We make it easy, stress-free, and safe. From apartments to estates, we treat your belongings like our own."
-            heroImage="https://images.unsplash.com/photo-1571175483831-508b98135804?auto=format&fit=crop&q=80&w=2000"
+            heroImage="/images/lifestyle_moving.png"
             sections={residentialSections}
             ctaHeading="Plan your home move today"
             ctaSubheading="Get a free, no-obligation quote instantly. Our simple process makes booking your move easier than ever."

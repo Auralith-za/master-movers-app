@@ -42,7 +42,7 @@ export default function InternationalMoversPage() {
         <ModernPageLayout
             heroTitle="International Movers"
             heroSubtitle="Moving abroad is a complex adventure. We simplify the logistics, customs, and shipping so you can focus on your new journey."
-            heroImage="https://images.unsplash.com/photo-1577705993359-877292700cb7?auto=format&fit=crop&q=80&w=2000"
+            heroImage="/images/nationwide_sa.jpg"
             sections={internationalSections}
             ctaHeading="Ready for your international adventure?"
             ctaSubheading="Speak to our international moving specialists today for a detailed consultation and quote."

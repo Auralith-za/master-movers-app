@@ -13,10 +13,11 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const merchantKey = isSandbox ? '46f0cd694581a' : (import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '0btdkli273lqs')
     const passphrase = isSandbox ? 'jt7NOE43FZPn' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')
 
-    // URLs
+    // URLs — embed the quote ID so SuccessPage can find the DB record after redirect
+    // (Zustand store is wiped when user leaves the site to PayFast)
     const baseUrl = window.location.origin
-    const returnUrl = `${baseUrl}/payment/success`
-    const cancelUrl = `${baseUrl}/payment/cancel`
+    const returnUrl = `${baseUrl}/payment/success?m_payment_id=${mPaymentId}&gateway=payfast`
+    const cancelUrl = `${baseUrl}/payment/cancel?m_payment_id=${mPaymentId}`
 
     // Dynamically build Notify URL from Supabase URL
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
