@@ -1,0 +1,262 @@
+Item Name,Category,Volume (ft³),Requires Photo,Requires Crate,Auto Packaging
+BARFRIDGE,Appliances,8.5,No,No,Wrapping
+BOXES,Appliances,4.25,No,No,None
+COFFEE MACHINE,Appliances,8.5,No,No,STOCK BOX
+DEEP FREEZE,Appliances,42.5,No,No,None
+DISHWASHER,Appliances,25.5,No,No,Wrapping
+FRIDGE D DOOR,Appliances,42.5,No,No,Wrapping
+FRIDGE DOUBLE UPRIGHT,Appliances,42.5,No,No,Wrapping
+FRIDGE LARGE S DOOR,Appliances,34,No,No,Wrapping
+GAS HEATER,Appliances,8,No,No,None
+HUGE GAS HEATERS,Appliances,51,No,No,None
+KITCHEN CUPBOARD DRAWER,Appliances,5.0,No,No,None
+LONG KITCHEN CABINET,Appliances,30.0,No,No,None
+MICROWAVE OVEN,Appliances,4.25,No,No,Wrapping
+OIL HEATER,Appliances,4.25,No,No,None
+SMALL FRIDGE,Appliances,25.5,No,No,Wrapping
+TUMBLE DRYER,Appliances,25.5,No,No,Wrapping
+VACUUM CLEANER,Appliances,8,No,No,None
+WASHING MACHINE,Appliances,25.5,No,No,Wrapping
+WATER COOLER,Appliances,17,No,No,None
+BABYCOT,Bedrooms,25.5,No,No,None
+BOXES,Bedrooms,4.25,No,No,None
+BUNK BEDS SINGLE,Bedrooms,51,No,No,Plastic Covers
+CAMP COT,Bedrooms,8.0,No,No,None
+CHEST OF DRAWERS,Bedrooms,17,No,No,Wrapping
+CHEVAL MIRROR,Bedrooms,5.0,No,No,Wrapping
+COMPACTUM,Bedrooms,34,No,No,None
+D BED HEADBOARD,Bedrooms,17,No,No,Wrapping
+DESK,Bedrooms,26.0,No,No,None
+DOUBLE BED BASE,Bedrooms,56,No,No,Plastic Covers
+DOUBLE BED BASE & MATTRESS,Bedrooms,40.0,No,No,None
+DOUBLE BED HEADBOARD,Bedrooms,15.0,No,No,None
+DOUBLE BED MATTRESS,Bedrooms,33,No,No,Plastic Covers
+DOUBLE BED METAL SPRING,Bedrooms,25.0,No,No,None
+DOUBLE BUNK BED,Bedrooms,68.0,No,No,None
+DRESSING TABLE/STOOL,Bedrooms,34,No,No,Wrapping
+DUMB VALET,Bedrooms,5,No,No,None
+KING HEADBOARD,Bedrooms,34.0,No,No,None
+KING MATTRESS BED & BASE,Bedrooms,60.0,No,No,None
+KING SIZE BED BASE,Bedrooms,34,No,No,None
+KING SIZE BED Mattress,Bedrooms,34,No,No,None
+LONG OTTOMAN,Bedrooms,8.0,No,No,None
+LOVE COUCH,Bedrooms,17.0,No,No,None
+MIRROR (LARGE),Bedrooms,5,No,No,Wrapping
+OFFICE CHAIR,Bedrooms,8.5,No,No,None
+PEDESTALS,Bedrooms,5.1,No,No,None
+PEDESTALS,Bedrooms,5.1,No,No,None
+PRAM,Bedrooms,5.1,No,No,None
+QUEEN BED BASE,Bedrooms,28,No,No,Plastic Covers
+QUEEN BED MATTRAS,Bedrooms,28,No,No,Plastic Covers
+QUEEN MATTRESS BED & BASE,Bedrooms,50.0,No,No,None
+SIDE TABLE,Bedrooms,5.1,No,No,None
+SINGLE BED BASE,Bedrooms,23,No,No,Plastic Covers
+SINGLE BED BASE & MATTRESS,Bedrooms,30.0,No,No,None
+SINGLE BED HEADBOARD,Bedrooms,8.5,No,No,None
+SINGLE BED MATTRASS,Bedrooms,23,No,No,Plastic Covers
+SINGLE BED STEEL FRAME,Bedrooms,20.0,No,No,None
+SLEIGH DOUBLE BED,Bedrooms,73.0,No,No,None
+SLEIGH KING BED,Bedrooms,85.0,No,No,None
+SLEIGH QUEEN BED,Bedrooms,73.0,No,No,None
+SUITCASES,Bedrooms,8.0,No,No,None
+WARDROBE,Bedrooms,51,No,No,None
+BAR STOOL,Boxes & Loose Items,4,No,No,None
+BEDSIDE LAMP,Boxes & Loose Items,4.0,No,No,STOCK BOX
+BOXES / CARTONS,Boxes & Loose Items,4.25,No,No,None
+BUTLERS TRAY,Boxes & Loose Items,4,No,No,None
+CARPET,Boxes & Loose Items,13.6,No,No,Plastic Covers
+CDRACK,Boxes & Loose Items,8.5,No,No,Wrapping
+CHAIR KITCHEN ROOM,Boxes & Loose Items,5.1,No,No,None
+DUSTBIN,Boxes & Loose Items,1,No,No,None
+FOLDING CHAIR,Boxes & Loose Items,4,No,No,None
+FOLDING TABLE,Boxes & Loose Items,17,No,No,None
+GENERAL CARTONS,Boxes & Loose Items,4.25,No,No,None
+GENERATOR,Boxes & Loose Items,17,No,No,None
+IRONING BOARD,Boxes & Loose Items,0.5,No,No,None
+LINEN CARTONS,Boxes & Loose Items,8.05,No,No,LINEN BOXES
+STANDING LAMP,Boxes & Loose Items,17,No,No,STOCK BOX
+SUITCASE,Boxes & Loose Items,8,No,No,None
+WARDROBE CARTONS,Boxes & Loose Items,14.4,No,No,WARDROBE CARTONS
+WASHING BASKET,Boxes & Loose Items,8,No,No,None
+10 SEATER DINING TABLE,Dining Room,85,No,No,Wrapping
+4 SEATER DINING TABLE,Dining Room,34,No,No,Wrapping
+6 SEAT TABLE + BASE,Dining Room,51,No,No,Wrapping
+6 SEAT TABLE TOP ONLY,Dining Room,28,No,No,Wrapping
+6 SEATER DINING TABLE,Dining Room,45.0,No,No,None
+8 SEATER DINING TABLE,Dining Room,68,No,No,Wrapping
+BOOK CASE SMALL,Dining Room,8.0,No,No,None
+BOXES,Dining Room,4.25,No,No,None
+CREDENZA,Dining Room,22,No,No,None
+DINING ROOM CHAIR,Dining Room,8.5,No,No,Wrapping
+DISPLAY CABINET,Dining Room,51,No,Yes,Wrapping
+HOSTESS,Dining Room,15.0,No,No,None
+KITCHEN / DINING ROOM CHAIR,Dining Room,5.1,No,No,None
+KITCHEN CHAIR,Dining Room,5.1,No,No,None
+KITCHEN TABLE,Dining Room,34,No,No,None
+PAINTING,Dining Room,4.0,No,No,None
+ROUND TABLE 1 PIECE,Dining Room,34,No,No,None
+ROUND TABLE SMALL,Dining Room,8,No,No,None
+SERVER,Dining Room,26.0,No,No,None
+SIDEBOARD,Dining Room,34,No,No,Wrapping
+SMALL SIDEBOARD,Dining Room,25.5,No,No,None
+TEA TROLLEY,Dining Room,8.5,No,No,None
+WELSH DRESSER,Dining Room,42.5,No,No,Wrapping
+WINE RACK,Dining Room,34,No,No,None
+BAR COUNTER,General Furniture,34,No,No,None
+BENCH,General Furniture,34,No,No,None
+BOOK CASE,General Furniture,8.0,No,No,None
+BOXES,General Furniture,4.25,No,No,None
+CARPET / RUG,General Furniture,13.6,No,No,None
+CD RACK,General Furniture,8.5,No,No,None
+CLUSTERS,General Furniture,20.0,No,No,None
+EXERCISE BIKE / MACHINE,General Furniture,17.0,No,No,None
+GUITAR,General Furniture,8.0,No,No,None
+KITCHEN CUPBOARD,General Furniture,51,No,No,None
+LARGE BOOKCASE,General Furniture,34,No,No,None
+LARGE BOOKCASE GLASS,General Furniture,34,No,No,Wrapping
+MEDIUM WALL UNIT,General Furniture,34,No,No,None
+PICTURES/MIRRORS,General Furniture,4,No,No,Wrapping
+SMALL WALL UNIT,General Furniture,26,No,No,None
+TABLE BASES,General Furniture,17,No,No,None
+TABLE TOPS,General Furniture,10.0,No,No,None
+TOOL BOX,General Furniture,8.5,No,No,None
+TOY BOX,General Furniture,8,No,No,None
+TRAMPOLINE,General Furniture,17.0,No,No,None
+WALL UNIT MEDIUM,General Furniture,34.0,No,No,None
+WALL UNIT SMALL,General Furniture,26.0,No,No,None
+WATER MACHINE,General Furniture,17.0,No,No,None
+ARMCHAIR SINGLE,Lounge / Living Room,17,No,No,Plastic Covers
+BEAN BAG CHAIR,Lounge / Living Room,34,No,No,None
+BOXES,Lounge / Living Room,4.25,No,No,None
+COFFEE TABLE,Lounge / Living Room,13.6,No,No,Wrapping
+COFFEE TABLE LARGE,Lounge / Living Room,17,No,No,Wrapping
+DOUBLE SEATER,Lounge / Living Room,37,No,No,Plastic Covers
+FLATRON TV,Lounge / Living Room,5,No,No,TV BOX MEDIUM
+GLASS PEDESTAL,Lounge / Living Room,5.1,No,No,None
+GUITER,Lounge / Living Room,8.0,No,No,None
+HALF MOON TABLE,Lounge / Living Room,8.5,No,No,Wrapping
+HALFMOON TABLE,Lounge / Living Room,8.5,No,No,None
+HALL STAND,Lounge / Living Room,34,No,No,Wrapping
+HAT STAND,Lounge / Living Room,8.0,No,No,None
+HI-FI SYSTEM,Lounge / Living Room,10.0,No,No,None
+HIFI SYSTEM,Lounge / Living Room,15,No,No,None
+KIST,Lounge / Living Room,13.6,No,No,None
+LOUNGE RECLINER,Lounge / Living Room,33,No,No,Wrapping
+MIRROR,Lounge / Living Room,5.0,No,No,None
+OCC TABLE SMALL,Lounge / Living Room,6.8,No,No,None
+OCCASIONAL TABLE (LARGE),Lounge / Living Room,10.0,No,No,None
+OCCL TABLE LARGE,Lounge / Living Room,8.5,No,No,None
+ONE SEATER LEATHER,Lounge / Living Room,17.0,No,No,Plastic Covers
+ORGAN,Lounge / Living Room,40.0,No,No,None
+OTTOMAN,Lounge / Living Room,8.0,No,No,None
+POOL LOUNGER,Lounge / Living Room,17,No,No,None
+POUFE,Lounge / Living Room,5.1,No,No,None
+ROOM DIVIDER,Lounge / Living Room,42.9,No,No,None
+SERVER,Lounge / Living Room,26.0,No,No,None
+SINGLE SEATER,Lounge / Living Room,17,No,No,Plastic Covers
+SMALL TABLE,Lounge / Living Room,17,No,No,None
+TABLE,Lounge / Living Room,102.0,No,No,None
+TABLE LAMP,Lounge / Living Room,5.1,No,No,None
+TALL BOY,Lounge / Living Room,13.24,No,No,None
+TELEPHONE TABLE,Lounge / Living Room,8.0,No,No,None
+THREE SEATER,Lounge / Living Room,51,No,No,Plastic Covers
+THREE SEATER LEATHER,Lounge / Living Room,51.0,No,No,Plastic Covers
+TV CABINET,Lounge / Living Room,25.5,No,No,Wrapping
+TV ENTERTAINMENT CENTRE,Lounge / Living Room,51.0,No,No,None
+TV ENTERTAINMENT CTR,Lounge / Living Room,60,No,No,Wrapping
+TV LARGE,Lounge / Living Room,13.6,No,No,TV BOX LARGE
+TV SMALL,Lounge / Living Room,8.5,No,No,TV BOX MEDIUM
+TV TROLLEY,Lounge / Living Room,17,No,No,None
+TWO SEATER LEATHER,Lounge / Living Room,37.0,No,No,Plastic Covers
+2 DRAWER FIL CABINET,Office / Study,17,No,No,None
+2 DRAWER FILING CABINET,Office / Study,10.0,No,No,None
+4 DRAWER FIL CABINET,Office / Study,16,No,No,None
+4 DRAWER FILING CABINET,Office / Study,20.0,No,No,None
+BOARDROOM TABLE (2 PIECE),Office / Study,60.0,No,No,None
+BOXES,Office / Study,4.25,No,No,None
+BOXES,Office / Study,4.25,No,No,None
+BULK FILLER,Office / Study,115.0,No,No,None
+COMPUTER,Office / Study,4.0,No,No,None
+COMPUTER & PRINTER,Office / Study,10.0,No,No,None
+COMPUTER STAND,Office / Study,4.0,No,No,None
+DESK LAMP,Office / Study,5.1,No,No,None
+DESKTOP PRINTER,Office / Study,8.0,No,No,None
+EXECUTIVE DESK,Office / Study,45.0,No,No,None
+EXERCISE MACHINE/TREADMILL,Office / Study,17.0,No,No,None
+FAN,Office / Study,8.0,No,No,None
+FAX MACHINE,Office / Study,5.0,No,No,None
+L-SHAPE DESK,Office / Study,25.5,No,No,None
+LARGE COFFEE TABLE,Office / Study,17.0,No,No,None
+LARGE DESK,Office / Study,26.0,No,No,None
+LOCKERS,Office / Study,34,No,No,None
+LOOSE SHELVES,Office / Study,17,No,No,None
+MIRROR LARGE,Office / Study,5.0,No,No,None
+MIRROR/PICTURES,Office / Study,4.0,No,No,None
+NORMAL DESK,Office / Study,26.0,No,No,None
+OCCASIONAL TABLE,Office / Study,6.8,No,No,None
+OFFICE CHAIRS,Office / Study,8.5,No,No,None
+ONE SEATER,Office / Study,17.0,No,No,None
+PANELS,Office / Study,5.0,No,No,None
+PEDESTAL,Office / Study,5.1,No,No,None
+PRINTER,Office / Study,10.0,No,No,None
+ROUND DESK / BOARDROOM TABLE (1 PIECE),Office / Study,30.0,No,No,None
+SERVER,Office / Study,26.0,No,No,None
+SEWING MACHINE,Office / Study,17.0,No,No,None
+SMALL BOOKCASE,Office / Study,8.0,No,No,None
+SMALL DESK,Office / Study,17,No,No,None
+STANDING SHELF UNIT,Office / Study,34,No,No,None
+STATIONERY CUPBOARD,Office / Study,51,No,No,None
+TWO SEATER,Office / Study,37.0,No,No,None
+WHITE BOARD,Office / Study,5,No,No,None
+WHITEBOARD,Office / Study,2.0,No,No,None
+10 SEATER PATIO TABLE,Outdoor & Patio,85,No,No,Wrapping
+4 SEATER PATIO TABLE,Outdoor & Patio,34,No,No,Wrapping
+6 SEATER PATIO TABLE,Outdoor & Patio,51,No,No,Wrapping
+8 SEATER PATIO TABLE,Outdoor & Patio,68,No,No,Wrapping
+BATH,Outdoor & Patio,34,No,No,None
+BICYCLE,Outdoor & Patio,17,No,No,None
+BIRD BATH,Outdoor & Patio,17,No,No,None
+BOXES,Outdoor & Patio,4.25,No,No,None
+CANOE,Outdoor & Patio,25,No,No,None
+CLOTHES HORSE,Outdoor & Patio,5,No,No,None
+COOLER BOX,Outdoor & Patio,8,No,No,None
+DOG KENNEL,Outdoor & Patio,17,No,No,None
+DSTV DISH,Outdoor & Patio,17,No,No,None
+EXERCISE BIKE,Outdoor & Patio,17,No,No,None
+FISHING ROD,Outdoor & Patio,4,No,No,None
+G UMBRELLA + BASE,Outdoor & Patio,34,No,No,None
+GARDEN BENCH,Outdoor & Patio,34,No,No,None
+GARDEN HOSE,Outdoor & Patio,8.5,No,No,None
+GARDEN SWING,Outdoor & Patio,68,No,No,None
+GARDEN TOOLS,Outdoor & Patio,5,No,No,None
+GARDEN UMBRELLA / BASE,Outdoor & Patio,15.0,No,No,None
+GOLF BAG,Outdoor & Patio,34,No,No,None
+LADDER,Outdoor & Patio,8.5,No,No,None
+LAWNMOWER,Outdoor & Patio,17,No,No,None
+PATIO CHAIRS,Outdoor & Patio,8.5,No,No,None
+PLASTIC STACK CHAIR,Outdoor & Patio,4,No,No,None
+SATELLITE DISH,Outdoor & Patio,8.5,No,No,None
+STANDING FAN,Outdoor & Patio,8.0,No,No,None
+WEBER BRAAI,Outdoor & Patio,17,No,No,None
+WEED EATER,Outdoor & Patio,8,No,No,None
+WHEELBARROW,Outdoor & Patio,25.5,No,No,None
+WORKBENCH,Outdoor & Patio,51,No,No,None
+BABY GRAND PIANO,Special Handling Items,85.0,No,No,None
+BOARDROOM TABLE 3 PIECE,Special Handling Items,190,No,No,None
+BULK FILERS SINGLE BAY,Special Handling Items,115,No,No,None
+CONCRETE GARDEN SET,Special Handling Items,51,No,No,None
+EMPTY POTS LARGE,Special Handling Items,17,No,Yes,None
+GLASS-TOP TABLE,Special Handling Items,68,No,No,Wrapping
+GOLF CART,Special Handling Items,250,No,No,None
+JUNGLE GYM,Special Handling Items,200,Yes,No,None
+LARGE POT PLANTS,Special Handling Items,34,Yes,No,None
+LARGE STATUES,Special Handling Items,34,No,Yes,Wrapping
+MEDIUM POT PLANTS,Special Handling Items,26,Yes,No,None
+MOTORBIKE,Special Handling Items,85,No,Yes,None
+POOL TABLE,Special Handling Items,85.0,No,No,None
+SERVER CABINETS,Special Handling Items,34,No,No,None
+SMALL POT PLANTS,Special Handling Items,17,Yes,No,None
+SMALL STATUES,Special Handling Items,17,No,Yes,Wrapping
+TENNIS TABLE,Special Handling Items,102.0,No,No,None
+UPRIGHT PIANO,Special Handling Items,85.0,No,No,None
+WENDY HOUSE,Special Handling Items,68,Yes,No,None

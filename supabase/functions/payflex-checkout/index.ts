@@ -66,39 +66,65 @@ serve(async (req) => {
             ? 'https://auth-production.payflex.co.za'
             : 'https://auth-dev.payflex.co.za'
 
-        console.log('Auth0 audience:', tokenAudience)
-        console.log('Merchant ID length:', merchantId.length)
+        // 5. Retrieve Bearer Token — try multiple auth endpoints in order
+        const tokenAudience = isProduction
+            ? 'https://auth-production.payflex.co.za'
+            : 'https://auth-dev.payflex.co.za'
 
-        let authBody: any
-        try {
-            const authResponse = await fetch('https://payflex.eu.auth0.com/oauth/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    client_id: merchantId,
-                    client_secret: apiKey,
-                    audience: tokenAudience,
-                    grant_type: 'client_credentials'
+        // PayFlex uses Auth0 but the tenant domain varies. We try all known endpoints in order.
+        const authEndpoints = [
+            'https://payflex.eu.auth0.com/oauth/token',   // Documented endpoint
+            'https://auth.payflex.co.za/oauth/token',     // Custom domain (returns real auth responses)
+            'https://identity.payflex.co.za/oauth/token', // Alternative custom domain
+        ]
+
+        const authPayload = JSON.stringify({
+            client_id: merchantId,
+            client_secret: apiKey,
+            audience: tokenAudience,
+            grant_type: 'client_credentials'
+        })
+
+        let authBody: any = null
+        let lastAuthError = ''
+
+        for (const endpoint of authEndpoints) {
+            console.log(`Trying auth endpoint: ${endpoint}`)
+            try {
+                const authResponse = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: authPayload
                 })
-            })
 
-            const authContentType = authResponse.headers.get('content-type') || ''
-            if (!authContentType.includes('application/json')) {
-                const rawAuthBody = await authResponse.text()
-                console.error(`Auth0 returned non-JSON (HTTP ${authResponse.status}):`, rawAuthBody.substring(0, 500))
-                throw new Error(`Auth0 authentication failed with HTTP ${authResponse.status}. Check PAYFLEX_MERCHANT_ID and PAYFLEX_API_KEY secrets.`)
-            }
+                const authContentType = authResponse.headers.get('content-type') || ''
+                if (!authContentType.includes('application/json')) {
+                    const rawText = await authResponse.text()
+                    console.warn(`${endpoint} returned HTTP ${authResponse.status} non-JSON:`, rawText.substring(0, 200))
+                    lastAuthError = `HTTP ${authResponse.status} from ${endpoint}`
+                    continue // Try next endpoint
+                }
 
-            authBody = await authResponse.json()
-            if (!authResponse.ok) {
-                console.error("Payflex Auth0 Authentication failed:", JSON.stringify(authBody))
-                throw new Error(authBody.error_description || authBody.error || `Auth0 error: ${authResponse.status}`)
+                const body = await authResponse.json()
+
+                if (authResponse.ok && body.access_token) {
+                    console.log(`✅ Authentication succeeded via ${endpoint}`)
+                    authBody = body
+                    break
+                }
+
+                // Got JSON error — record it but try next endpoint
+                lastAuthError = body.error_description || body.error || body.message || `HTTP ${authResponse.status}`
+                console.warn(`${endpoint} auth failed:`, lastAuthError)
+
+            } catch (fetchErr: any) {
+                lastAuthError = fetchErr.message
+                console.warn(`${endpoint} fetch error:`, fetchErr.message)
             }
-        } catch (authError: any) {
-            console.error("Auth0 fetch error:", authError.message)
-            throw new Error(`PayFlex authentication failed: ${authError.message}`)
+        }
+
+        if (!authBody || !authBody.access_token) {
+            throw new Error(`PayFlex authentication failed on all endpoints. Last error: ${lastAuthError}. Please verify your PAYFLEX_MERCHANT_ID and PAYFLEX_API_KEY secrets are correct for the PRODUCTION environment.`)
         }
 
         const accessToken = authBody.access_token

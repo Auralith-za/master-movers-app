@@ -4,7 +4,7 @@ import { CheckCircle, ArrowRight, User, Mail, Phone, Hash, MessageCircle } from 
 import Button from '../../components/ui/Button'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { supabase } from '../../lib/supabaseClient'
-import { event } from '../../lib/gtag'
+import { event, trackPurchaseConversion } from '../../lib/gtag'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 
@@ -79,8 +79,14 @@ export default function SuccessPage() {
                         alert("Note: We've recorded your payment locally, but there was a sync issue with the server. Our team will verify this manually.")
                     } else {
                         console.log("SUCCESS: Quote status verified and updated to booked_paid", data)
-                        if (data && data.length > 0) {
+                                        if (data && data.length > 0) {
                             sendConfirmationEmail(data[0])
+                            // 🔴 Google Ads Purchase Conversion
+                            trackPurchaseConversion({
+                                value: data[0]?.total_price || 0,
+                                currency: 'ZAR',
+                                transactionId: quoteId
+                            })
                         }
                     }
                 })
@@ -88,11 +94,11 @@ export default function SuccessPage() {
             console.warn("SuccessPage: No Quote ID found in URL or Store. Status update skipped.")
         }
 
-        // 3. Track Purchase
+        // 3. Track Purchase (Legacy GA4 event — kept for backwards compat)
         event({
-            action: 'conversion',
+            action: 'purchase',
             category: 'Sales',
-            label: 'Purchase',
+            label: 'Payment Completed',
             value: 1
         })
 

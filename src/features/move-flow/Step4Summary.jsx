@@ -10,7 +10,7 @@ import { emailService } from '../../services/emailService'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
 import CouponInput from '../payment/CouponInput'
-import { event } from '../../lib/gtag'
+import { event, trackLeadConversion, trackQuoteSubmit } from '../../lib/gtag'
 import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
 import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
 import clsx from 'clsx'
@@ -233,6 +233,13 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         } finally {
             setIsSubmitting(false)
         }
+        // 🔴 Google Ads Lead Conversion — Proceed to Payment (high-intent quote)
+        if (submissionType !== 'admin') {
+            trackLeadConversion({
+                label: 'Proceed to Payment',
+                value: discountedTotal || total || 0
+            })
+        }
         // Always show payment options for non-admin
         setSearchParams({ saved: 'true' })
     }
@@ -276,11 +283,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 return
             }
 
-            event({
-                action: 'conversion',
-                category: 'Lead',
-                label: 'Request Call Back',
-                value: 1
+            // 🔴 Google Ads Lead Conversion — Call Back Request
+            trackLeadConversion({
+                label: 'Call Back Request',
+                value: discountedTotal || total || 0
             })
 
             const result = await submitQuote({
@@ -343,12 +349,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const handleGeneratePDF = () => {
         setIsGenerating(true)
         try {
-            event({
-                action: 'conversion',
-                category: 'Engagement',
-                label: 'Download Quote PDF',
-                value: 0
-            })
+            // 🔴 Google Ads — PDF download engagement
+            trackQuoteSubmit({ value: discountedTotal || total || 0 })
 
             generateProfessionalQuote({
                 quoteId: lastSavedQuote?.id || `MM-${Math.floor(Math.random() * 10000)}`,
