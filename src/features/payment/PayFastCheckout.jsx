@@ -5,13 +5,10 @@ import { md5 } from './md5'
 export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     const formRef = useRef(null)
 
-    // PayFast Sandbox Details:
-    // Merchant ID: 10000100
-    // Merchant Key: 46f0cd694581a
+    // isSandbox: only true if VITE_TEST_MODE is explicitly 'true'
+    const isSandbox = import.meta.env.VITE_TEST_MODE === 'true'
 
-    const isSandbox = import.meta.env.VITE_TEST_MODE !== 'false'
-
-    // Credentials: Force default sandbox if in sandbox mode; use Env or Live defaults otherwise
+    // Live production credentials (from .env or hardcoded fallback)
     const merchantId = isSandbox ? '10000100' : (import.meta.env.VITE_PAYFAST_MERCHANT_ID || '17687227')
     const merchantKey = isSandbox ? '46f0cd694581a' : (import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '0btdkli273lqs')
     const passphrase = isSandbox ? 'jt7NOE43FZPn' : (import.meta.env.VITE_PAYFAST_PASSPHRASE || 'Mastermovers12897yd28dhqw')

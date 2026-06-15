@@ -28,11 +28,21 @@ export default function PayflexCheckout({ quote }) {
                 })
             })
 
-            const data = await response.json()
+            // Safely parse JSON — if the edge function crashes, Supabase may return HTML
+            let data
+            const contentType = response.headers.get('content-type') || ''
+            if (contentType.includes('application/json')) {
+                data = await response.json()
+            } else {
+                const rawText = await response.text()
+                console.error('Payflex returned non-JSON response:', rawText)
+                throw new Error(`Payment service error (HTTP ${response.status}). Please try again or contact support.`)
+            }
+
             if (!response.ok) throw new Error(data.error || 'Failed to initiate Payflex session')
 
             if (data.redirectUrl) {
-                // Redirect user to Payflex sandbox / production site
+                // Redirect user to Payflex production site
                 window.location.href = data.redirectUrl
             } else {
                 throw new Error('No redirect URL returned from Payflex')
