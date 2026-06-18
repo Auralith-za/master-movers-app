@@ -113,12 +113,23 @@ export default function QuoteReviewPage() {
                                     {appSettings.maintenance_heading || 'Pricing Temporarily Unavailable'}
                                 </h2>
                             </div>
-                        ) : (
-                        <div className="text-right">
-                            <div className="text-4xl font-black text-red-500">R {quote.total_price?.toLocaleString()}</div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total Amount Incl. VAT</p>
-                        </div>
-                        )}
+                        ) : (() => {
+                            const inclVatTotal = quote.total_price || 0;
+                            const exVatSubtotal = inclVatTotal / 1.15;
+                            const vatAmount = inclVatTotal - exVatSubtotal;
+                            return (
+                                <div className="text-right">
+                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Subtotal (ex-VAT)</div>
+                                    <div className="text-lg font-bold text-slate-300">R {exVatSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
+                                    <div className="text-lg font-bold text-slate-300">R {vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <div className="w-full border-t border-slate-700 my-2"></div>
+                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Total (incl. VAT)</div>
+                                    <div className="text-4xl font-black text-red-500">R {inclVatTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total Amount Incl. VAT</p>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>

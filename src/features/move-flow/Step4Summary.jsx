@@ -555,15 +555,27 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <div className="text-right">
                                 {appliedCoupon ? (
                                     <>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Subtotal (ex-VAT)</div>
+                                        <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
+                                        <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Total (incl. VAT)</div>
                                         <div className="text-lg font-bold text-slate-500 line-through">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-3xl font-bold text-emerald-400">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">-{appliedCoupon.discount_percent}% Applied!</div>
+                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">-{appliedCoupon.discount_percent}% Coupon Applied!</div>
                                     </>
                                 ) : (
-                                    <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Subtotal (ex-VAT)</div>
+                                        <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
+                                        <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="w-full border-t border-slate-700 my-2"></div>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Total (incl. VAT)</div>
+                                        <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    </>
                                 )}
-                                <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Incl. VAT</div>
-                                <div className="text-[10px] text-slate-500 mt-1 italic">* Pricing valid for 7 days from date of issue.</div>
+                                <div className="text-[10px] text-slate-500 mt-2 italic">* Pricing valid for 7 days from date of issue.</div>
                             </div>
                         </div>
                     </div>
@@ -675,9 +687,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
                         {discount > 0 && (
                             <div className="flex justify-between items-center py-4 border-b border-green-100 bg-green-50 px-4 -mx-4 rounded-xl">
-                                <span className="text-green-800 font-black uppercase text-xs tracking-widest flex items-center gap-2">
-                                    <Sparkles size={16} className="animate-pulse" /> {discountType}
-                                </span>
+                                <div>
+                                    <span className="text-green-800 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                                        <Sparkles size={16} className="animate-pulse" /> Mid-Month Discount (10%)
+                                    </span>
+                                    <span className="text-green-600 text-[10px] font-bold">Applied on ex-VAT subtotal</span>
+                                </div>
                                 <span className="font-black text-green-700 text-xl">- R {discount.toFixed(2)}</span>
                             </div>
                         )}

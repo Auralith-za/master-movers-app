@@ -207,6 +207,11 @@ export default function Step1Details() {
             setAddressError("Both pickup and dropoff addresses are required.")
             return
         }
+        // Ensure Google Maps has resolved a real distance — prevents 0km pricing errors
+        if (!moveDetails.distanceKm || moveDetails.distanceKm === 0) {
+            setAddressError("Could not calculate a route between these addresses. Please select a valid address from the Google Maps suggestions.")
+            return
+        }
         navigate(`${basePath}/access`)
     }
 

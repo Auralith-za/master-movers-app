@@ -451,30 +451,37 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     }
 
     const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0
-    const totalInclVatBeforeDiscount = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + (PRICING_CONSTANTS.documentationFee || 175)
-    
-    let discountInclVat = 0
+
+    // All rates are EX-VAT. Build the ex-VAT subtotal first.
+    const VAT_RATE = 0.15
+    const documentationFee = PRICING_CONSTANTS.documentationFee || 175
+
+    let exclVatSubTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + documentationFee
+
+    // Apply mid-month discount (10%) on the ex-VAT subtotal
+    let exclVatDiscount = 0
     if (moveDetails.moveDate) {
         const day = new Date(moveDetails.moveDate).getDate()
-        if (day >= 5 && day <= 24) discountInclVat = totalInclVatBeforeDiscount * 0.10
+        if (day >= 5 && day <= 24) exclVatDiscount = exclVatSubTotal * 0.10
     }
 
-    let total = totalInclVatBeforeDiscount - discountInclVat
+    let exclVatAfterDiscount = exclVatSubTotal - exclVatDiscount
 
-    // Additional Costs: Payflex Surcharge (+7%)
+    // Enforce minimums on the EX-VAT amount (before VAT is added)
+    if (!isNationalMove && exclVatAfterDiscount < PRICING_CONSTANTS.minOrder) {
+        exclVatAfterDiscount = PRICING_CONSTANTS.minOrder
+    }
+
+    // Now add 15% VAT to get the final incl-VAT total
+    const vatAmount = exclVatAfterDiscount * VAT_RATE
+    let total = exclVatAfterDiscount + vatAmount
+
+    // Payflex surcharge (+7%) applied AFTER VAT on the total
     if (moveDetails.paymentMethod === 'payflex') {
         total = total * (1 + ADDITIONAL_COSTS.payflex.surcharge)
     }
 
-    // Additional Notes: Min Order R2600 for local only
-    if (!isNationalMove && total < PRICING_CONSTANTS.minOrder) {
-        total = PRICING_CONSTANTS.minOrder
-    }
-
-    // Since the spreadsheet rates ALREADY INCLUDE VAT, we work backwards to find Excl VAT
-    const exclVatSubTotal = totalInclVatBeforeDiscount / 1.15
-    const exclVatDiscount = discountInclVat / 1.15
-    const vat = total - (total / 1.15)
+    const vat = vatAmount
 
     const detailedAccess = []
     if (hasShuttle) detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
@@ -510,9 +517,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     return {
         total,
-        subTotal: exclVatSubTotal,
-        discount: exclVatDiscount,
-        vat,
+        subTotal: exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
+        discount: exclVatDiscount,        // Ex-VAT discount amount
+        vat,                              // VAT amount (15% of ex-VAT subtotal)
         totalVolume,
         totalVolumeCuFt,
         isNationalMove,
