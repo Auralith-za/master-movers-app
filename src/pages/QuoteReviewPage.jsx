@@ -20,6 +20,7 @@ export default function QuoteReviewPage() {
     const [isTermsOpen, setIsTermsOpen] = useState(false);
     const [accepted, setAccepted] = useState(false);
     const [signatureData, setSignatureData] = useState(null);
+    const [appSettings, setAppSettings] = useState(null);
 
     useEffect(() => {
         fetchQuote();
@@ -39,8 +40,13 @@ export default function QuoteReviewPage() {
                 setAccepted(true);
                 setSignatureData(data.signature_json);
             }
+
+            // Fetch app_settings
+            const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 1).single();
+            if (settingsData) setAppSettings(settingsData);
+
         } catch (error) {
-            console.error('Error fetching quote:', error);
+            console.error('Error fetching quote or settings:', error);
         } finally {
             setLoading(false);
         }
@@ -101,10 +107,18 @@ export default function QuoteReviewPage() {
                             <h1 className="text-4xl font-black tracking-tight">Review Your Move</h1>
                             <p className="text-slate-400 mt-2">Reference: <span className="text-white font-bold tracking-wider">#{quote.id.toString().substring(0, 8).toUpperCase()}</span></p>
                         </div>
+                        {appSettings && appSettings.pricing_active === false ? (
+                            <div className="text-right max-w-sm">
+                                <h2 className="text-xl font-black text-amber-400 leading-tight uppercase">
+                                    {appSettings.maintenance_heading || 'Pricing Temporarily Unavailable'}
+                                </h2>
+                            </div>
+                        ) : (
                         <div className="text-right">
                             <div className="text-4xl font-black text-red-500">R {quote.total_price?.toLocaleString()}</div>
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total Amount Incl. VAT</p>
                         </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -233,7 +247,14 @@ export default function QuoteReviewPage() {
                             )}
                         </div>
 
-                        {/* Payment Card */}
+                        {/* Payment Card / Maintenance Banner */}
+                        {appSettings && appSettings.pricing_active === false ? (
+                            <div className="bg-amber-50 rounded-2xl p-6 text-center border border-amber-200">
+                                <p className="text-amber-800 text-sm font-medium mb-4 leading-relaxed">
+                                    {appSettings.maintenance_message || 'We are currently updating our pricing engine. Please contact the Master Movers team to complete your quote.'}
+                                </p>
+                            </div>
+                        ) : (
                         <div className={clsx(
                             "bg-white rounded-2xl shadow-sm border border-slate-100 p-8 transition-all duration-500",
                             !accepted ? "opacity-40 grayscale pointer-events-none" : "opacity-100"
@@ -271,6 +292,7 @@ export default function QuoteReviewPage() {
                                 </div>
                             </div>
                         </div>
+                        )}
 
                         {/* Support Card */}
                         <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100">
@@ -281,6 +303,17 @@ export default function QuoteReviewPage() {
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Office: +27 11 493 7569</p>
                         </div>
                     </div>
+                </div>
+
+                {/* General Disclaimer */}
+                <div className="mt-8 bg-white shadow-sm border border-slate-200 p-6 rounded-2xl text-center">
+                    <p className="text-xs text-slate-500 uppercase tracking-widest font-black flex items-center justify-center gap-2">
+                        <CheckCircle size={14} className="text-slate-400" />
+                        Important Notice
+                    </p>
+                    <p className="text-sm font-medium text-slate-600 mt-2 max-w-2xl mx-auto leading-relaxed">
+                        Prices of quotes are not final until approved by the Master Movers team to see if inventory and location were entered correctly.
+                    </p>
                 </div>
             </div>
 

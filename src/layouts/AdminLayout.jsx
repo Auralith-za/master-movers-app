@@ -16,6 +16,7 @@ export default function AdminLayout() {
         { icon: FileText, label: 'Quotes', path: '/admin/quotes' },
         { icon: MessageSquare, label: 'Contact Forms', path: '/admin/contact-submissions' },
         { icon: Tag, label: 'Coupon Codes', path: '/admin/coupons' },
+        { icon: Settings, label: 'Settings', path: '/admin/settings' },
     ]
 
     return (

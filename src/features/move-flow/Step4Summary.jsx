@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
-import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles } from 'lucide-react'
+import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone } from 'lucide-react'
 import { PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
 import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
 import clsx from 'clsx'
 import { LeadCaptureModal } from './Step1Details'
+import { supabase } from '../../lib/supabaseClient'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -91,6 +92,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [isCalculating, setIsCalculating] = useState(false)
     const [calcMessage, setCalcMessage] = useState('Analyzing inventory volume...')
     const [appliedCoupon, setAppliedCoupon] = useState(null)
+    const [appSettings, setAppSettings] = useState(null)
+
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const { data } = await supabase.from('app_settings').select('*').eq('id', 1).single();
+                if (data) setAppSettings(data);
+            } catch (err) {
+                console.error("Failed to fetch app settings:", err);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     React.useEffect(() => {
         if (!isCalculating) return;
@@ -502,7 +516,26 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                {/* Quote Card */}
+                {/* Quote Card or Maintenance Banner */}
+                {appSettings && appSettings.pricing_active === false ? (
+                    <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-200 overflow-hidden p-8 text-center animate-in fade-in slide-in-from-top-4">
+                        <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Sparkles size={32} />
+                        </div>
+                        <h2 className="text-2xl md:text-3xl font-black text-amber-900 mb-2 uppercase tracking-tight">
+                            {appSettings.maintenance_heading || 'Pricing Temporarily Unavailable'}
+                        </h2>
+                        <p className="text-amber-800/80 mb-8 max-w-md mx-auto font-medium leading-relaxed">
+                            {appSettings.maintenance_message || 'We are currently updating our pricing engine. Please contact the Master Movers team to complete your quote.'}
+                        </p>
+                        <a 
+                            href="tel:+27861440000"
+                            className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg hover:-translate-y-1"
+                        >
+                            <Phone size={20} /> Call Master Movers
+                        </a>
+                    </div>
+                ) : (
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
                     <div className="bg-slate-900 p-6 text-white">
                         <div className="flex justify-between items-start">
@@ -750,6 +783,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* Summary Details */}
                 <div className="space-y-6">
@@ -852,6 +886,20 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">Need immediate help with your quote?</p>
                         <p className="text-sm font-black text-slate-900 group">
                             Call us at any time: <a href="tel:+27114937569" className="text-red-600 hover:underline">+27 11 493 7569</a>
+                        </p>
+                        <p className="text-sm font-black text-slate-900 group mt-2">
+                            <a href="mailto:info@mastermovers.co.za" className="text-sm font-medium hover:text-red-600 underline underline-offset-4">info@mastermovers.co.za</a>
+                        </p>
+                    </div>
+
+                    {/* General Disclaimer */}
+                    <div className="mt-8 bg-slate-50 border border-slate-200 p-6 rounded-2xl text-center shadow-sm">
+                        <p className="text-xs text-slate-500 uppercase tracking-widest font-black flex items-center justify-center gap-2">
+                            <CheckCircle size={14} className="text-slate-400" />
+                            Important Notice
+                        </p>
+                        <p className="text-sm font-medium text-slate-600 mt-2 max-w-2xl mx-auto leading-relaxed">
+                            Prices of quotes are not final until approved by the Master Movers team to see if inventory and location were entered correctly.
                         </p>
                     </div>
                 </div>
