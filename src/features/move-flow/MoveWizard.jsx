@@ -15,90 +15,19 @@ export default function MoveWizard() {
     const navigate = useNavigate()
     const { moveDetails, inventory, getTotals, submitQuote, lastSavedQuote } = useMoveStore()
 
-    // 2-Minute Inactivity Tracker for Abandoned Leads
+    // Debounced Auto-Save to Database
     React.useEffect(() => {
-        let timeoutId
+        // Only auto-save if we have at least some contact info
+        if (!moveDetails?.contactEmail && !moveDetails?.contactPhone && !moveDetails?.contactName) return;
 
-        const handleInactivity = async (isInstant = false) => {
-            // Only send if they've provided contact details
-            if (!moveDetails?.contactEmail && !moveDetails?.contactPhone) return;
+        const timeoutId = setTimeout(() => {
+            console.log("Auto-saving progress to database...");
+            // Preserve existing status if it exists (e.g. 'lead', 'abandoned', etc.)
+            submitQuote({ status: lastSavedQuote?.status || 'new' }).catch(console.error);
+        }, 3000); // 3 seconds debounce
 
-            // Only send once per session to avoid spamming
-            if (sessionStorage.getItem('abandoned_lead_sent')) return;
-
-            console.log(isInstant ? "Jump off detected. Saving as abandoned lead..." : "Inactivity detected. Saving as abandoned lead...")
-            
-            // Mark as sent immediately to prevent race conditions
-            sessionStorage.setItem('abandoned_lead_sent', 'true');
-            
-            // 1. Fetch totals
-            const totals = getTotals();
-
-            // 2. We skip DB save if it's instant because async DB save might block the immediate network request on tab close.
-            // But we will use the lastSavedQuote if it exists.
-            let quoteIdToUse = lastSavedQuote?.id;
-
-            if (!isInstant) {
-                const saveResult = await submitQuote({ status: 'abandoned' });
-                quoteIdToUse = saveResult?.data?.id || lastSavedQuote?.id;
-            }
-            
-            // 3. Send email alert
-            // If it's instant, this skips PDF generation and uses keepalive: true
-            await emailService.sendAbandonedLeadAlert({
-                quoteId: quoteIdToUse,
-                clientName: moveDetails.contactName,
-                clientEmail: moveDetails.contactEmail,
-                clientPhone: moveDetails.contactPhone,
-                moveDate: moveDetails.moveDate,
-                pickupAddress: moveDetails.pickupAddress,
-                dropoffAddress: moveDetails.dropoffAddress,
-                moveType: totals.isNationalMove ? 'National' : 'Local',
-                total: totals.total,
-                vat: totals.vat,
-                subTotal: totals.subTotal,
-                inventory,
-                breakdown: totals.breakdown,
-                inventoryItems: INVENTORY_ITEMS,
-                isInstant
-            });
-        }
-
-        const resetTimer = () => {
-            clearTimeout(timeoutId)
-            // 2 minutes = 120000 ms
-            timeoutId = setTimeout(() => handleInactivity(false), 120000)
-        }
-        
-        // Handle jump off (tab close, refresh, navigate away)
-        const handleBeforeUnload = (e) => {
-            handleInactivity(true);
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                handleInactivity(true);
-            }
-        };
-
-        // Listen for user interactions for the 2-min timer
-        const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll']
-        events.forEach(event => window.addEventListener(event, resetTimer))
-        
-        // Listen for jump offs
-        window.addEventListener('beforeunload', handleBeforeUnload)
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-
-        // Initial setup
-        resetTimer()
-
-        return () => {
-            clearTimeout(timeoutId)
-            events.forEach(event => window.removeEventListener(event, resetTimer))
-            window.removeEventListener('beforeunload', handleBeforeUnload)
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
-        }
-    }, [moveDetails, inventory, getTotals, submitQuote, lastSavedQuote])
+        return () => clearTimeout(timeoutId);
+    }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status]);
 
 
     // Determine if we're in test mode or admin mode based on current path
