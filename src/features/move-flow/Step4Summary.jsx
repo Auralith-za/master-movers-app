@@ -529,7 +529,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             {appSettings.maintenance_message || 'We are currently updating our pricing engine. Please contact the Master Movers team to complete your quote.'}
                         </p>
                         <a 
-                            href="tel:+27861440000"
+                            href="tel:+27114937569"
                             className="inline-flex items-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg hover:-translate-y-1"
                         >
                             <Phone size={20} /> Call Master Movers
