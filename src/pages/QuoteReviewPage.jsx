@@ -7,6 +7,9 @@ import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
 export default function QuoteReviewPage() {
     const { id: pathId } = useParams();
     const [searchParams] = useSearchParams();
@@ -45,27 +48,25 @@ export default function QuoteReviewPage() {
 
     const handleAcceptTerms = async (sig) => {
         try {
-            const { error } = await supabase
-                .from('quotes')
-                .update({
-                    terms_accepted: true,
-                    signature_json: sig,
-                    status: 'pending_payment'
+            // Use edge function (service role) to bypass RLS on the public quote page
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-terms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    quoteId: id,
+                    signatureName: sig.name
                 })
-                .eq('id', id);
+            })
 
-            if (error) throw error;
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Failed to save acceptance')
 
             setAccepted(true);
             setSignatureData(sig);
             setIsTermsOpen(false);
-            
-            // Log activity internally
-            await supabase.from('quote_activities').insert([{
-                quote_id: id,
-                activity_type: 'system',
-                content: `Client accepted and signed terms. Signature: ${sig.name}`
-            }]);
 
         } catch (error) {
             console.error('Error accepting terms:', error);
@@ -184,7 +185,12 @@ export default function QuoteReviewPage() {
                                     return (
                                         <div key={idKey} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-lg">{item?.image || '📦'}</div>
+                                                <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+                                                    {item?.image
+                                                        ? <img src={item.image} alt={item.name} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
+                                                        : <span className="text-lg">📦</span>
+                                                    }
+                                                </div>
                                                 <span className="text-sm font-bold text-slate-700">{item?.name || idKey} {variation ? <span className="text-slate-400 font-normal">({variation})</span> : ''}</span>
                                             </div>
                                             <span className="text-slate-900 font-black">x{qty}</span>

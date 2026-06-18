@@ -18,8 +18,11 @@ export default function AreasPage() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
                     <h1 className="text-4xl font-bold text-slate-900 mb-4">Areas We Serve</h1>
-                    <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+                    <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-2">
                         With a national network of branches and logistics hubs, we cover every corner of South Africa.
+                    </p>
+                    <p className="text-lg font-semibold text-primary-600">
+                        JHB | Cape Town | Durban | International
                     </p>
                 </div>
 

@@ -81,8 +81,11 @@
 /wp-login.php            /  301
 
 # ============================================================
-# SPA CATCH-ALL — must be LAST
-# Serves index.html for all other routes so React Router
-# can handle them (and redirect unknown ones to home)
+# SPA CATCH-ALL — serves index.html for all routes so React
+# Router handles them; unknown routes are redirected to
+# mastermovers.co.za by the app's own catch-all route.
 # ============================================================
 /*    /index.html   200
+
+# Final safety net: any true server-level 404 → mastermovers.co.za
+/*    https://mastermovers.co.za   301

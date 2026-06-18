@@ -40,12 +40,16 @@ export default function DashboardPage() {
     }
 
     const calculateStats = (data) => {
+        const isPaid = (quote) => 
+            ['paid', 'booked_paid', 'booked'].includes(quote.status) || 
+            quote.payment_status === 'paid'
+
         const totalRev = data.reduce((acc, curr) => {
-            return acc + (curr.status === 'paid' ? (Number(curr.total_price) || 0) : 0)
+            return acc + (isPaid(curr) ? (Number(curr.total_price) || 0) : 0)
         }, 0)
 
         const pendingRev = data.reduce((acc, curr) => {
-            return acc + (curr.status !== 'paid' && curr.status !== 'rejected' ? (Number(curr.total_price) || 0) : 0)
+            return acc + (!isPaid(curr) && curr.status !== 'rejected' ? (Number(curr.total_price) || 0) : 0)
         }, 0)
 
         const rejectedRev = data.reduce((acc, curr) => {
@@ -53,7 +57,7 @@ export default function DashboardPage() {
         }, 0)
 
         const active = data.length
-        const pending = data.filter(q => q.status !== 'paid' && q.status !== 'rejected').length
+        const pending = data.filter(q => !isPaid(q) && q.status !== 'rejected').length
         const rejected = data.filter(q => q.status === 'rejected').length
 
         setStats({

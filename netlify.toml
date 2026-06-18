@@ -13,3 +13,10 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Safety net: any true 404 not matched by the SPA falls back to mastermovers.co.za
+[[redirects]]
+  from = "/*"
+  to = "https://mastermovers.co.za"
+  status = 301
+  force = false

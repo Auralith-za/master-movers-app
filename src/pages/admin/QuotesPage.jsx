@@ -49,9 +49,11 @@ export default function QuotesPage() {
     }
 
     const filteredQuotes = quotes.filter(quote => {
+        const isPaid = quote.status === 'booked' || quote.status === 'paid' || quote.status === 'booked_paid' || quote.payment_status === 'paid'
+
         if (filter === 'all') return true
-        if (filter === 'pending') return quote.status === 'new' || quote.status === 'draft' || quote.status === 'processing' || quote.status === 'pending_payment' || quote.status === 'lead'
-        if (filter === 'paid') return quote.status === 'booked' || quote.status === 'paid' || quote.status === 'booked_paid'
+        if (filter === 'paid') return isPaid
+        if (filter === 'pending') return !isPaid && quote.status !== 'rejected'
         if (filter === 'rejected') return quote.status === 'rejected'
         return true
     })
@@ -102,8 +104,8 @@ export default function QuotesPage() {
             return
         }
 
-        const SITE_URL = 'https://fanciful-cupcake-cb7c87.netlify.app'
-        const paymentLink = `${SITE_URL}/quote/review/${quote.id}`
+        const SITE_URL = 'https://mastermovers.co.za'
+        const paymentLink = `${SITE_URL}/quote-review?id=${quote.id}`
 
         const confirmed = confirm(
             `Send payment link to ${quote.client_email}?\n\nLink: ${paymentLink}\n\nThe customer will be able to view their full quote summary and pay via PayFast or Payflex.`

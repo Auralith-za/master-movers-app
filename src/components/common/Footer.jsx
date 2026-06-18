@@ -50,16 +50,9 @@ export default function Footer() {
                     {/* Locations */}
                     <div>
                         <h3 className="text-white font-semibold mb-4">Locations We Serve</h3>
-                        <ul className="space-y-2 text-sm">
-                            <li>
-                                <Link
-                                    to="/locations/movers-durban"
-                                    className="hover:text-primary-400 transition-colors"
-                                >
-                                    Movers Durban
-                                </Link>
-                            </li>
-                        </ul>
+                        <div className="text-sm text-slate-300 font-medium">
+                            JHB | Cape Town | Durban | International
+                        </div>
                     </div>
 
                     {/* Contact */}

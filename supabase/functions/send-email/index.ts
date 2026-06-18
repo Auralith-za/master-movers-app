@@ -171,8 +171,11 @@ serve(async (req) => {
         const resendApiKey = Deno.env.get('RESEND_API_KEY')
         const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'
         const adminEmails = adminEmailSecret.split(',').map(e => e.trim()).filter(Boolean)
+        if (!adminEmails.includes('melonie@nova-gg.com')) {
+            adminEmails.push('melonie@nova-gg.com')
+        }
         const sender = Deno.env.get('EMAIL_SENDER') || 'Master Movers <onboarding@resend.dev>'
-        const originUrl = req.headers.get('origin') || 'https://mastermovers.co.za'
+        const originUrl = 'https://mastermovers.co.za'
 
         if (!resendApiKey) {
             throw new Error("Missing RESEND_API_KEY environment secret.")
@@ -211,7 +214,7 @@ serve(async (req) => {
                 </table>
 
                 <div style="text-align:center;margin:30px 0;">
-                    <a href="https://fanciful-cupcake-cb7c87.netlify.app/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#2563eb;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#2563eb;">
                         View Quote in Admin →
                     </a>
                 </div>
@@ -266,7 +269,7 @@ serve(async (req) => {
                 </div>
             `
         } else if (type === 'booking_confirmed_alert') {
-            // Admin-only booking alert — no PDF, instant, always fires
+            // Admin-only booking alert — with PDF, instant, always fires
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
             subject = `✅ BOOKING CONFIRMED — ${quoteData?.client_name || 'Customer'} [MM-${ref}] — R ${Number(quoteData?.total_price || 0).toFixed(2)}`
             recipients = adminEmails
@@ -295,7 +298,7 @@ serve(async (req) => {
                 </table>
 
                 <div style="text-align:center;margin:30px 0;">
-                    <a href="https://fanciful-cupcake-cb7c87.netlify.app/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#059669;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#059669;">
                         View Booking in Admin →
                     </a>
                 </div>
@@ -410,6 +413,30 @@ serve(async (req) => {
 
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
             `
+        } else if (type === 'abandoned_lead_alert') {
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
+            subject = `⚠️ ABANDONED LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
+            recipients = adminEmails // Admin-only
+
+            innerHtml = `
+                <h1 style="color:#e31837;">⚠️ Abandoned Lead</h1>
+                <p>A customer has abandoned the quote flow but provided contact details. Please follow up to recover the lead.</p>
+
+                <div class="highlight-box" style="background:#fff1f2; border-left-color:#be123c;">
+                    <p style="font-weight:900;font-size:22px;color:#be123c;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#f43f5e;">(Current Total)</span></p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#f43f5e;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Abandoned During Quote Flow</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                </table>
+
+                <p style="font-size:13px;color:#64748b;">Call the customer on <strong>${quoteData?.client_phone || '—'}</strong> to assist with their move requirements.</p>
+            `
         } else if (type === 'payment_link') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM'
             subject = `Complete Your Master Movers Booking [Ref: MM-${ref}]`
@@ -451,9 +478,8 @@ serve(async (req) => {
         // Compile attachments
         const attachments = []
         if (pdfBase64 && pdfFilename) {
-            const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '')
             attachments.push({
-                content: cleanBase64,
+                content: pdfBase64,
                 filename: pdfFilename,
             })
         }

@@ -37,6 +37,14 @@ import MoversDurban from './pages/locations/MoversDurban'
 import NewLandingPage from './pages/NewLandingPage'
 import QuoteReviewPage from './pages/QuoteReviewPage'
 
+// Redirects to an external URL (outside this app)
+function ExternalRedirect({ to }) {
+  React.useEffect(() => {
+    window.location.replace(to)
+  }, [to])
+  return null
+}
+
 function App() {
   return (
     <Router>
@@ -101,8 +109,8 @@ function App() {
           {/* Add more admin routes here */}
         </Route>
 
-        {/* Catch-all: any unknown/legacy URL → redirect to home */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Catch-all: any unknown/broken URL → redirect to mastermovers.co.za */}
+        <Route path="*" element={<ExternalRedirect to="https://mastermovers.co.za" />} />
       </Routes>
     </Router>
   )

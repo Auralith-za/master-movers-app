@@ -85,7 +85,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [showLeadModal, setShowLeadModal] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
-    const isStep4Initialized = React.useRef(false)
+    // Use sessionStorage key scoped to user email to survive StrictMode double-mounts and page refreshes
+    const step4SessionKey = `mm_step4_lead_saved_${moveDetails.contactEmail || 'anon'}`
 
     const [isCalculating, setIsCalculating] = useState(false)
     const [calcMessage, setCalcMessage] = useState('Analyzing inventory volume...')
@@ -129,26 +130,41 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const couponDiscount = appliedCoupon ? (total * appliedCoupon.discount_percent) / 100 : 0
     const discountedTotal = Math.max(0, total - couponDiscount)
 
-    // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners
-    // Uses forceNew:true so it ALWAYS inserts a fresh record regardless of any
-    // previously saved quote still sitting in the Zustand store from the same session.
+    // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners.
+    // Uses sessionStorage to guard against duplicate inserts from:
+    //   - React StrictMode double-invocation
+    //   - Page refreshes (useRef resets, but sessionStorage persists)
+    //   - Component unmount/remount from navigation
+    // If a lastSavedQuote already exists in the store, it UPDATE that record instead.
     React.useEffect(() => {
-        if (moveDetails.contactName && !isStep4Initialized.current) {
-            isStep4Initialized.current = true
-            console.log('[Step4] Auto-saving as lead on arrival...')
-            submitQuote({
-                status: 'lead',
-                submission_type: submissionType,
-                forceNew: submissionType !== 'admin'  // Always new record for public users
-            }).then(result => {
-                if (result.success) {
-                    console.log('[Step4] Lead captured:', result.data?.[0]?.id)
-                } else {
-                    console.warn('[Step4] Lead save failed:', result.error)
-                }
-            })
+        if (!moveDetails.contactName || submissionType === 'admin') return
+
+        // Already captured a lead for this customer in this browser session
+        if (sessionStorage.getItem(step4SessionKey)) {
+            console.log('[Step4] Lead already captured this session, skipping duplicate insert.')
+            return
         }
-    }, [moveDetails.contactName, submitQuote, submissionType])
+
+        // Mark as captured immediately (before async call) to prevent race conditions
+        sessionStorage.setItem(step4SessionKey, '1')
+        console.log('[Step4] Auto-saving as lead on arrival...')
+
+        submitQuote({
+            status: 'lead',
+            submission_type: submissionType,
+            // forceNew only if no existing quote from this session
+            forceNew: !lastSavedQuote?.id
+        }).then(result => {
+            if (result.success) {
+                console.log('[Step4] Lead captured:', result.data?.[0]?.id)
+            } else {
+                // Clear the flag so it can retry on next visit
+                sessionStorage.removeItem(step4SessionKey)
+                console.warn('[Step4] Lead save failed:', result.error)
+            }
+        })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [moveDetails.contactName])
 
     if (isCalculating) {
         return (
@@ -216,28 +232,34 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
         setIsSubmitting(true)
         try {
-            // Save to backend — non-blocking: show payment regardless of result
+            // Save to backend — always UPDATE the existing lead record, never insert a new one
             const result = await submitQuote({
                 status: (submissionType === 'admin') ? 'lead' : 'pending_payment',
-                submission_type: submissionType
+                submission_type: submissionType,
+                // Never force a new insert here — update the lead that was created on Step 4 entry
+                forceNew: false
             })
             
             if (result.success && result.data?.[0]) {
                 const savedQuote = result.data[0]
 
-                // 1. Instant admin alert — no PDF, fires immediately so sales team can follow up
                 if (submissionType !== 'admin') {
                     emailService.sendPendingQuoteAlert({
-                        id: savedQuote.id,
-                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
-                        client_email: moveDetails.contactEmail,
-                        client_phone: moveDetails.contactPhone,
-                        move_date: moveDetails.moveDate,
-                        pickup_address: moveDetails.pickupAddress,
-                        dropoff_address: moveDetails.dropoffAddress,
-                        total_price: discountedTotal || total,
-                        move_type: moveDetails.moveType || '',
-                        payment_method: moveDetails.paymentMethod || 'not selected'
+                        quoteId: savedQuote.id,
+                        clientName: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                        clientEmail: moveDetails.contactEmail,
+                        clientPhone: moveDetails.contactPhone,
+                        moveDate: moveDetails.moveDate,
+                        pickupAddress: moveDetails.pickupAddress,
+                        dropoffAddress: moveDetails.dropoffAddress,
+                        total: discountedTotal || total,
+                        vat: vat,
+                        subTotal: subTotal,
+                        inventory: inventory,
+                        breakdown: breakdown,
+                        inventoryItems: INVENTORY_ITEMS,
+                        moveType: moveDetails.moveType || '',
+                        paymentMethod: moveDetails.paymentMethod || 'not selected'
                     }).catch(err => console.error('Non-blocking admin alert error:', err))
                 }
 
@@ -319,7 +341,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 status: 'lead',
                 request_call_back: true,
                 submission_type: submissionType,
-                forceNew: true
+                // Update existing lead record instead of creating a duplicate
+                forceNew: false
             })
 
             // Optimistic success — don't block user if Supabase is flaky

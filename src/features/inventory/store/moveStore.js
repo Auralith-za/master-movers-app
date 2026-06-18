@@ -117,14 +117,20 @@ export const useMoveStore = create(
             setCurrentVehicle: (v) => set({ currentVehicle: v }),
 
             // Basic Helpers
-            reset: () => set({ 
-                moveDetails: { packagingOption: 'none', insuranceEnabled: false }, 
-                accessDetails: {}, 
-                inventory: {}, 
-                manualServiceCharges: {},
-                undoHistory: [],
-                lastSavedQuote: null
-            }),
+            reset: () => {
+                // Clear sessionStorage dedup guards so a new quote flow can create a fresh lead
+                Object.keys(sessionStorage)
+                    .filter(k => k.startsWith('mm_step4_lead_saved_'))
+                    .forEach(k => sessionStorage.removeItem(k))
+                set({ 
+                    moveDetails: { packagingOption: 'none', insuranceEnabled: false }, 
+                    accessDetails: {}, 
+                    inventory: {}, 
+                    manualServiceCharges: {},
+                    undoHistory: [],
+                    lastSavedQuote: null
+                })
+            },
             clearInventory: () => set((state) => ({ inventory: {}, undoHistory: [...state.undoHistory, state.inventory] })),
             
             manualServiceCharges: {},

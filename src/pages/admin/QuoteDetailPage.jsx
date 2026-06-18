@@ -382,7 +382,7 @@ export default function QuoteDetailPage() {
         
         try {
             const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
-            const reviewLink = `${window.location.origin}/quote/review/${id}`
+            const reviewLink = `https://mastermovers.co.za/quote-review?id=${id}`
             
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
@@ -414,7 +414,7 @@ export default function QuoteDetailPage() {
     }
 
     const copyPaymentLink = () => {
-        const link = `${window.location.origin}/quote/review/${id}`
+        const link = `https://mastermovers.co.za/quote-review?id=${id}`
         navigator.clipboard.writeText(link)
         alert('Payment link copied to clipboard!')
     }

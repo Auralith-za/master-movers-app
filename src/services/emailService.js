@@ -35,8 +35,8 @@ export const emailService = {
                 shouldSave: false
             })
 
-            // 2. Convert PDF to base64 data URL
-            const pdfBase64 = doc.output('datauristring')
+            // 2. Convert PDF to raw base64 string (no data URI prefix)
+            const pdfBase64 = doc.output('base64')
             const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
 
             // 3. Construct quote payload for the email template
@@ -119,8 +119,43 @@ export const emailService = {
      * Admin-only booking confirmed alert — no PDF, fires instantly after payment
      * Separate from the customer email so admins always get notified
      */
-    sendBookingConfirmedAlert: async (quoteData) => {
+    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'card/eft' }) => {
         try {
+            console.log(`Generating in-memory PDF for booking confirmed alert...`)
+
+            const doc = await generateProfessionalQuote({
+                quoteId,
+                clientName,
+                clientEmail,
+                clientPhone,
+                pickupAddress,
+                dropoffAddress,
+                moveDate,
+                inventory,
+                breakdown,
+                total,
+                vat,
+                subTotal,
+                inventoryItems,
+                isSharedLoad: breakdown?.isSharedLoad || false,
+                shouldSave: false
+            })
+
+            const pdfBase64 = doc.output('base64')
+            const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
+
+            const quoteData = {
+                id: quoteId,
+                client_name: clientName,
+                client_email: clientEmail,
+                client_phone: clientPhone,
+                move_date: moveDate,
+                pickup_address: pickupAddress,
+                dropoff_address: dropoffAddress,
+                total_price: total,
+                payment_method: paymentMethod
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
@@ -128,7 +163,7 @@ export const emailService = {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
                 },
-                body: JSON.stringify({ type: 'booking_confirmed_alert', quoteData })
+                body: JSON.stringify({ type: 'booking_confirmed_alert', quoteData, pdfBase64, pdfFilename })
             })
             const result = await response.json()
             if (!response.ok) throw new Error(result.error || 'Booking alert failed')
@@ -144,8 +179,44 @@ export const emailService = {
      * Send instant admin-only alert when a customer reaches Step 4 (pending quote)
      * No PDF needed — fires immediately so sales team can follow up
      */
-    sendPendingQuoteAlert: async (quoteData) => {
+    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'not selected' }) => {
         try {
+            console.log(`Generating in-memory PDF for pending quote alert...`)
+
+            const doc = await generateProfessionalQuote({
+                quoteId,
+                clientName,
+                clientEmail,
+                clientPhone,
+                pickupAddress,
+                dropoffAddress,
+                moveDate,
+                inventory,
+                breakdown,
+                total,
+                vat,
+                subTotal,
+                inventoryItems,
+                isSharedLoad: breakdown?.isSharedLoad || false,
+                shouldSave: false
+            })
+
+            const pdfBase64 = doc.output('base64')
+            const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
+
+            const quoteData = {
+                id: quoteId,
+                client_name: clientName,
+                client_email: clientEmail,
+                client_phone: clientPhone,
+                move_date: moveDate,
+                pickup_address: pickupAddress,
+                dropoff_address: dropoffAddress,
+                total_price: total,
+                move_type: moveType,
+                payment_method: paymentMethod
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
@@ -155,7 +226,9 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'pending_quote_alert',
-                    quoteData
+                    quoteData,
+                    pdfBase64,
+                    pdfFilename
                 })
             })
             const result = await response.json()
@@ -164,6 +237,72 @@ export const emailService = {
             return { success: true }
         } catch (error) {
             console.error('sendPendingQuoteAlert error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
+    /**
+     * Send admin alert for an abandoned lead after inactivity
+     * Uses whatever data is available from the incomplete form
+     */
+    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned' }) => {
+        try {
+            console.log(`Generating in-memory PDF for abandoned lead alert...`)
+
+            const doc = await generateProfessionalQuote({
+                quoteId,
+                clientName,
+                clientEmail,
+                clientPhone,
+                pickupAddress,
+                dropoffAddress,
+                moveDate,
+                inventory: inventory || {},
+                breakdown: breakdown || {},
+                total: total || 0,
+                vat: vat || 0,
+                subTotal: subTotal || 0,
+                inventoryItems: inventoryItems || [],
+                isSharedLoad: breakdown?.isSharedLoad || false,
+                shouldSave: false
+            })
+
+            const pdfBase64 = doc.output('base64')
+            const pdfFilename = `MasterMovers_Abandoned_${quoteId || 'Lead'}.pdf`
+
+            const quoteData = {
+                id: quoteId,
+                client_name: clientName,
+                client_email: clientEmail,
+                client_phone: clientPhone,
+                move_date: moveDate,
+                pickup_address: pickupAddress,
+                dropoff_address: dropoffAddress,
+                total_price: total || 0,
+                move_type: moveType || 'Unknown',
+                payment_method: paymentMethod
+            }
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'abandoned_lead_alert',
+                    quoteData,
+                    pdfBase64,
+                    pdfFilename
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Abandoned lead alert failed')
+            console.log('⚠️ Abandoned lead admin alert sent')
+            return { success: true }
+        } catch (error) {
+            console.error('sendAbandonedLeadAlert error:', error)
             return { success: false, error: error.message }
         }
     },

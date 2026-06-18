@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { useMoveStore } from '../inventory/store/moveStore'
+import { emailService } from '../../services/emailService'
+import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import Step1Details from './Step1Details'
 import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
@@ -11,7 +13,70 @@ import Step4Summary from './Step4Summary'
 export default function MoveWizard() {
     const location = useLocation()
     const navigate = useNavigate()
-    const { moveDetails, inventory } = useMoveStore()
+    const { moveDetails, inventory, getTotals, submitQuote, lastSavedQuote } = useMoveStore()
+
+    // 2-Minute Inactivity Tracker for Abandoned Leads
+    React.useEffect(() => {
+        let timeoutId
+
+        const handleInactivity = async () => {
+            // Only send if they've provided contact details
+            if (!moveDetails?.contactEmail && !moveDetails?.contactPhone) return;
+
+            // Only send once per session to avoid spamming
+            if (sessionStorage.getItem('abandoned_lead_sent')) return;
+
+            console.log("Inactivity detected. Saving as abandoned lead...")
+            
+            // 1. Save quote as abandoned
+            const saveResult = await submitQuote({ status: 'abandoned' });
+            
+            // 2. Fetch totals
+            const totals = getTotals();
+
+            // 3. Send email alert
+            const quoteIdToUse = saveResult?.data?.id || lastSavedQuote?.id;
+            
+            await emailService.sendAbandonedLeadAlert({
+                quoteId: quoteIdToUse,
+                clientName: moveDetails.contactName,
+                clientEmail: moveDetails.contactEmail,
+                clientPhone: moveDetails.contactPhone,
+                moveDate: moveDetails.moveDate,
+                pickupAddress: moveDetails.pickupAddress,
+                dropoffAddress: moveDetails.dropoffAddress,
+                moveType: totals.isNationalMove ? 'National' : 'Local',
+                total: totals.total,
+                vat: totals.vat,
+                subTotal: totals.subTotal,
+                inventory,
+                breakdown: totals.breakdown,
+                inventoryItems: INVENTORY_ITEMS
+            });
+
+            // Mark as sent in session
+            sessionStorage.setItem('abandoned_lead_sent', 'true');
+        }
+
+        const resetTimer = () => {
+            clearTimeout(timeoutId)
+            // 2 minutes = 120000 ms
+            timeoutId = setTimeout(handleInactivity, 120000)
+        }
+
+        // Listen for user interactions
+        const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll']
+        events.forEach(event => window.addEventListener(event, resetTimer))
+
+        // Initial setup
+        resetTimer()
+
+        return () => {
+            clearTimeout(timeoutId)
+            events.forEach(event => window.removeEventListener(event, resetTimer))
+        }
+    }, [moveDetails, inventory, getTotals, submitQuote, lastSavedQuote])
+
 
     // Determine if we're in test mode or admin mode based on current path
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 

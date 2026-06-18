@@ -73,17 +73,27 @@ export default function SuccessPage() {
                 if (result.success && result.quote) {
                     setQuoteRecord(result.quote)
 
-                    // 1. Instant admin-only booking alert (no PDF, always fires)
+                    // Calculate totals for PDF generation
+                    const total = result.quote.total_price || result.quote.total || 0
+                    const subTotal = total / 1.15
+                    const vat = total - subTotal
+
+                    // 1. Instant admin-only booking alert (now with PDF)
                     emailService.sendBookingConfirmedAlert({
-                        id: result.quote.id,
-                        client_name: result.quote.client_name,
-                        client_email: result.quote.client_email,
-                        client_phone: result.quote.client_phone,
-                        move_date: result.quote.move_date,
-                        pickup_address: result.quote.pickup_address,
-                        dropoff_address: result.quote.dropoff_address,
-                        total_price: result.quote.total_price,
-                        payment_method: result.quote.payment_method || gateway
+                        quoteId: result.quote.id,
+                        clientName: result.quote.client_name,
+                        clientEmail: result.quote.client_email,
+                        clientPhone: result.quote.client_phone,
+                        moveDate: result.quote.move_date,
+                        pickupAddress: result.quote.pickup_address,
+                        dropoffAddress: result.quote.dropoff_address,
+                        total: total,
+                        vat: vat,
+                        subTotal: subTotal,
+                        inventory: result.quote.items_json || {},
+                        breakdown: result.quote.trip_breakdown || {},
+                        inventoryItems: INVENTORY_ITEMS,
+                        paymentMethod: result.quote.payment_method || gateway
                     }).catch(err => console.error('Admin booking alert error:', err))
 
                     // 2. Customer booking confirmation with PDF (separate)

@@ -11,6 +11,7 @@ export default function AboutUsPage() {
             title: 'Moving You Anywhere within SA 🇿🇦',
             description: "From Cape Town to Limpopo, we've got you covered. Whether you're moving down the street in Sandton or relocating across the country to the Western Cape, MasterMovers has the fleet and the network to get you there.",
             features: [
+                'JHB | Cape Town | Durban | International',
                 'Long Distance & Inter-Provincial Moves',
                 'Weekly Shuttles between JHB, DBN, and CPT',
                 'Remote & Outlying Area Services',
