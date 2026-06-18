@@ -94,7 +94,7 @@ export const getCityCode = (cityName) => {
     if (name.includes('cape town') || name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') || name.includes('paarl') || name.includes('epping') || name === 'cpt' || name.includes('cpt')) {
         return CITY_CODES.CPT;
     }
-    if (name.includes('durban') || name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') || name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof') || name === 'dbn' || name.includes('dbn')) {
+    if (name.includes('durban') || name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') || name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof') || name.includes('hilton') || name.includes('pietermaritzburg') || name.includes('howick') || name === 'dbn' || name.includes('dbn')) {
         return CITY_CODES.DBN;
     }
     if (name.includes('knysna') || name.includes('george') || name.includes('plettenberg bay') || name.includes('mossel bay') || name.includes('garden route') || name.includes('sedgefield') || name.includes('wilderness') || name.includes('great brak') || name.includes('riversdale') || name.includes('still bay') || name.includes('oudtshoorn') || name.includes('de rust') || name.includes('uniondale') || name.includes('ladismith') || name.includes('barrydale') || name.includes('swellendam') || name.includes('heidelberg') || name.includes('albertinia') || name.includes('herbertsdale') || name === 'gr' || name.includes('gr')) {

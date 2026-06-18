@@ -82,17 +82,8 @@ export const calculateTripDistances = async (pickupAddress, dropoffAddress, city
             unitSystem: window.google.maps.UnitSystem.METRIC,
         }, (response, status) => {
             if (status !== 'OK') {
-                console.warn(`Distance Matrix failed: ${status}. Using default fallback distance.`);
-                resolve({
-                    totalDistance: 50,
-                    breakdown: {
-                        depotToPickup: 15,
-                        pickupToDropoff: 20,
-                        dropoffToDepot: 15
-                    },
-                    depotUsed: depotLocation,
-                    isApiDenied: true
-                });
+                console.warn(`Distance Matrix failed: ${status}.`);
+                reject(new Error("Google Maps could not process these addresses. Please select a valid address from the dropdown."));
                 return;
             }
 
@@ -108,17 +99,11 @@ export const calculateTripDistances = async (pickupAddress, dropoffAddress, city
             if (!depotToPickupElement || depotToPickupElement.status !== 'OK' ||
                 !pickupToDropoffElement || pickupToDropoffElement.status !== 'OK' ||
                 !dropoffToDepotElement || dropoffToDepotElement.status !== 'OK') {
-                console.warn("Address verification failed. Using default fallback distance.");
-                resolve({
-                    totalDistance: 50,
-                    breakdown: {
-                        depotToPickup: 15,
-                        pickupToDropoff: 20,
-                        dropoffToDepot: 15
-                    },
-                    depotUsed: depotLocation,
-                    isApiDenied: true
+                console.warn("Address verification failed in Distance Matrix.", {
+                    pickup: pickupToDropoffElement?.status,
+                    depot: depotToPickupElement?.status
                 });
+                reject(new Error("Could not find a route for the provided addresses. Please ensure they are valid and correctly formatted."));
                 return;
             }
 

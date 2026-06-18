@@ -291,10 +291,19 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(pickupAddress)
     const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(dropoffAddress)
     
+    // Extract provinces as a fail-safe
+    const provinces = ['gauteng', 'western cape', 'kwazulu-natal', 'kzn', 'eastern cape', 'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape'];
+    const getProvince = (addr) => provinces.find(p => addr.includes(p)) || null;
+    const pickupProvince = getProvince(pickupAddress);
+    const dropoffProvince = getProvince(dropoffAddress);
+    
+    const isInterProvincial = pickupProvince && dropoffProvince && pickupProvince !== dropoffProvince;
+
     const totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
 
-    // Force National if we detect cross-city keywords OR distance is high
+    // Force National if we detect cross-city keywords, cross-province, OR distance is high
     const isNationalMove = (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) || 
+                          isInterProvincial ||
                           totalDistance > 150 ||
                           (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
                           (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
