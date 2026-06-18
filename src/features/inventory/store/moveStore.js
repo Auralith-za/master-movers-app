@@ -122,6 +122,7 @@ export const useMoveStore = create(
                 Object.keys(sessionStorage)
                     .filter(k => k.startsWith('mm_step4_lead_saved_'))
                     .forEach(k => sessionStorage.removeItem(k))
+                sessionStorage.removeItem('abandoned_lead_sent')
                 set({ 
                     moveDetails: { packagingOption: 'none', insuranceEnabled: false }, 
                     accessDetails: {}, 
