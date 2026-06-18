@@ -162,56 +162,79 @@ export default function Step1Details() {
 
     // Auto-calculate distance in background when both addresses are filled
     React.useEffect(() => {
-        if (moveDetails.pickupAddress && moveDetails.dropoffAddress) {
-            const cityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress) || 'JHB';
-            
-            setIsValidating(true)
+        if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
             setAddressError(null)
-            
-            calculateTripDistances(
-                moveDetails.pickupAddress,
-                moveDetails.dropoffAddress,
-                cityCode
-            )
-                .then(({ breakdown, totalDistance }) => {
-                    setMoveDetails({
-                        distanceKm: breakdown.pickupToDropoff,
-                        tripBreakdown: breakdown,
-                        totalBillableDistance: totalDistance
-                    })
-                    setAddressError(null)
-                })
-                .catch((error) => {
-                    console.error("Background calculation error:", error)
-                    setAddressError(error.message || "Invalid address. Please select a valid Google Maps address from the suggestions.")
-                })
-                .finally(() => {
-                    setIsValidating(false)
-                })
-        } else {
-            setAddressError(null)
+            return
         }
-    }, [moveDetails.pickupAddress, moveDetails.dropoffAddress])
+
+        const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress)
+        const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(moveDetails.dropoffAddress)
+
+        // National moves are VOLUME-based — they don't need a distance from Google Maps.
+        // Skip the Distance Matrix call entirely for cross-city routes to avoid failures.
+        const isDetectedNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
+        if (isDetectedNational) {
+            // Store city codes but clear any previous error — no distance needed
+            setMoveDetails({ distanceKm: 0, tripBreakdown: null })
+            setAddressError(null)
+            setIsValidating(false)
+            return
+        }
+
+        // Local move — call Distance Matrix to get driving distance
+        const cityCode = pickupCityCode || 'JHB'
+        setIsValidating(true)
+        setAddressError(null)
+
+        calculateTripDistances(
+            moveDetails.pickupAddress,
+            moveDetails.dropoffAddress,
+            cityCode
+        )
+            .then(({ breakdown, totalDistance }) => {
+                setMoveDetails({
+                    distanceKm: breakdown.pickupToDropoff,
+                    tripBreakdown: breakdown,
+                    totalBillableDistance: totalDistance
+                })
+                setAddressError(null)
+            })
+            .catch((error) => {
+                console.error("Distance calculation error:", error)
+                setAddressError("Could not calculate the distance between these addresses. Please make sure you selected a valid address from the Google Maps dropdown.")
+                setMoveDetails({ distanceKm: 0, tripBreakdown: null })
+            })
+            .finally(() => {
+                setIsValidating(false)
+            })
+    }, [moveDetails.pickupAddress, moveDetails.dropoffAddress, moveDetails.pickupCity, moveDetails.dropoffCity])
 
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        
-        if (addressError) {
+
+        if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
+            setAddressError("Both pickup and dropoff addresses are required.")
             return
         }
         if (isValidating) {
             return
         }
-        if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
-            setAddressError("Both pickup and dropoff addresses are required.")
+        if (addressError) {
             return
         }
-        // Ensure Google Maps has resolved a real distance — prevents 0km pricing errors
-        if (!moveDetails.distanceKm || moveDetails.distanceKm === 0) {
-            setAddressError("Could not calculate a route between these addresses. Please select a valid address from the Google Maps suggestions.")
+
+        // Check if this is a national move — national moves don't need distanceKm
+        const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress)
+        const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(moveDetails.dropoffAddress)
+        const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
+
+        // For local moves, ensure Google Maps resolved a real distance
+        if (!isNational && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
+            setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
             return
         }
+
         navigate(`${basePath}/access`)
     }
 
