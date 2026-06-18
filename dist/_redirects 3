@@ -1,0 +1,91 @@
+# ============================================================
+# LEGACY URL REDIRECTS (301 = permanent, good for SEO)
+# These redirect old website URLs to the correct new pages
+# ============================================================
+
+# Free quote / get a quote → quote flow
+/*/free-quote            /quote  301
+/*/free-quote/           /quote  301
+/*/get-a-quote           /quote  301
+/*/get-a-quote/          /quote  301
+/*/quote                 /quote  301
+/*/quote/                /quote  301
+/*/request-a-quote       /quote  301
+/*/request-a-quote/      /quote  301
+/*/moving-quote          /quote  301
+/*/moving-quote/         /quote  301
+/free-quote              /quote  301
+/free-quote/             /quote  301
+/get-a-quote             /quote  301
+/get-a-quote/            /quote  301
+/request-a-quote         /quote  301
+/request-a-quote/        /quote  301
+/moving-quote            /quote  301
+/moving-quote/           /quote  301
+/quote-now               /quote  301
+/quote-now/              /quote  301
+
+# City / region landing pages → home
+/cape-town               /  301
+/cape-town/*             /  301
+/johannesburg            /  301
+/johannesburg/*          /  301
+/durban                  /  301
+/durban/*                /  301
+/pretoria                /  301
+/pretoria/*              /  301
+/sandton                 /  301
+/sandton/*               /  301
+/centurion               /  301
+/centurion/*             /  301
+/east-rand               /  301
+/east-rand/*             /  301
+/west-rand               /  301
+/west-rand/*             /  301
+/port-elizabeth          /  301
+/port-elizabeth/*        /  301
+/bloemfontein            /  301
+/bloemfontein/*          /  301
+
+# Contact redirects
+/contact                 /contact-us  301
+/contact/                /contact-us  301
+/contact-us/             /contact-us  301
+/reach-us                /contact-us  301
+/reach-us/               /contact-us  301
+
+# About redirects
+/about-us                /about  301
+/about-us/               /about  301
+/who-we-are              /about  301
+/who-we-are/             /about  301
+
+# Services redirects
+/moving-services         /services  301
+/moving-services/        /services  301
+/our-services            /services  301
+/our-services/           /services  301
+
+# Blog / news
+/news                    /blog  301
+/news/*                  /blog  301
+/articles                /blog  301
+/articles/*              /blog  301
+
+# Old home variations
+/home                    /  301
+/home/                   /  301
+/index                   /  301
+/index.html              /  301
+/index.php               /  301
+/wp-login.php            /  301
+
+# ============================================================
+# SPA CATCH-ALL — serves index.html for all routes so React
+# Router handles them; unknown routes are redirected to
+# mastermovers.co.za by the app's own catch-all route.
+# ============================================================
+/*    /index.html   200
+
+# Final safety net: any true server-level 404 → mastermovers.co.za
+/*    https://mastermovers.co.za   301

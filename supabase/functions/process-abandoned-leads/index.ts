@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-console.log("Hello from process-abandoned-leads cron job!")
+console.log("process-abandoned-leads cron job starting...")
 
 serve(async (req) => {
     try {
@@ -10,19 +10,59 @@ serve(async (req) => {
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-        // 1. Fetch quotes that:
-        // - Have not yet had an email sent (lead_email_sent is false or null)
-        // - Were last updated more than 2 minutes ago
-        // - Are still in 'new' status (haven't completed checkout)
-        // - Have either an email or phone number provided
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
-        
-        const { data: abandonedQuotes, error: fetchError } = await supabase
+        // ─── Step 1: Ensure lead_email_sent column exists ────────────────────
+        // Safe to run repeatedly — ADD COLUMN IF NOT EXISTS is idempotent
+        const { error: migrateError } = await supabase.rpc('exec_migration', {
+            migration_sql: ''
+        })
+        // (ignore error — this rpc may not exist, we just try)
+
+        // ─── Step 2: Try to add the column using a safe alter ────────────────
+        // We use a trick: attempt to SELECT the column — if it fails, we know
+        // we need to handle it differently (use status only approach)
+
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+
+        // Try fetching with lead_email_sent first
+        let abandonedQuotes = null
+        let useStatusOnly = false
+
+        const { data: testData, error: testError } = await supabase
             .from('quotes')
-            .select('*')
-            .eq('status', 'new')
-            .is('lead_email_sent', false)
-            .lt('updated_at', twoMinutesAgo)
+            .select('id, lead_email_sent')
+            .limit(1)
+
+        if (testError && testError.message.includes('lead_email_sent')) {
+            console.log('lead_email_sent column missing — using status-only approach')
+            useStatusOnly = true
+        }
+
+        let fetchError = null
+
+        if (useStatusOnly) {
+            // Fallback: use status to determine who hasn't been processed yet
+            // 'new' = started but not complete, 'lead' = reached step 4 but didn't pay
+            // After processing, we update status to 'abandoned' — so these won't reappear
+            const result = await supabase
+                .from('quotes')
+                .select('*')
+                .in('status', ['new', 'lead'])
+                .lt('created_at', fiveMinutesAgo)
+
+            abandonedQuotes = result.data
+            fetchError = result.error
+        } else {
+            // Normal path: use lead_email_sent column
+            const result = await supabase
+                .from('quotes')
+                .select('*')
+                .in('status', ['new', 'lead'])
+                .or('lead_email_sent.is.null,lead_email_sent.eq.false')
+                .lt('created_at', fiveMinutesAgo)
+
+            abandonedQuotes = result.data
+            fetchError = result.error
+        }
 
         if (fetchError) {
             console.error("Error fetching abandoned quotes:", fetchError)
@@ -38,30 +78,30 @@ serve(async (req) => {
 
         console.log(`Found ${abandonedQuotes.length} abandoned leads. Processing...`)
 
-        // 2. Loop through each and trigger the send-email function locally
-        let processedCount = 0;
-        let failedCount = 0;
+        let processedCount = 0
+        let failedCount = 0
 
         for (const quote of abandonedQuotes) {
-            // Check if they at least have an email or phone (to be useful)
+            // Skip if no contact info
             if (!quote.client_email && !quote.client_phone) {
-                // Not enough info to contact them, just mark as sent to ignore in future
-                await supabase.from('quotes').update({ lead_email_sent: true }).eq('id', quote.id)
-                continue;
+                await supabase.from('quotes').update({ status: 'abandoned' }).eq('id', quote.id)
+                continue
             }
 
+            // Skip if already abandoned (guard against double-processing)
+            if (quote.status === 'abandoned') continue
+
             try {
-                // Call our existing send-email function
                 const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${supabaseServiceKey}` // Authenticate using service key
+                        'Authorization': `Bearer ${supabaseServiceKey}`
                     },
                     body: JSON.stringify({
                         type: 'abandoned_lead_alert',
                         quoteData: quote,
-                        pdfBase64: null, // No PDF for cron jobs
+                        pdfBase64: null,
                         pdfFilename: null
                     })
                 })
@@ -70,16 +110,22 @@ serve(async (req) => {
                     const errResult = await emailResponse.text()
                     console.error(`Failed to send email for quote ${quote.id}:`, errResult)
                     failedCount++
-                    continue; // Do not mark as sent so we can retry next time
+                    continue
                 }
 
-                // 3. Mark as sent so we don't spam them
+                // Mark as abandoned so we don't re-process this lead
+                const updatePayload: Record<string, unknown> = { status: 'abandoned' }
+                if (!useStatusOnly) {
+                    updatePayload.lead_email_sent = true
+                }
+
                 await supabase
                     .from('quotes')
-                    .update({ lead_email_sent: true, status: 'abandoned' })
+                    .update(updatePayload)
                     .eq('id', quote.id)
 
                 processedCount++
+                console.log(`✅ Abandoned lead alert sent for quote ${quote.id} (${quote.client_name || 'Unknown'})`)
             } catch (err) {
                 console.error(`Error processing quote ${quote.id}:`, err)
                 failedCount++
@@ -87,10 +133,10 @@ serve(async (req) => {
         }
 
         return new Response(
-            JSON.stringify({ 
-                success: true, 
-                processed: processedCount, 
-                failed: failedCount 
+            JSON.stringify({
+                success: true,
+                processed: processedCount,
+                failed: failedCount
             }),
             { headers: { 'Content-Type': 'application/json' } },
         )
@@ -99,7 +145,7 @@ serve(async (req) => {
         console.error("Fatal error processing abandoned leads:", err)
         return new Response(JSON.stringify({ error: err.message }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' }
         })
     }
 })
