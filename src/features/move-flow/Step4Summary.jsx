@@ -86,13 +86,15 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [showLeadModal, setShowLeadModal] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
+    const [appSettings, setAppSettings] = useState(null)
+    const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+
     // Use sessionStorage key scoped to user email to survive StrictMode double-mounts and page refreshes
     const step4SessionKey = `mm_step4_lead_saved_${moveDetails.contactEmail || 'anon'}`
 
     const [isCalculating, setIsCalculating] = useState(false)
     const [calcMessage, setCalcMessage] = useState('Analyzing inventory volume...')
     const [appliedCoupon, setAppliedCoupon] = useState(null)
-    const [appSettings, setAppSettings] = useState(null)
 
     React.useEffect(() => {
         const fetchSettings = async () => {
@@ -101,6 +103,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 if (data) setAppSettings(data);
             } catch (err) {
                 console.error("Failed to fetch app settings:", err);
+            } finally {
+                setIsLoadingSettings(false);
             }
         };
         fetchSettings();
@@ -517,7 +521,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Quote Card or Maintenance Banner */}
-                {appSettings && appSettings.pricing_active === false ? (
+                {isLoadingSettings ? (
+                    <div className="bg-slate-50 rounded-2xl shadow-sm border border-slate-100 p-8 flex flex-col justify-center items-center min-h-[300px] animate-pulse">
+                        <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-400 rounded-full animate-spin mb-4"></div>
+                        <div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading Pricing...</div>
+                    </div>
+                ) : appSettings && appSettings.pricing_active === false ? (
                     <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-200 overflow-hidden p-8 text-center animate-in fade-in slide-in-from-top-4">
                         <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Sparkles size={32} />
