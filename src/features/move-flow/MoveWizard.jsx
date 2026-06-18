@@ -13,7 +13,7 @@ import Step4Summary from './Step4Summary'
 export default function MoveWizard() {
     const location = useLocation()
     const navigate = useNavigate()
-    const { moveDetails, inventory, getTotals, submitQuote, lastSavedQuote } = useMoveStore()
+    const { moveDetails, accessDetails, inventory, getTotals, submitQuote, lastSavedQuote } = useMoveStore()
 
     // Debounced Auto-Save to Database
     React.useEffect(() => {
