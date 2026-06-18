@@ -415,16 +415,16 @@ serve(async (req) => {
             `
         } else if (type === 'abandoned_lead_alert') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
-            subject = `⚠️ ABANDONED LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
+            subject = `⭐️ NEW LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
             recipients = adminEmails // Admin-only
 
             innerHtml = `
-                <h1 style="color:#e31837;">⚠️ Abandoned Lead</h1>
-                <p>A customer has abandoned the quote flow but provided contact details. Please follow up to recover the lead.</p>
+                <h1 style="color:#059669;">⭐️ New Lead</h1>
+                <p>A customer has started a quote but has not yet completed it. Please follow up to assist them.</p>
 
-                <div class="highlight-box" style="background:#fff1f2; border-left-color:#be123c;">
-                    <p style="font-weight:900;font-size:22px;color:#be123c;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#f43f5e;">(Current Total)</span></p>
-                    <p style="margin:4px 0 0;font-size:12px;color:#f43f5e;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Abandoned During Quote Flow</p>
+                <div class="highlight-box" style="background:#f0fdf4; border-left-color:#059669;">
+                    <p style="font-weight:900;font-size:22px;color:#047857;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#10b981;">(Current Total)</span></p>
+                    <p style="margin:4px 0 0;font-size:12px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Incomplete Quote Flow</p>
                 </div>
 
                 <table class="details-table">
