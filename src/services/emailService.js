@@ -245,30 +245,34 @@ export const emailService = {
      * Send admin alert for an abandoned lead after inactivity
      * Uses whatever data is available from the incomplete form
      */
-    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned' }) => {
+    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false }) => {
         try {
-            console.log(`Generating in-memory PDF for abandoned lead alert...`)
+            let pdfBase64 = null;
+            let pdfFilename = null;
 
-            const doc = await generateProfessionalQuote({
-                quoteId,
-                clientName,
-                clientEmail,
-                clientPhone,
-                pickupAddress,
-                dropoffAddress,
-                moveDate,
-                inventory: inventory || {},
-                breakdown: breakdown || {},
-                total: total || 0,
-                vat: vat || 0,
-                subTotal: subTotal || 0,
-                inventoryItems: inventoryItems || [],
-                isSharedLoad: breakdown?.isSharedLoad || false,
-                shouldSave: false
-            })
-
-            const pdfBase64 = doc.output('base64')
-            const pdfFilename = `MasterMovers_Abandoned_${quoteId || 'Lead'}.pdf`
+            // Only generate PDF if we have time (not an instant tab close)
+            if (!isInstant) {
+                console.log(`Generating in-memory PDF for abandoned lead alert...`)
+                const doc = await generateProfessionalQuote({
+                    quoteId,
+                    clientName,
+                    clientEmail,
+                    clientPhone,
+                    pickupAddress,
+                    dropoffAddress,
+                    moveDate,
+                    inventory: inventory || {},
+                    breakdown: breakdown || {},
+                    total: total || 0,
+                    vat: vat || 0,
+                    subTotal: subTotal || 0,
+                    inventoryItems: inventoryItems || [],
+                    isSharedLoad: breakdown?.isSharedLoad || false,
+                    shouldSave: false
+                })
+                pdfBase64 = doc.output('base64')
+                pdfFilename = `MasterMovers_Abandoned_${quoteId || 'Lead'}.pdf`
+            }
 
             const quoteData = {
                 id: quoteId,
@@ -286,6 +290,7 @@ export const emailService = {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
+                keepalive: isInstant, // Ensures the request finishes even if the tab is closing
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
@@ -297,9 +302,14 @@ export const emailService = {
                     pdfFilename
                 })
             })
-            const result = await response.json()
-            if (!response.ok) throw new Error(result.error || 'Abandoned lead alert failed')
-            console.log('⚠️ Abandoned lead admin alert sent')
+            
+            // Note: if isInstant is true (tab closing), we might not even get a response back here, 
+            // but the request is guaranteed to be sent to the server.
+            if (!isInstant) {
+                const result = await response.json()
+                if (!response.ok) throw new Error(result.error || 'Abandoned lead alert failed')
+                console.log('⚠️ Abandoned lead admin alert sent')
+            }
             return { success: true }
         } catch (error) {
             console.error('sendAbandonedLeadAlert error:', error)

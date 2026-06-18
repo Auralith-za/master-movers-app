@@ -19,24 +19,32 @@ export default function MoveWizard() {
     React.useEffect(() => {
         let timeoutId
 
-        const handleInactivity = async () => {
+        const handleInactivity = async (isInstant = false) => {
             // Only send if they've provided contact details
             if (!moveDetails?.contactEmail && !moveDetails?.contactPhone) return;
 
             // Only send once per session to avoid spamming
             if (sessionStorage.getItem('abandoned_lead_sent')) return;
 
-            console.log("Inactivity detected. Saving as abandoned lead...")
+            console.log(isInstant ? "Jump off detected. Saving as abandoned lead..." : "Inactivity detected. Saving as abandoned lead...")
             
-            // 1. Save quote as abandoned
-            const saveResult = await submitQuote({ status: 'abandoned' });
+            // Mark as sent immediately to prevent race conditions
+            sessionStorage.setItem('abandoned_lead_sent', 'true');
             
-            // 2. Fetch totals
+            // 1. Fetch totals
             const totals = getTotals();
 
-            // 3. Send email alert
-            const quoteIdToUse = saveResult?.data?.id || lastSavedQuote?.id;
+            // 2. We skip DB save if it's instant because async DB save might block the immediate network request on tab close.
+            // But we will use the lastSavedQuote if it exists.
+            let quoteIdToUse = lastSavedQuote?.id;
+
+            if (!isInstant) {
+                const saveResult = await submitQuote({ status: 'abandoned' });
+                quoteIdToUse = saveResult?.data?.id || lastSavedQuote?.id;
+            }
             
+            // 3. Send email alert
+            // If it's instant, this skips PDF generation and uses keepalive: true
             await emailService.sendAbandonedLeadAlert({
                 quoteId: quoteIdToUse,
                 clientName: moveDetails.contactName,
@@ -51,22 +59,35 @@ export default function MoveWizard() {
                 subTotal: totals.subTotal,
                 inventory,
                 breakdown: totals.breakdown,
-                inventoryItems: INVENTORY_ITEMS
+                inventoryItems: INVENTORY_ITEMS,
+                isInstant
             });
-
-            // Mark as sent in session
-            sessionStorage.setItem('abandoned_lead_sent', 'true');
         }
 
         const resetTimer = () => {
             clearTimeout(timeoutId)
             // 2 minutes = 120000 ms
-            timeoutId = setTimeout(handleInactivity, 120000)
+            timeoutId = setTimeout(() => handleInactivity(false), 120000)
         }
+        
+        // Handle jump off (tab close, refresh, navigate away)
+        const handleBeforeUnload = (e) => {
+            handleInactivity(true);
+        };
 
-        // Listen for user interactions
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                handleInactivity(true);
+            }
+        };
+
+        // Listen for user interactions for the 2-min timer
         const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll']
         events.forEach(event => window.addEventListener(event, resetTimer))
+        
+        // Listen for jump offs
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
 
         // Initial setup
         resetTimer()
@@ -74,6 +95,8 @@ export default function MoveWizard() {
         return () => {
             clearTimeout(timeoutId)
             events.forEach(event => window.removeEventListener(event, resetTimer))
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
     }, [moveDetails, inventory, getTotals, submitQuote, lastSavedQuote])
 
