@@ -442,28 +442,30 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     }
 
     const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0
-    const subTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + (PRICING_CONSTANTS.documentationFee || 175)
+    const totalInclVatBeforeDiscount = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + (PRICING_CONSTANTS.documentationFee || 175)
     
-    let discount = 0
+    let discountInclVat = 0
     if (moveDetails.moveDate) {
         const day = new Date(moveDetails.moveDate).getDate()
-        if (day >= 5 && day <= 24) discount = subTotal * 0.10
+        if (day >= 5 && day <= 24) discountInclVat = totalInclVatBeforeDiscount * 0.10
     }
 
-    const subTotalAfterDiscount = subTotal - discount
-    let vat = subTotalAfterDiscount * 0.15
-    let total = subTotalAfterDiscount + vat
+    let total = totalInclVatBeforeDiscount - discountInclVat
 
     // Additional Costs: Payflex Surcharge (+7%)
     if (moveDetails.paymentMethod === 'payflex') {
         total = total * (1 + ADDITIONAL_COSTS.payflex.surcharge)
-        // Adjust VAT accordingly if needed, or just keep it as a flat surcharge on final
     }
 
     // Additional Notes: Min Order R2600 for local only
     if (!isNationalMove && total < PRICING_CONSTANTS.minOrder) {
         total = PRICING_CONSTANTS.minOrder
     }
+
+    // Since the spreadsheet rates ALREADY INCLUDE VAT, we work backwards to find Excl VAT
+    const exclVatSubTotal = totalInclVatBeforeDiscount / 1.15
+    const exclVatDiscount = discountInclVat / 1.15
+    const vat = total - (total / 1.15)
 
     const detailedAccess = []
     if (hasShuttle) detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
@@ -499,8 +501,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     return {
         total,
-        subTotal,
-        discount,
+        subTotal: exclVatSubTotal,
+        discount: exclVatDiscount,
         vat,
         totalVolume,
         totalVolumeCuFt,
