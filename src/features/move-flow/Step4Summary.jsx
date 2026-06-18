@@ -258,8 +258,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 forceNew: false
             })
             
-            if (result.success && result.data?.[0]) {
-                const savedQuote = result.data[0]
+            // Use returned data OR fall back to the lastSavedQuote already in store
+            // (Supabase RLS may block SELECT on insert/update, returning success but null data)
+            const savedQuote = result.data?.[0] || lastSavedQuote
+            if (result.success && savedQuote) {
 
                 if (submissionType !== 'admin') {
                     emailService.sendPendingQuoteAlert({
