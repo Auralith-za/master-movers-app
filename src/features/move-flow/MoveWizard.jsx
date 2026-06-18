@@ -159,11 +159,16 @@ export default function MoveWizard() {
         if (!lastSavedQuote?.id) return
         if (!lastSavedQuote?.client_email && !lastSavedQuote?.client_phone) return
 
+        // Don't send for admin-created quotes or test flows
+        const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
+            location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote'
+        if (currentBase !== '/quote') return
+
         // Check if this quote already had a new-lead alert sent
         const sentKey = `mm_new_lead_${lastSavedQuote.id}`
         if (sessionStorage.getItem(sentKey)) return
 
-        // Don't send for quotes that are already in 'lead', 'abandoned', 'booked' state
+        // Don't re-send for quotes that are already past the lead stage
         if (['lead', 'abandoned', 'booked', 'confirmed'].includes(lastSavedQuote.status)) return
 
         console.log('⭐ New lead captured — sending instant new-lead alert...')
@@ -171,7 +176,7 @@ export default function MoveWizard() {
         sessionStorage.setItem(sentKey, '1')
 
         sendInstantLeadAlert(lastSavedQuote)
-    }, [lastSavedQuote?.id, lastSavedQuote?.client_email, lastSavedQuote?.client_phone, lastSavedQuote?.status])
+    }, [lastSavedQuote?.id, lastSavedQuote?.client_email, lastSavedQuote?.client_phone, lastSavedQuote?.status, location.pathname])
 
     // ─── Determine base path & admin mode ────────────────────────────────────
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' :
