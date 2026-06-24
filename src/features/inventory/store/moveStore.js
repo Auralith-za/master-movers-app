@@ -9,7 +9,8 @@ import {
     ADDITIONAL_COSTS, 
     PACKAGING_RATES, 
     PRICING_CONSTANTS, 
-    getCityCode 
+    getCityCode,
+    detectCityCode
 } from '../data/pricingRates'
 
 export const useMoveStore = create(
@@ -40,7 +41,14 @@ export const useMoveStore = create(
                 })),
             setPackagingOption: (option) =>
                 set((state) => ({
-                    moveDetails: { ...state.moveDetails, packagingOption: option }
+                    moveDetails: { 
+                        ...state.moveDetails, 
+                        packagingOption: option,
+                        // Always reset box quantities when switching packaging option
+                        // This prevents stale persisted values from showing phantom costs
+                        st7Boxes: 0,
+                        linenBoxes: 0
+                    }
                 })),
 
             // Step 2: Access
@@ -169,6 +177,12 @@ export const useMoveStore = create(
                 const { forceNew, submission_type, contactName, contactEmail, contactPhone, ...dbOverrides } = overrides
 
                 // Build a clean payload with only known database columns
+                const isLocationNotFound = Boolean(overrides.cant_find_address || state.moveDetails.cant_find_address)
+                const commentsBase = dbOverrides.customer_comments || state.moveDetails.generalNotes || ''
+                const commentsFinal = isLocationNotFound 
+                    ? `[LOCATION SEARCH FAILED] User could not find their address. Please contact them. ${commentsBase}`
+                    : commentsBase
+
                 const quotePayload = {
                     client_name: dbOverrides.client_name || overrides.contactName || state.moveDetails.contactName || 'Anonymous',
                     client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
@@ -177,11 +191,18 @@ export const useMoveStore = create(
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
                     distance_km: Number(dbOverrides.distance_km || state.moveDetails.distanceKm || 0),
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
-                    items_json: state.inventory || {},
+                    items_json: { ...(state.inventory || {}), cant_find_address: isLocationNotFound },
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: dbOverrides.status || overrides.status || 'new',
-                    request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back),
+                    request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back || isLocationNotFound),
+                    customer_comments: commentsFinal,
+                    access_details: dbOverrides.access_details || state.accessDetails || {},
+                    packaging_option: dbOverrides.packaging_option || state.moveDetails.packagingOption || 'none',
+                    st7_boxes: Number(dbOverrides.st7_boxes || state.moveDetails.st7Boxes || 0),
+                    linen_boxes: Number(dbOverrides.linen_boxes || state.moveDetails.linenBoxes || 0),
+                    insurance_enabled: Boolean(dbOverrides.insurance_enabled !== undefined ? dbOverrides.insurance_enabled : state.moveDetails.insuranceEnabled),
+                    payment_method: dbOverrides.payment_method || state.moveDetails.paymentMethod || 'eft'
                 }
 
                 console.log('SUBMITTING QUOTE PAYLOAD (clean):', quotePayload)
@@ -264,51 +285,259 @@ export const useMoveStore = create(
     )
 )
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}) => {
+export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0) => {
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
-    let autoPackagingCost = 0
+    let plasticSleeveCost = 0
+    let wrappingCost = 0
     let requiresCrateFlag = false
     let requiresPhotoFlag = false
 
+    const getPlasticSleevesCount = (item, idKey) => {
+        const itemId = item.id.toLowerCase()
+        const name = item.name.toLowerCase()
+        const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
+        
+        const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
+        const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 
+                                      itemId.includes('mattress') || name.includes('mattress') || 
+                                      itemId.includes('base') || name.includes('base') ||
+                                      itemId.includes('futon') || name.includes('futon')
+        
+        if (isBedOrMattressOrBase) {
+            return isKing ? 4 : 2
+        }
+        
+        const isCouch = itemId.includes('couch') || name.includes('couch') || 
+                        itemId.includes('sofa') || name.includes('sofa') || 
+                        itemId.includes('suite') || name.includes('suite') ||
+                        itemId.includes('seater') || name.includes('seater')
+                        
+        if (isCouch) {
+            const is4Seater = itemId.includes('4-seater') || name.includes('4-seater') || 
+                              itemId.includes('4 seater') || name.includes('4 seater') ||
+                              variation.includes('4-seater') || variation.includes('4 seater')
+            return is4Seater ? 2 : 1
+        }
+        
+        const isReclinerOrPoofOrLounger = itemId.includes('recliner') || name.includes('recliner') ||
+                                          itemId.includes('poof') || name.includes('poof') ||
+                                          itemId.includes('pouf') || name.includes('pouf') ||
+                                          itemId.includes('lounger') || name.includes('lounger') ||
+                                          itemId.includes('ottoman') || name.includes('ottoman') ||
+                                          itemId.includes('chaise') || name.includes('chaise') ||
+                                          itemId.includes('armchair') || name.includes('armchair') ||
+                                          itemId.includes('daybed') || name.includes('daybed')
+                                          
+        if (isReclinerOrPoofOrLounger) {
+            return 1
+        }
+        
+        if (item.autoPackagingType === 'Plastic Covers') {
+            return 1
+        }
+        
+        return 0
+    }
+
+    let boxQty = 0
     Object.entries(inventory).forEach(([idKey, qty]) => {
         const [itemId] = idKey.split('_')
+        const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_') : null
         const item = items.find(i => i.id === itemId)
         if (item) {
-            totalVolume += item.volume * qty
-            if (item.autoPackagingType === 'Plastic Covers') autoPackagingCost += (qty * 145)
-            if (item.autoPackagingType === 'Wrapping') autoPackagingCost += (qty * 75)
+            if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
+                boxQty += qty
+            } else {
+                totalVolume += item.volume * qty
+            }
+            
+            const sleeves = getPlasticSleevesCount(item, idKey)
+            if (sleeves > 0) {
+                plasticSleeveCost += (qty * sleeves * 55)
+            }
+            
+            // Wrapping only applies when:
+            //  - Item has autoPackagingType = 'Wrapping' AND no variation selected (no material choice)
+            //  - OR the selected variation is specifically Glass or Marble
+            // Standard Wood/Other = no wrapping cost.
+            const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
+            const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
+            const appliesWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
+            
+            if (appliesWrapping || isGlassOrMarble) {
+                // R5.90 per cubic FOOT
+                wrappingCost += qty * (item.volume * 5.90);
+            }
+            
             if (item.requiresCrate) requiresCrateFlag = true
             if (item.requiresPhoto) requiresPhotoFlag = true
         }
     })
 
+    // Add any extra volume (e.g. from manual custom items in admin)
+    totalVolume += extraVolumeCuFt
+
     const totalVolumeCuFt = totalVolume
     const pickupAddress = (moveDetails.pickupAddress || '').toLowerCase()
     const dropoffAddress = (moveDetails.dropoffAddress || '').toLowerCase()
     
-    // Attempt detection from metadata first, then full address string
-    const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(pickupAddress)
-    const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(dropoffAddress)
-    
-    // Extract provinces as a fail-safe
-    const provinces = ['gauteng', 'western cape', 'kwazulu-natal', 'kzn', 'eastern cape', 'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape'];
+    // ─── STEP 1: City Code Detection ────────────────────────────────────────────
+    // Raw codes before any fallback — null means the address was not recognised
+    // as being in a JHB / DBN / CPT metro area.
+    const rawPickupCityCode = detectCityCode(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
+    const rawDropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
+
+    // ─── STEP 2: Outline Province / Unknown Location Detection ──────────────────
+    // These are the SA provinces we do NOT serve with a live price.
+    // NOTE: Eastern Cape is NOT in this list — it is a served national route (GR code).
+    const outlineProvinces = [
+        'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
+        'mpumulanga', 'mphumulanga',
+        'potchefstroom', 'klerksdorp', 'rustenburg', 
+        'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+        'kimberley', 'upington'
+    ];
+
+    const checkComponentsForOutline = (components) => {
+        if (!components || !Array.isArray(components)) return false;
+        return components.some(c => {
+            const name = (c.long_name || c.short_name || '').toLowerCase().trim();
+            return outlineProvinces.some(prov => name === prov || name.includes(prov));
+        });
+    };
+
+    const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+
+    // Returns true when GPS coords are present but the point sits outside all 3 depot
+    // metro radii AND is not in the Eastern Cape / GR region (which IS served nationally).
+    // GR coords: Gqeberha ~(-33.96, 25.60), George ~(-33.96, 22.45)
+    const isGPSOutline = (latLng) => {
+        if (!latLng || !latLng.lat || !latLng.lng) return false;
+        const lat = parseFloat(latLng.lat);
+        const lng = parseFloat(latLng.lng);
+        if (isNaN(lat) || isNaN(lng)) return false;
+        const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
+        const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
+        const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
+        // Check if it resolves to a GR city code (Eastern Cape / Garden Route — nationally served)
+        const resolvedCode = detectCityCode(null, null, latLng);
+        if (resolvedCode === CITY_CODES.GR) return false;
+        return distToJhb > 150 && distToDbn > 150 && distToCpt > 150;
+    };
+
+    // Text-based outline province detection (address string or components)
+    const textIsOutline = [pickupAddress, dropoffAddress].some(addr =>
+        outlineProvinces.some(prov => addr.toLowerCase().includes(prov))
+    );
+    const componentsIsOutline =
+        checkComponentsForOutline(moveDetails.pickupAddressComponents) ||
+        checkComponentsForOutline(moveDetails.dropoffAddressComponents);
+
+    // GPS-based outline detection (only run if text didn't resolve a city)
+    const gpsIsOutline =
+        (!rawPickupCityCode && isGPSOutline(moveDetails.pickupLatLng)) ||
+        (!rawDropoffCityCode && isGPSOutline(moveDetails.dropoffLatLng));
+
+    // An address is "unresolved" if detectCityCode returned null (not a known hub)
+    // AND it either has GPS coordinates placing it outside all hubs, OR it is entirely
+    // missing GPS coordinates (meaning the user typed an unknown town and bypassed Google Maps).
+    const pickupUnresolved = !rawPickupCityCode && (!moveDetails.pickupLatLng || isGPSOutline(moveDetails.pickupLatLng));
+    const dropoffUnresolved = !rawDropoffCityCode && (!moveDetails.dropoffLatLng || isGPSOutline(moveDetails.dropoffLatLng));
+
+    // NOTE: GR city code (Eastern Cape) is intentionally excluded from this check —
+    // those routes have defined national rates and should be priced, not quote-requested.
+    const hasOutlineProvince =
+        textIsOutline ||
+        componentsIsOutline ||
+        gpsIsOutline ||
+        pickupUnresolved ||
+        dropoffUnresolved;
+
+    // ─── STEP 3: Resolve final city codes (fallback after outline check) ─────────
+    // Cross-address fallback: if one side is resolved, propagate it to the other.
+    let pickupCityCode = rawPickupCityCode;
+    let dropoffCityCode = rawDropoffCityCode;
+    if (pickupCityCode && !dropoffCityCode) dropoffCityCode = pickupCityCode;
+    if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
+
+    // Absolute fallback — only reached for addresses with no GPS and no text match.
+    // The outline-province flag above will have already caught most real cases.
+    if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
+    if (!dropoffCityCode) dropoffCityCode = CITY_CODES.JHB;
+
+    // ─── STEP 4: Province text cross-check (fail-safe) ───────────────────────────
+    const provinces = ['gauteng', 'western cape', 'kwazulu-natal', 'kzn', 'eastern cape', 'free state', 'limpopo', 'mpumalanga', 'mpumulanga', 'mphumulanga', 'north west', 'northern cape'];
     const getProvince = (addr) => provinces.find(p => addr.includes(p)) || null;
     const pickupProvince = getProvince(pickupAddress);
     const dropoffProvince = getProvince(dropoffAddress);
-    
     const isInterProvincial = pickupProvince && dropoffProvince && pickupProvince !== dropoffProvince;
 
-    const totalDistance = (parseFloat(moveDetails.distanceKm) || 0) + 30
+    // ─── STEP 5: Total Billable Distance ─────────────────────────────────────────
+    // Prefer the Google Maps Distance Matrix result (stored as totalBillableDistance).
+    // Fallback: use distanceKm + depot legs from tripBreakdown, or a flat 30km estimate.
+    const totalDistance = parseFloat(moveDetails.totalBillableDistance) || 
+                         ((parseFloat(moveDetails.distanceKm) || 0) + (moveDetails.tripBreakdown 
+                             ? (moveDetails.tripBreakdown.depotToPickup || 0) + (moveDetails.tripBreakdown.dropoffToDepot || 0)
+                             : 30))
 
-    // Force National if we detect cross-city keywords, cross-province, OR distance is high
-    const isNationalMove = (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) || 
-                          isInterProvincial ||
-                          totalDistance > 150 ||
-                          (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
-                          (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
-                          (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
-                          (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg'))
+    // ─── STEP 6: National Move Detection ─────────────────────────────────────────
+    // A move is national when it crosses between our three served city depots.
+    // Note: outline province moves are caught by hasOutlineProvince — they are NOT
+    // priced as national (we have no national rates for those routes).
+    const isNationalMove =
+        !hasOutlineProvince && (
+            (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
+            isInterProvincial ||
+            (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
+            (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
+            (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
+            (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg'))
+        );
+
+    // ─── STEP 7: Local 80km Depot Rule ───────────────────────────────────────────
+    // If this is a local move and either the depot→pickup OR dropoff→depot leg
+    // (per Google Maps) exceeds 80 km, we cannot price it — request a quote.
+    // We use tripBreakdown (Google Maps legs) when available, otherwise fall back to
+    // the haversine distance from the depot coord to the address GPS coords.
+    let isDepotOver80 = false;
+    if (!isNationalMove) {
+        if (moveDetails.tripBreakdown) {
+            const { depotToPickup, dropoffToDepot } = moveDetails.tripBreakdown;
+            if ((depotToPickup || 0) > 80 || (dropoffToDepot || 0) > 80) {
+                isDepotOver80 = true;
+            }
+        } else {
+            // No tripBreakdown yet — use GPS haversine as a conservative estimate.
+            const depotCity = pickupCityCode || 'JHB';
+            const DEPOT_COORDS_LOCAL = {
+                JHB: { lat: -26.2573, lng: 28.1519 },
+                DBN: { lat: -29.5444, lng: 31.2174 },
+                CPT: { lat: -33.9340, lng: 18.5328 },
+            };
+            const depot = DEPOT_COORDS_LOCAL[depotCity] || DEPOT_COORDS_LOCAL.JHB;
+            if (moveDetails.pickupLatLng?.lat) {
+                const d2p = haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.pickupLatLng.lat), parseFloat(moveDetails.pickupLatLng.lng));
+                if (d2p > 80) isDepotOver80 = true;
+            }
+            if (!isDepotOver80 && moveDetails.dropoffLatLng?.lat) {
+                const d2d = haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.dropoffLatLng.lat), parseFloat(moveDetails.dropoffLatLng.lng));
+                if (d2d > 80) isDepotOver80 = true;
+            }
+        }
+    }
+
+    const needsQuoteRequest = hasOutlineProvince || (!isNationalMove && isDepotOver80)
 
     let transportCost = 0
     let volumeCost = 0
@@ -346,7 +575,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         // Local logic: Vehicle selection by volume + ft3 charge
         const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
         const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
-        const vehicle = vehicleList.find(v => v.capacityCuFt >= totalVolumeCuFt) || vehicleList[vehicleList.length - 1]
+        const volumeForVehicle = totalVolumeCuFt + (4.25 * boxQty)
+        const vehicle = vehicleList.find(v => v.capacityCuFt >= volumeForVehicle) || vehicleList[vehicleList.length - 1]
         
         transportRate = vehicle.ratePerKm || 0
         volumeRate = vehicle.ratePerCuFt || 0
@@ -366,50 +596,92 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let accessFees = 0
     let hasShuttle = false
-    
+    const detailedAccess = []
+
     // Additional Costs: Shuttle & Long Carry logic
-    const addAccess = (loc) => {
-        if (loc?.elevator) accessFees += 300
-        if (loc?.stairs) {
-            const fl = loc.floorLevel;
+    const addAccess = (loc, prefix) => {
+        const hasElevator = !!loc?.elevator
+        if (hasElevator) {
+            accessFees += 300
+            detailedAccess.push(`${prefix} Elevator: R300`)
+        } else {
+            // Enforce staircase surcharges (no lift logged)
+            const fl = loc?.floorLevel
             if (fl === 'double_volume') {
-                accessFees += 500;
+                accessFees += 500
+                detailedAccess.push(`${prefix} Stairs (Double Volume): R500`)
             } else if (fl === 'multiple_stairs') {
-                accessFees += 800;
+                accessFees += 800
+                detailedAccess.push(`${prefix} Stairs (Multiple Flights): R800`)
             } else {
-                accessFees += (parseInt(fl) || 0) * 200;
+                const flNum = parseInt(fl) || 0
+                if (flNum === 2) {
+                    accessFees += 450
+                    detailedAccess.push(`${prefix} Stairs (2nd flr): R450`)
+                } else if (flNum === 3 || flNum === 4) {
+                    accessFees += 750
+                    detailedAccess.push(`${prefix} Stairs (${flNum}rd/th flr): R750`)
+                } else if (flNum >= 5) {
+                    accessFees += 950
+                    detailedAccess.push(`${prefix} Stairs (${flNum}th+ flr): R950`)
+                }
             }
         }
-        if (loc?.specialConditions?.panhandle) accessFees += 0
-        if (loc?.specialConditions?.hoisting) accessFees += 0
-        
+
+        if (loc?.specialConditions?.hoisting) {
+            accessFees += 750
+            detailedAccess.push(`${prefix} Hoisting: R750`)
+        }
+
         // Shuttle: Track if needed
         if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle) {
             hasShuttle = true
         }
-        
+
         // Long Carry / Shuttle based on distance:
-        // - 50m and over needs shuttle (R2500)
-        // - 30 - 50m gets R450 flat rate
+        let appliedLongCarryCost = 0
+        let isLongCarryAuto = false
+
+        // Auto-apply long carry at R450 when floor access is 3rd floor and above (or multiple_stairs)
+        const fl = loc?.floorLevel
+        const flNum = parseInt(fl) || 0
+        if (fl === 'multiple_stairs' || flNum >= 3) {
+            appliedLongCarryCost = 450
+            isLongCarryAuto = true
+        }
+
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance) || 0
             if (dist >= 50) {
                 hasShuttle = true
-            } else if (dist >= 30) {
-                accessFees += ADDITIONAL_COSTS.longCarry.flatRate
+            }
+            if (dist >= 50 && dist <= 80) {
+                if (appliedLongCarryCost < 450) {
+                    appliedLongCarryCost = 450
+                }
+            }
+        }
+
+        if (appliedLongCarryCost > 0) {
+            accessFees += appliedLongCarryCost
+            if (isLongCarryAuto) {
+                detailedAccess.push(`${prefix} Long Carry (Floor 3+ Auto): R${appliedLongCarryCost}`)
+            } else {
+                detailedAccess.push(`${prefix} Long Carry (${loc.longCarryDistance}m): R${appliedLongCarryCost}`)
             }
         }
     }
-    if (accessDetails?.origin) addAccess(accessDetails.origin)
-    if (accessDetails?.destination) addAccess(accessDetails.destination)
+    if (accessDetails?.origin) addAccess(accessDetails.origin, 'Origin')
+    if (accessDetails?.destination) addAccess(accessDetails.destination, 'Dest')
 
     if (hasShuttle) {
         accessFees += ADDITIONAL_COSTS.shuttle.flatRate
+        detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
     }
 
     let additionalCrewCost = 0
     let hasHeavyItems = false
-    // Additional Costs: Heavy Items (2 Crew @ R700pp - Flat fee)
+    // Additional Costs: Heavy Items (2 Crew @ R550pp - Flat fee)
     Object.entries(inventory).forEach(([idKey, qty]) => {
         if (qty <= 0) return
         const [itemId] = idKey.split('_')
@@ -438,25 +710,45 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     }
 
     let packagingCost = 0
-    if (moveDetails.packagingOption !== 'none') {
-        const isBoxesOnly = moveDetails.packagingOption === 'boxes_only'
+    const hasStep2Packaging = moveDetails.packagingOption && moveDetails.packagingOption !== 'none';
+    
+    if (hasStep2Packaging || boxQty > 0) {
+        const isBoxesOnly = moveDetails.packagingOption === 'boxes_only' || !hasStep2Packaging
         const rates = isBoxesOnly 
             ? PACKAGING_RATES.sendMeBoxesOnly 
             : PACKAGING_RATES.boxesAndPacking
             
-        const st7Cost = (moveDetails.st7Boxes || 0) * rates.st7
+        const totalSt7 = (moveDetails.st7Boxes || 0) + boxQty
+        const st7Cost = totalSt7 * rates.st7
         const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
-        const deliveryFee = isBoxesOnly ? (rates.deliveryFee || 0) : 0
+        
+        // Only apply delivery fee if they explicitly used Step 2 and asked for boxes_only delivery
+        const deliveryFee = (moveDetails.packagingOption === 'boxes_only') ? (rates.deliveryFee || 0) : 0
+        
         packagingCost = st7Cost + linenCost + deliveryFee
     }
 
     const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0
 
+    // Sum all other manual service charges
+    let manualServiceChargesTotal = 0
+    if (manualServiceCharges) {
+        Object.entries(manualServiceCharges).forEach(([key, val]) => {
+            if (key !== 'specialWrapping') {
+                manualServiceChargesTotal += parseFloat(val) || 0
+            }
+        })
+    }
+
+    // All Risk Insurance: R250 up to 300 cubes, R450 over 300 cubes
+    const standardInsurance = totalVolumeCuFt <= 300 ? 250 : 450
+
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
     const VAT_RATE = 0.15
     const documentationFee = PRICING_CONSTANTS.documentationFee || 175
+    const autoPackagingCost = plasticSleeveCost + wrappingCost
 
-    let exclVatSubTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + documentationFee
+    let exclVatSubTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
     // Apply mid-month discount (10%) on the ex-VAT subtotal
     let exclVatDiscount = 0
@@ -483,25 +775,6 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     const vat = vatAmount
 
-    const detailedAccess = []
-    if (hasShuttle) detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
-    const checkLoc = (loc, prefix) => {
-        if (loc?.elevator) detailedAccess.push(`${prefix} Elevator: R300`)
-        if (loc?.stairs) {
-            const fl = loc.floorLevel;
-            const stairsFee = fl === 'double_volume' ? 500 : fl === 'multiple_stairs' ? 800 : (parseInt(fl) || 0) * 200;
-            const stairsLabel = fl === 'double_volume' ? 'Double Volume' : fl === 'multiple_stairs' ? 'Multiple Flights' : `${fl} flr`;
-            detailedAccess.push(`${prefix} Stairs (${stairsLabel}): R${stairsFee}`)
-        }
-        if (loc?.specialConditions?.panhandle) detailedAccess.push(`${prefix} Panhandle: R0`)
-        if (loc?.specialConditions?.hoisting) detailedAccess.push(`${prefix} Hoisting: R0`)
-        if (loc?.specialConditions?.longCarry && (parseFloat(loc?.longCarryDistance) > ADDITIONAL_COSTS.longCarry.thresholdMeters)) {
-            detailedAccess.push(`${prefix} Long Carry (${loc.longCarryDistance}m): R${ADDITIONAL_COSTS.longCarry.flatRate}`)
-        }
-    }
-    if (accessDetails?.origin) checkLoc(accessDetails.origin, 'Origin')
-    if (accessDetails?.destination) checkLoc(accessDetails.destination, 'Dest')
-
     const detailedExtraDistance = []
     if (!isNationalMove && moveDetails.tripBreakdown) {
         const { depotToPickup, dropoffToDepot } = moveDetails.tripBreakdown
@@ -516,14 +789,18 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const needsConsultation = totalDistance > 100 || totalVolumeCuFt > 3600
 
     return {
-        total,
-        subTotal: exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
-        discount: exclVatDiscount,        // Ex-VAT discount amount
-        vat,                              // VAT amount (15% of ex-VAT subtotal)
+        total: needsQuoteRequest ? 0 : total,
+        subTotal: needsQuoteRequest ? 0 : exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
+        discount: needsQuoteRequest ? 0 : exclVatDiscount,        // Ex-VAT discount amount
+        vat: needsQuoteRequest ? 0 : vat,                              // VAT amount (15% of ex-VAT subtotal)
         totalVolume,
         totalVolumeCuFt,
+        boxQty,
+        volumeForVehicle: totalVolumeCuFt + (4.25 * boxQty),
         isNationalMove,
+        needsQuoteRequest,
         packagingCost: packagingCost + autoPackagingCost,
+        standardInsurance,
         requiresCrateFlag,
         requiresPhotoFlag,
         needsConsultation,
@@ -532,11 +809,14 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             transport: transportCost,
             volume: volumeCost,
             access: accessFees,
-            detailedAccess: detailedAccess.length > 0 ? detailedAccess.join(' | ') : 'Standard Access (No Surcharges)',
+            detailedAccess: detailedAccess,
             crew: additionalCrewCost,
             extraDistance: extraDistanceFees,
             detailedExtraDistance: detailedExtraDistance.length > 0 ? detailedExtraDistance.join(' | ') : 'No Depot Surcharges',
-            packaging: packagingCost + autoPackagingCost,
+            packaging: packagingCost,
+            plasticSleeveCost: plasticSleeveCost,
+            wrappingCost: wrappingCost + specialWrappingCost,
+            standardInsurance: standardInsurance,
             distance: totalDistance,
             transportRate: transportRate,
             volumeRate: volumeRate,

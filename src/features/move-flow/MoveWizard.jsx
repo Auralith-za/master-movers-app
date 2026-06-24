@@ -9,6 +9,7 @@ import Step1Details from './Step1Details'
 import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
 import Step4Summary from './Step4Summary'
+import TestCalcBreakdown from '../../components/TestCalcBreakdown'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
@@ -242,6 +243,8 @@ export default function MoveWizard() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [location.pathname])
 
+    const isTest = basePath === '/quote-test'
+
     return (
         <div className="max-w-6xl mx-auto px-4 md:px-6 pb-20">
             {/* Stepper Header */}
@@ -311,23 +314,90 @@ export default function MoveWizard() {
                 </div>
             </div>
 
-            {/* Step Content */}
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={location.pathname}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                >
-                    <Routes>
-                        <Route index element={<Step1Details />} />
-                        <Route path="access" element={<Step2Access />} />
-                        <Route path="inventory" element={<Step3Inventory />} />
-                        <Route path="summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : (basePath === '/quote-test' ? 'test' : 'standard')} />} />
-                    </Routes>
-                </motion.div>
-            </AnimatePresence>
+            {/* Step Content — test mode gets a 2-col layout with inspector on the right */}
+            {isTest ? (
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
+                    {/* Left: Normal wizard steps */}
+                    <div>
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={location.pathname}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <Routes>
+                                    <Route index element={<Step1Details />} />
+                                    <Route path="access" element={<Step2Access />} />
+                                    <Route path="inventory" element={<Step3Inventory />} />
+                                    <Route path="summary" element={<Step4Summary submissionType="test" />} />
+                                </Routes>
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Right: Sticky live calculation inspector */}
+                    <div className="sticky top-6">
+                        <TestCalcBreakdown />
+                    </div>
+                </div>
+            ) : (
+                /* Normal (non-test) layout */
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={location.pathname}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <Routes>
+                            <Route index element={<Step1Details />} />
+                            <Route path="access" element={<Step2Access />} />
+                            <Route path="inventory" element={<Step3Inventory />} />
+                            <Route path="summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : 'standard'} />} />
+                        </Routes>
+                    </motion.div>
+                </AnimatePresence>
+            )}
+            {/* Bottom Info Section explaining surcharges / additional items */}
+            <div className="mt-16 bg-slate-50 border border-slate-200/60 rounded-2xl p-6 md:p-8 max-w-4xl mx-auto">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <span className="inline-block w-2.5 h-6 bg-red-600 rounded-full mr-3"></span>
+                    Understanding Additional Services & Surcharges
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-bold text-slate-800">Shuttle Vehicle Service</h4>
+                            <p className="text-slate-600 mt-1">
+                                Used when a large delivery truck cannot access your complex or street due to narrow roads, low bridges, or weight limits. A smaller shuttle vehicle is deployed to transfer items between the residence and the main truck.
+                            </p>
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-slate-800">Long Carry Surcharge</h4>
+                            <p className="text-slate-600 mt-1">
+                                Applies when the distance between where the moving truck can safely park and the entrance of your residence exceeds 50 meters. Carrying items over long distances increases labor and time.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-bold text-slate-800">Hoisting Service</h4>
+                            <p className="text-slate-600 mt-1">
+                                Required for large furniture items (like large couches, table tops, or mattresses) that cannot fit through doorways, passages, stairwells, or elevators, and must be hoisted over balconies or window frames.
+                            </p>
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-slate-800">Special Wrapping / Protective Sleeves</h4>
+                            <p className="text-slate-600 mt-1">
+                                Delicate items (Glass, Marble) require special protective bubble wrapping or blankets to guarantee safe transit. Couches, beds, and mattresses automatically receive heavy-duty plastic protective sleeves.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

@@ -314,7 +314,7 @@ export default function QuoteDetailPage() {
                     total_price: finalPrice, 
                     total_volume: finalVolume 
                 })
-                await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`)
+                await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
                 setIsEditing(false)
                 alert('Quote updated successfully!')
             }
@@ -1104,7 +1104,7 @@ export default function QuoteDetailPage() {
                         <div className="relative z-10">
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : (quote?.total_price || 0))?.toLocaleString()}</span>
+                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : (quote?.total_price || 0))?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 {isEditing && (
                                     <span className="text-emerald-400 text-xs font-bold animate-pulse">Live</span>
                                 )}
@@ -1122,12 +1122,42 @@ export default function QuoteDetailPage() {
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Custom Products</span>
-                                        <span className="font-bold">+ R {customProductsTotal.toLocaleString()}</span>
+                                        <span className="font-bold">+ R {customProductsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {isEditing && recalculatedData?.breakdown?.packaging > 0 && (
+                                    <div className="flex justify-between text-xs text-emerald-400/80">
+                                        <span>Box Supplies</span>
+                                        <span className="font-bold">+ R {recalculatedData.breakdown.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {isEditing && recalculatedData?.breakdown?.wrappingCost > 0 && (
+                                    <div className="flex justify-between text-xs text-emerald-400/80">
+                                        <span>Specialized Wrapping</span>
+                                        <span className="font-bold">+ R {recalculatedData.breakdown.wrappingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {isEditing && recalculatedData?.breakdown?.plasticSleeveCost > 0 && (
+                                    <div className="flex justify-between text-xs text-emerald-400/80">
+                                        <span>Plastic Sleeves</span>
+                                        <span className="font-bold">+ R {recalculatedData.breakdown.plasticSleeveCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {isEditing && recalculatedData?.breakdown?.access > 0 && (
+                                    <div className="flex justify-between text-xs text-amber-400/80">
+                                        <span title={Array.isArray(recalculatedData.breakdown.detailedAccess) ? recalculatedData.breakdown.detailedAccess.join(' | ') : recalculatedData.breakdown.detailedAccess}>Access & Surcharges</span>
+                                        <span className="font-bold">+ R {recalculatedData.breakdown.access.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {isEditing && recalculatedData?.breakdown?.crew > 0 && (
+                                    <div className="flex justify-between text-xs text-amber-400/80">
+                                        <span>Heavy Item Crew</span>
+                                        <span className="font-bold">+ R {recalculatedData.breakdown.crew.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : ((quote?.total_price || 0) * 0.15 / 1.15)) || 0).toLocaleString()}</span>
+                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : ((quote?.total_price || 0) * 0.15 / 1.15)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>

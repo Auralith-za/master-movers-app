@@ -3,16 +3,14 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
-import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone } from 'lucide-react'
-import { PRICING_CONSTANTS } from '../inventory/data/pricingRates'
+import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone, ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
+import { PRICING_CONSTANTS, LOCAL_VEHICLE_RATES, PACKAGING_RATES } from '../inventory/data/pricingRates'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
 import PayFastCheckout from '../payment/PayFastCheckout'
 import PayflexCheckout from '../payment/PayflexCheckout'
 import CouponInput from '../payment/CouponInput'
 import { event, trackLeadConversion, trackQuoteSubmit } from '../../lib/gtag'
-import { ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
-import { LOCAL_VEHICLE_RATES } from '../inventory/data/pricingRates'
 import clsx from 'clsx'
 import { LeadCaptureModal } from './Step1Details'
 import { supabase } from '../../lib/supabaseClient'
@@ -76,6 +74,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const navigate = useNavigate()
     const { moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote, manualServiceCharges, updateManualServiceCharge, setMoveDetails } = useMoveStore()
     const location = useLocation()
+    const isTestPath = location.pathname.startsWith('/quote-test') || location.pathname.startsWith('/admin/quotes/new')
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
     const [searchParams, setSearchParams] = useSearchParams()
@@ -135,12 +134,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [isCalculating]);
 
     // Calculate Totals
-    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove } = useMemo(() => {
+    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, standardInsurance, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove, needsQuoteRequest } = useMemo(() => {
         try {
             return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
         } catch (e) {
             console.error("Calculation Error:", e)
-            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
+            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, standardInsurance: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, needsQuoteRequest: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
@@ -244,7 +243,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
     const handleProceed = async () => {
         if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
-            alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString()}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
+            alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
             return
         }
 
@@ -310,6 +309,35 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         }
         // Always show payment options for non-admin
         setSearchParams({ saved: 'true' })
+    }
+
+    const handleCustomQuoteRequest = async () => {
+        setIsSubmitting(true)
+        try {
+            const result = await submitQuote({
+                status: 'lead',
+                request_call_back: true,
+                forceNew: false
+            })
+            
+            const savedQuote = result.data?.[0] || lastSavedQuote
+            if (result.success && savedQuote) {
+                await emailService.sendCallbackEmail({
+                    name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                    email: moveDetails.contactEmail,
+                    phone: moveDetails.contactPhone,
+                    step: 'Step 4 - Custom Quote Redirect (>80km or Outline)',
+                    pickup: moveDetails.pickupAddress,
+                    dropoff: moveDetails.dropoffAddress,
+                    moveDate: moveDetails.moveDate
+                })
+            }
+        } catch (error) {
+            console.error('Error submitting custom quote request:', error)
+        } finally {
+            setIsSubmitting(false)
+            setSearchParams({ saved: 'true' })
+        }
     }
 
     // Auto-scroll to payment options when saved
@@ -528,7 +556,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-400 rounded-full animate-spin mb-4"></div>
                         <div className="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading Pricing...</div>
                     </div>
-                ) : appSettings && appSettings.pricing_active === false ? (
+                ) : !isTestPath && appSettings && appSettings.pricing_active === false ? (
                     <div className="bg-amber-50 rounded-2xl shadow-xl border border-amber-200 overflow-hidden p-8 text-center animate-in fade-in slide-in-from-top-4">
                         <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Sparkles size={32} />
@@ -545,6 +573,61 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         >
                             <Phone size={20} /> Call Master Movers
                         </a>
+                    </div>
+                ) : needsQuoteRequest ? (
+                    /* Custom Rate Request Card for Outline or Depot > 80km */
+                    <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden text-white flex flex-col justify-between">
+                        <div className="p-8 text-center bg-slate-950/40 border-b border-slate-800">
+                            <div className="w-16 h-16 bg-red-950/50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-900/50 animate-pulse">
+                                <Phone size={32} />
+                            </div>
+                            <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Custom Rate Required</h2>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest leading-none mt-1">Extended Depot Logistics</p>
+                        </div>
+                        
+                        <div className="p-8 space-y-6 flex-grow text-left">
+                            <p className="text-sm text-slate-300 leading-relaxed">
+                                Because your move involves outline provinces/regions or collection/delivery logistics extending over 80km from our central depots, we require custom route scheduling to offer you the most accurate and competitive price.
+                            </p>
+                            
+                            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/40 text-xs text-slate-400 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>Pickup Address:</span>
+                                    <strong className="text-slate-200">{moveDetails.pickupAddress?.split(',')[0]}</strong>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Dropoff Address:</span>
+                                    <strong className="text-slate-200">{moveDetails.dropoffAddress?.split(',')[0]}</strong>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Logistics Type:</span>
+                                    <strong className="text-red-400">Outline / Long Distance (&gt;80km)</strong>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-200 text-xs p-4 rounded-xl">
+                                <strong>No Payment Required Now:</strong> Submit your details below, and one of our dedicated coordinators will email your professional quote shortly.
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-slate-950/40 border-t border-slate-800 space-y-3">
+                            {searchParams.get('saved') === 'true' ? (
+                                <div className="bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-xs p-4 rounded-xl text-center">
+                                    <strong>✓ Thank you! Your request has been received.</strong><br/>
+                                    One of our consultants will contact you shortly with your custom quote.
+                                </div>
+                            ) : (
+                                <Button
+                                    size="lg"
+                                    className="w-full flex justify-between items-center group bg-[#e31837] hover:bg-[#c0152f] shadow-xl shadow-red-600/20 py-6"
+                                    onClick={handleCustomQuoteRequest}
+                                    isLoading={isSubmitting}
+                                >
+                                    <span className="font-black uppercase tracking-widest text-sm">Submit Quote Request</span>
+                                    <Send size={18} />
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 ) : (
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -592,29 +675,126 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <span className="font-black text-emerald-600">- R {couponDiscount.toFixed(2)}</span>
                             </div>
                         )}
-                        {/* Base Transport row removed as per request */}
-                        {packagingCost > 0 && (
+                        {packagingCost > 0 && (() => {
+                            const isBoxesOnly = moveDetails.packagingOption === 'boxes_only'
+                            const rates = isBoxesOnly ? PACKAGING_RATES.sendMeBoxesOnly : PACKAGING_RATES.boxesAndPacking
+                            const st7Qty   = moveDetails.st7Boxes || 0
+                            const linenQty = moveDetails.linenBoxes || 0
+                            const st7Total   = st7Qty   * rates.st7
+                            const linenTotal = linenQty * rates.linen
+                            const deliveryFee = isBoxesOnly ? (rates.deliveryFee || 0) : 0
+                            return (
+                                <div className="space-y-2 py-4 border-b border-gray-100">
+                                    <div className="flex justify-between items-center bg-slate-100 rounded-lg p-4 mb-2">
+                                        <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Box Supplies & Packing</span>
+                                        <span className="font-bold text-slate-900">+ R {packagingCost.toFixed(2)}</span>
+                                    </div>
+                                    <div className="pl-4 space-y-1.5 mt-1">
+                                        {st7Qty > 0 && (
+                                            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                                <span>{st7Qty}× ST7 Boxes <span className="text-slate-300 font-medium normal-case">@ R{rates.st7.toFixed(2)} ea</span></span>
+                                                <span className="text-slate-500">R {st7Total.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {linenQty > 0 && (
+                                            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                                <span>{linenQty}× Linen Boxes <span className="text-slate-300 font-medium normal-case">@ R{rates.linen.toFixed(2)} ea</span></span>
+                                                <span className="text-slate-500">R {linenTotal.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {deliveryFee > 0 && (
+                                            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                                <span>Delivery &amp; Handling Fee</span>
+                                                <span className="text-slate-500">R {deliveryFee.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })()}
+
+                        {/* Heavy Item Crew */}
+                        {breakdown.crew > 0 && (
                             <div className="space-y-2 py-4 border-b border-gray-100">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Protective Packaging</span>
-                                    <span className="font-bold text-slate-900">+ R {packagingCost.toFixed(2)}</span>
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        Heavy Item Logistics
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.crew.toFixed(2)}</span>
                                 </div>
-                                <div className="pl-4 space-y-1">
-                                    {moveDetails.st7Boxes > 0 && (
-                                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                            <span>{moveDetails.st7Boxes}x ST7 Boxes</span>
-                                            <span>Included</span>
-                                        </div>
-                                    )}
-                                    {moveDetails.linenBoxes > 0 && (
-                                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                            <span>{moveDetails.linenBoxes}x Linen Boxes</span>
-                                            <span>Included</span>
-                                        </div>
-                                    )}
+                                <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                        <span>Delivery & Handling Fee</span>
-                                        <span>Included</span>
+                                        <span>Specialist Crew (Heavy Items)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Protective Wrapping & Sleeves */}
+                        {(breakdown.wrappingCost > 0 || breakdown.plasticSleeveCost > 0) && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Specialized Wrapping & Covers</span>
+                                    <span className="font-bold text-slate-900">+ R {(breakdown.wrappingCost + breakdown.plasticSleeveCost).toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    {breakdown.wrappingCost > 0 && (
+                                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                            <span>Specialized Furniture Wrapping</span>
+                                            <span className="text-slate-500">R {breakdown.wrappingCost.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {breakdown.plasticSleeveCost > 0 && (
+                                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                            <span>Mattress / Couch Plastic Sleeves <span className="text-slate-300 font-medium normal-case">@ R55.00 ea</span></span>
+                                            <span className="text-slate-500">R {breakdown.plasticSleeveCost.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Access & Special Services */}
+                        {breakdown.access > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Access & Special Services</span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.access.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    {breakdown.detailedAccess && breakdown.detailedAccess.length > 0 ? (
+                                        breakdown.detailedAccess.map((detail, index) => {
+                                            const parts = detail.split(':')
+                                            const label = parts[0]?.trim()
+                                            const value = parts[1]?.trim()
+                                            return (
+                                                <div key={index} className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                                    <span>{label}</span>
+                                                    <span className="text-slate-500">{value}</span>
+                                                </div>
+                                            )
+                                        })
+                                    ) : (
+                                        <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                            <span>Standard Access</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Move Protection */}
+                        {breakdown.standardInsurance > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        Move Protection
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.standardInsurance.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <span>Standard Goods in Transit Insurance</span>
                                     </div>
                                 </div>
                             </div>
@@ -679,10 +859,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         />
                                         <div>
                                             <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Payflex (Interest Free)</p>
-                                            <p className="text-[9px] text-indigo-600 font-bold uppercase">Service fees apply</p>
+                                            <p className="text-[9px] text-indigo-600 font-bold uppercase">Pay in 4 · No interest</p>
                                         </div>
                                     </div>
-                                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Service Fee</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-100 px-2 py-0.5 rounded-full">+7% Applied</span>
+                                        <div className="group relative">
+                                            <div className="w-4 h-4 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center text-[9px] font-black cursor-help hover:bg-indigo-300 transition-colors">i</div>
+                                            <div className="absolute right-0 bottom-full mb-2 w-56 bg-slate-900 text-white text-[10px] font-medium rounded-xl p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl z-50 leading-relaxed">
+                                                A <strong>7% surcharge</strong> is added when paying via Payflex. This covers the platform commission charged to Master Movers by Payflex, which is passed on to the client.
+                                                <div className="absolute right-2 top-full border-8 border-transparent border-t-slate-900" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </label>
                             </div>
                         </div>

@@ -2,17 +2,31 @@ import React, { useMemo } from 'react'
 import { Truck } from 'lucide-react'
 import TruckVisual from './TruckVisual'
 
-export default function VolumeSummary({ items, inventory, packagingCost = 0, children }) {
+export default function VolumeSummary({ items, inventory, breakdown = {}, children }) {
     const totalVolume = useMemo(() => {
         return Object.entries(inventory).reduce((total, [idKey, qty]) => {
             const [itemId] = idKey.split('_')
+            if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
+                return total
+            }
             const item = items.find(i => i.id === itemId)
             return total + (item ? item.volume * qty : 0)
         }, 0)
     }, [items, inventory])
 
+    const boxQty = useMemo(() => {
+        return Object.entries(inventory).reduce((total, [idKey, qty]) => {
+            const [itemId] = idKey.split('_')
+            if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
+                return total + qty
+            }
+            return total
+        }, 0)
+    }, [inventory])
+
+    const volumeForTruck = totalVolume + 4.25 * boxQty
     const truckSize = 883
-    const usagePercent = Math.min((totalVolume / truckSize) * 100, 100)
+    const usagePercent = Math.min((volumeForTruck / truckSize) * 100, 100)
 
     return (
         <div
@@ -28,7 +42,7 @@ export default function VolumeSummary({ items, inventory, packagingCost = 0, chi
 
             {/* Truck Visual — never scrolls */}
             <div className="px-6 pb-2 flex-shrink-0">
-                <TruckVisual volumeMp={totalVolume} fillPercent={usagePercent} />
+                <TruckVisual volumeMp={volumeForTruck} fillPercent={usagePercent} />
             </div>
             
             <div className="px-6 py-3 bg-indigo-900/50 mx-4 rounded-xl border border-indigo-500/30 mb-4 animate-in fade-in slide-in-from-top-2">
@@ -42,11 +56,29 @@ export default function VolumeSummary({ items, inventory, packagingCost = 0, chi
                 <p className="text-[11px] text-white font-bold mt-1">Pay in 4 interest-free installments</p>
             </div>
 
-            {/* Packaging Cost Summary */}
-            {packagingCost > 0 && (
-                <div className="px-6 py-3 bg-red-950/40 border-y border-red-500/20 flex justify-between items-center animate-in slide-in-from-right-4">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">Protective Packaging</span>
-                    <span className="text-sm font-black text-red-400">R {packagingCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            {/* Box Supplies Summary */}
+            {breakdown?.packaging > 0 && (
+                <div className="px-6 py-2 bg-slate-800/50 border-y border-slate-700/50 flex justify-between items-center animate-in slide-in-from-right-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Box Supplies & Delivery</span>
+                    <span className="text-sm font-black text-slate-200">R {breakdown.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+            )}
+
+            {/* Protective Packaging (Wrapping & Sleeves) */}
+            {(breakdown?.wrappingCost > 0 || breakdown?.plasticSleeveCost > 0) && (
+                <div className="border-y border-red-500/20 bg-red-950/40">
+                    {breakdown?.wrappingCost > 0 && (
+                        <div className={`px-6 py-2 flex justify-between items-center animate-in slide-in-from-right-4 ${breakdown?.plasticSleeveCost > 0 ? 'border-b border-red-900/30' : ''}`}>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">Specialized Wrapping</span>
+                            <span className="text-sm font-black text-red-400">R {breakdown.wrappingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                    )}
+                    {breakdown?.plasticSleeveCost > 0 && (
+                        <div className="px-6 py-2 flex justify-between items-center animate-in slide-in-from-right-4">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">Plastic Covers</span>
+                            <span className="text-sm font-black text-red-400">R {breakdown.plasticSleeveCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                    )}
                 </div>
             )}
 

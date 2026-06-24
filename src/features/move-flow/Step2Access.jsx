@@ -20,7 +20,6 @@ const PROPERTY_TYPES = [
 const PARKING_OPTIONS = [
     { value: 'driveway', label: 'Driveway' },
     { value: 'panhandle', label: 'Panhandle Driveway' },
-    { value: 'shuttle', label: 'Shuttle Required' },
     { value: 'street', label: 'Street Parking' },
     { value: 'secure_complex', label: 'Secure Complex (Inside)' },
     { value: 'loading_bay', label: 'Loading Bay' },
@@ -44,6 +43,7 @@ export default function Step2Access() {
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
     const [showLeadModal, setShowLeadModal] = React.useState(false)
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
+    const [addedBoxes, setAddedBoxes] = React.useState(false)
 
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
@@ -133,6 +133,8 @@ export default function Step2Access() {
                                         <option value={1}>1st Floor</option>
                                         <option value={2}>2nd Floor</option>
                                         <option value={3}>3rd Floor</option>
+                                        <option value={4}>4th Floor</option>
+                                        <option value={5}>5th Floor and above</option>
                                         <option value="double_volume">Double Volume</option>
                                         <option value="multiple_stairs">Multiple Flights of Stairs</option>
                                     </select>
@@ -203,6 +205,12 @@ export default function Step2Access() {
                             checked={data.specialConditions?.panhandle}
                             onChange={() => handleSpecialCondition(locationType, 'panhandle')}
                         />
+                        <ConditionCheckbox
+                            label="Shuttle Required"
+                            tooltip="A smaller shuttle vehicle is used to transfer items from your home to our large truck if the large truck cannot access your property (due to narrow gates, weight/height limits, steep driveways, or complex restrictions)."
+                            checked={data.specialConditions?.shuttle}
+                            onChange={() => handleSpecialCondition(locationType, 'shuttle')}
+                        />
                         {isTownhouse && (
                             <ConditionCheckbox
                                 label="Weight Limits"
@@ -212,20 +220,20 @@ export default function Step2Access() {
                             />
                         )}
                         {isTownhouse && (
-                             <>
-                             <ConditionCheckbox
-                                 label="Elevator"
-                                 tooltip="Goods lift or passenger lift available."
-                                 checked={data.elevator}
-                                 onChange={() => handleUpdate(locationType, 'elevator', !data.elevator)}
-                             />
-                             <ConditionCheckbox
-                                 label="Stairs"
-                                 tooltip="Multiple flights of stairs required for entry."
-                                 checked={data.stairs}
-                                 onChange={() => handleUpdate(locationType, 'stairs', !data.stairs)}
-                             />
-                         </>
+                            <>
+                                <ConditionCheckbox
+                                    label="Elevator"
+                                    tooltip="Goods lift or passenger lift available."
+                                    checked={data.elevator}
+                                    onChange={() => handleUpdate(locationType, 'elevator', !data.elevator)}
+                                />
+                                <ConditionCheckbox
+                                    label="Stairs"
+                                    tooltip="Multiple flights of stairs required for entry."
+                                    checked={data.stairs}
+                                    onChange={() => handleUpdate(locationType, 'stairs', !data.stairs)}
+                                />
+                            </>
                         )}
                         <ConditionCheckbox
                             label="Security Gate"
@@ -386,6 +394,22 @@ export default function Step2Access() {
                                         <p className="text-[10px] font-bold uppercase tracking-tight">Delivery Fee of R{PACKAGING_RATES.sendMeBoxesOnly.deliveryFee.toFixed(2)} will be included in the total.</p>
                                     </div>
                                 )}
+                                <div className="mt-6">
+                                    <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            setAddedBoxes(true)
+                                            setTimeout(() => setAddedBoxes(false), 2000)
+                                        }}
+                                        className={clsx(
+                                            "w-full py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2",
+                                            addedBoxes ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" : "bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
+                                        )}
+                                    >
+                                        <span className="font-black uppercase tracking-widest text-sm">{addedBoxes ? "✓ Added To Quote" : "Confirm Box Quantities"}</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -408,17 +432,22 @@ export default function Step2Access() {
                         >
                             <div className="flex-1 text-center md:text-left">
                                 <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                                    <h4 className="font-black text-slate-900 uppercase tracking-tight text-xl">Add MasterCare Insurance</h4>
-                                    <Tooltip text="Full Replacement Value cover. Recommended for all moves." />
+                                    <h4 className="font-black text-slate-900 uppercase tracking-tight text-xl">All Risk Insurance</h4>
+                                    <Tooltip text="Contact our office for details." />
                                 </div>
-                                <p className="text-base text-slate-500 max-w-md">Comprehensive protection for breakages, damage, or loss during transit.</p>
-                                <p className="text-xs text-emerald-600 font-black uppercase mt-4 tracking-widest px-3 py-1 bg-emerald-100/50 w-fit rounded-full">✨ Premium confirmed after inventory review</p>
+                                <p className="text-base text-slate-500 max-w-md">
+                                    Contact our office for details on All Risk Insurance cover. 
+                                    <span className="block mt-1 text-sm font-medium text-slate-600">
+                                        *Please note: This will be added after the quote has been submitted and requires wrapping of goods.
+                                    </span>
+                                </p>
+                                <p className="text-xs text-emerald-600 font-black uppercase mt-4 tracking-widest px-3 py-1 bg-emerald-100/50 w-fit rounded-full">✨ Call us for a custom quote</p>
                             </div>
                             <button type="button" className={clsx(
                                 "px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm transition-all shadow-xl",
                                 moveDetails.insuranceEnabled ? "bg-emerald-600 text-white shadow-emerald-600/30" : "bg-slate-900 text-white hover:bg-slate-800"
                             )}>
-                                {moveDetails.insuranceEnabled ? "Protection Added" : "Add Protection"}
+                                {moveDetails.insuranceEnabled ? "Interest Logged" : "I'm Interested"}
                             </button>
                         </div>
                     </div>

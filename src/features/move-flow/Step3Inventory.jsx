@@ -50,12 +50,12 @@ export default function Step3Inventory() {
     const [showLeadModal, setShowLeadModal] = useState(false)
     const [isSubmittingLead, setIsSubmittingLead] = useState(false)
 
-    const { totalVolume, packagingCost, currentVehicleName } = React.useMemo(() => {
+    const { totalVolume, breakdown, currentVehicleName } = React.useMemo(() => {
         const result = calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
-        return {
-            totalVolume: result.totalVolumeCuFt,
-            packagingCost: result.packagingCost,
-            currentVehicleName: result.breakdown.vehicleType
+        return { 
+            totalVolume: result.totalVolumeCuFt, 
+            breakdown: result.breakdown,
+            currentVehicleName: result.breakdown?.vehicleType 
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
@@ -72,18 +72,17 @@ export default function Step3Inventory() {
     }, [currentVehicleName, lastVehicleName])
 
     const getQuantity = (itemId) => {
-        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
         return Object.entries(inventory)
-            .filter(([idKey]) => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`))
+            .filter(([idKey]) => idKey === itemId || idKey.startsWith(`${itemId}_`))
             .reduce((sum, [_, qty]) => sum + qty, 0);
     }
 
     const handleAddItem = (itemId) => {
-        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
-        const item = INVENTORY_ITEMS.find(i => i.id === resolvedId);
+        const item = INVENTORY_ITEMS.find(i => i.id === itemId);
         if (!item) return;
 
-        const currentQty = getQuantity(resolvedId);
+        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
+        const currentQty = getQuantity(itemId);
 
         if (item.variationOptions && item.variationOptions.length > 0) {
             setVariationModalItem(item);
@@ -132,7 +131,8 @@ export default function Step3Inventory() {
 
     const filteredItems = INVENTORY_ITEMS.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesCategory = searchTerm ? true : (activeCategory ? item.category === activeCategory : true)
+        // If there's a search term, ignore the active category and search the entire catalog
+        const matchesCategory = (activeCategory && !searchTerm) ? item.category === activeCategory : true
         return matchesSearch && matchesCategory
     })
 
@@ -319,7 +319,7 @@ export default function Step3Inventory() {
 
                 {/* Summary Column - First on mobile, Right on desktop */}
                 <div className="lg:order-2 lg:col-span-1">
-                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory} packagingCost={packagingCost}>
+                    <VolumeSummary items={INVENTORY_ITEMS} inventory={inventory} breakdown={breakdown}>
                         <Button variant="primary" size="lg" className="w-full bg-[#e31837] hover:bg-[#c0152f] font-bold" onClick={handleProceed}>
                             View Quote Summary
                         </Button>
@@ -351,11 +351,11 @@ export default function Step3Inventory() {
 
                         {/* Search */}
                         <div className="relative mb-6">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500" size={18} />
                             <input
                                 type="text"
                                 placeholder="Search for items..."
-                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition-shadow text-sm md:text-base"
+                                className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-red-200 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-shadow text-sm md:text-base text-red-950 placeholder:text-red-400 bg-red-50/10 focus:bg-white"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />

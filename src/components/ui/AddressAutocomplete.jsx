@@ -13,8 +13,14 @@ export default function AddressAutocomplete({
 }) {
     const inputRef = useRef(null)
     const autocompleteRef = useRef(null)
+    const onChangeRef = useRef(onChange)
     const [isScriptLoaded, setIsScriptLoaded] = useState(false)
     const [scriptError, setScriptError] = useState(null)
+
+    // Keep the ref up to date with the latest onChange without triggering re-init
+    useEffect(() => {
+        onChangeRef.current = onChange
+    }, [onChange])
 
     // Load GMaps Script on mount
     useEffect(() => {
@@ -26,7 +32,7 @@ export default function AddressAutocomplete({
             })
     }, [])
 
-    // Initialize Autocomplete once script is loaded
+    // Initialize Autocomplete once script is loaded — only runs ONCE
     useEffect(() => {
         if (!isScriptLoaded || !inputRef.current || !window.google) return
 
@@ -35,8 +41,7 @@ export default function AddressAutocomplete({
 
         const options = {
             componentRestrictions: { country: "za" }, // Restrict to South Africa
-            fields: ["formatted_address", "geometry", "name", "address_components"],
-            types: ["address"], // Only addresses
+            fields: ["formatted_address", "geometry", "name", "address_components", "place_id"],
         }
 
         autocompleteRef.current = new window.google.maps.places.Autocomplete(
@@ -47,35 +52,56 @@ export default function AddressAutocomplete({
         autocompleteRef.current.addListener("place_changed", () => {
             const place = autocompleteRef.current.getPlace()
 
-            // If user selects a prediction
-            if (place.formatted_address) {
-                // Extract city/locality
-                let city = "";
-                if (place.address_components) {
-                    const locality = place.address_components.find(c => 
-                        c.types.includes("locality") || 
-                        c.types.includes("sublocality") ||
-                        c.types.includes("administrative_area_level_2")
-                    );
-                    if (locality) city = locality.long_name;
-                }
+            // Only process if user selected a prediction (has formatted_address)
+            if (!place || !place.formatted_address) return;
 
-                // For now, mimicking standard input event but adding metadata
-                const event = {
-                    target: {
-                        name: name,
-                        value: place.formatted_address,
-                        city: city,
-                        isGoogleSelect: true
-                    }
-                }
-                onChange(event)
+            // Extract the best city name from address_components
+            // Priority: locality → sublocality → administrative_area_level_2 → administrative_area_level_1
+            let city = "";
+            if (place.address_components) {
+                const locality = place.address_components.find(c =>
+                    c.types.includes("locality")
+                ) || place.address_components.find(c =>
+                    c.types.includes("sublocality_level_1") ||
+                    c.types.includes("sublocality")
+                ) || place.address_components.find(c =>
+                    c.types.includes("administrative_area_level_2")
+                ) || place.address_components.find(c =>
+                    c.types.includes("administrative_area_level_1")
+                );
+                if (locality) city = locality.long_name;
             }
+
+            // Extract precise lat/lng and place_id for Distance Matrix API calls
+            let latLng = null;
+            const placeId = place.place_id || null;
+            if (place.geometry && place.geometry.location) {
+                latLng = {
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng()
+                };
+            }
+
+            // Build the event object — mimics a standard input change event
+            // but includes Google Places metadata for accurate distance calculation
+            const event = {
+                target: {
+                    name: name,
+                    value: place.formatted_address,
+                    city: city,
+                    isGoogleSelect: true,
+                    placeId: placeId,
+                    latLng: latLng,
+                    addressComponents: place.address_components || null
+                }
+            };
+            // Use the ref so we always call the latest onChange without re-registering the listener
+            onChangeRef.current(event);
         })
 
         // Cleanup not strictly necessary for single page simple implementations but good practice
         // Google Maps instances are tricky to cleanup fully without memory leaks, but removing listener is good.
-    }, [isScriptLoaded, name, onChange])
+    }, [isScriptLoaded]) // ← removed `name` and `onChange` from deps to prevent re-registration on every keystroke
 
     return (
         <div className={`space-y-1.5 ${className}`}>

@@ -418,14 +418,82 @@ serve(async (req) => {
             subject = `⭐️ NEW LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
             recipients = adminEmails // Admin-only
 
+            // Build inventory HTML from items_json
+            // items_json can be { items: {...} } or a flat { itemId: qty } object
+            const rawItems = quoteData?.items_json?.items || quoteData?.items_json || {}
+            const itemEntries = Object.entries(rawItems).filter(([, qty]) => Number(qty) > 0)
+
+            let inventoryHtml = ''
+            if (itemEntries.length > 0) {
+                const totalQty = itemEntries.reduce((sum, [, qty]) => sum + Number(qty), 0)
+                const rows = itemEntries.map(([itemId, qty]) => {
+                    // Clean up the item ID — strip variation suffix (e.g. "sofa_3seater" → "Sofa 3Seater")
+                    const cleanName = itemId
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, (c: string) => c.toUpperCase())
+                    return `<tr>
+                        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#334155;">${cleanName}</td>
+                        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#0f172a;text-align:center;">${qty}</td>
+                    </tr>`
+                }).join('')
+
+                inventoryHtml = `
+                <div style="margin-top:24px;">
+                    <p style="font-weight:800;font-size:12px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px 0;">
+                        📦 Inventory Added (${totalQty} item${totalQty !== 1 ? 's' : ''})
+                    </p>
+                    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Item</th>
+                                <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    ${quoteData?.total_volume ? `<p style="font-size:12px;color:#64748b;margin:8px 0 0;font-weight:600;">Total Volume: <strong style="color:#0f172a;">${Number(quoteData.total_volume).toFixed(1)} cuft</strong></p>` : ''}
+                </div>`
+            } else {
+                inventoryHtml = `
+                <div style="margin-top:20px;padding:12px 16px;background:#fefce8;border-left:3px solid #eab308;border-radius:6px;">
+                    <p style="margin:0;font-size:12px;font-weight:600;color:#92400e;">⚠️ No inventory added yet — customer dropped off before Step 3</p>
+                </div>`
+            }
+
+            // Work out which step the customer dropped off at
+            const hasAddresses = !!(quoteData?.pickup_address && quoteData?.dropoff_address)
+            const hasInventory = itemEntries.length > 0
+            const hasPrice = Number(quoteData?.total_price || 0) > 0
+            let stepDropped = ''
+            let stepColor = '#64748b'
+            if (!hasAddresses) {
+                stepDropped = 'Step 1 — Details (addresses not entered)'
+                stepColor = '#dc2626'
+            } else if (!hasInventory) {
+                stepDropped = 'Step 3 — Inventory (not yet started)'
+                stepColor = '#d97706'
+            } else if (!hasPrice) {
+                stepDropped = 'Step 3 — Inventory (in progress)'
+                stepColor = '#d97706'
+            } else {
+                stepDropped = 'Step 4 — Quote Summary (saw price, did not submit)'
+                stepColor = '#059669'
+            }
+
             innerHtml = `
                 <h1 style="color:#059669;">⭐️ New Lead</h1>
                 <p>A customer has started a quote but has not yet completed it. Please follow up to assist them.</p>
 
+                ${hasInventory && hasPrice ? `
                 <div class="highlight-box" style="background:#f0fdf4; border-left-color:#059669;">
                     <p style="font-weight:900;font-size:22px;color:#047857;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#10b981;">(Current Total)</span></p>
                     <p style="margin:4px 0 0;font-size:12px;color:#10b981;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Incomplete Quote Flow</p>
                 </div>
+                ` : `
+                <div style="padding:12px 16px;background:#f8fafc;border-left:3px solid #94a3b8;border-radius:6px;margin-bottom:16px;">
+                    <p style="margin:0;font-size:13px;font-weight:600;color:#64748b;">No price yet — customer has not added inventory</p>
+                </div>
+                `}
 
                 <table class="details-table">
                     <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
@@ -433,7 +501,26 @@ serve(async (req) => {
                     <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
                     <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
+                    <tr>
+                        <td class="label">Step:</td>
+                        <td class="value" style="font-weight:700;color:${stepColor};">${stepDropped}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Inventory:</td>
+                        <td class="value" style="${!hasInventory ? 'color:#94a3b8;font-style:italic;' : 'font-weight:700;color:#0f172a;'}">
+                            ${hasInventory ? `${itemEntries.reduce((s, [,q]) => s + Number(q), 0)} items added` : 'Not completed yet'}
+                        </td>
+                    </tr>
                 </table>
+
+                ${inventoryHtml}
+
+                <div style="text-align:center;margin:24px 0 12px;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#059669;">
+                        View Lead in Admin →
+                    </a>
+                </div>
 
                 <p style="font-size:13px;color:#64748b;">Call the customer on <strong>${quoteData?.client_phone || '—'}</strong> to assist with their move requirements.</p>
             `

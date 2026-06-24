@@ -256,7 +256,7 @@ export const INVENTORY_ITEMS = [
 {
     "id": "pool-lounger",
     "name": "POOL LOUNGER",
-    "category": "Lounge / Living Room",
+    "category": "Outdoor & Patio",
     "volume": 17,
     "image": "/inventory/pool-lounger.png",
     "requiresPhoto": false,
@@ -364,7 +364,7 @@ export const INVENTORY_ITEMS = [
     "id": "table",
     "name": "TABLE",
     "category": "Lounge / Living Room",
-    "volume": 102.0,
+    "volume": 34,
     "image": "/inventory/table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
@@ -438,15 +438,19 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "tv-trolley",
-    "name": "TV TROLLEY",
+    "id": "tv-stand",
+    "name": "TV STAND",
     "category": "Lounge / Living Room",
     "volume": 17,
-    "image": "/inventory/tv-trolley.png",
+    "image": "/inventory/tv-stand.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
+    "autoPackagingType": "Wrapping",
+    "variationOptions": [
+        "Glass",
+        "Marble",
+        "Standard Wood/Other"
+    ]
 },
 {
     "id": "tv-cabinet",
@@ -674,7 +678,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/king-size-bed-base.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -685,7 +689,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/king-size-bed-mattress.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -762,7 +766,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/single-bed-headboard.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2120,7 +2124,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/double-bunk-bed.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2131,7 +2135,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/sleigh-king-bed.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2142,7 +2146,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/sleigh-queen-bed.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2153,7 +2157,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/sleigh-double-bed.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2175,7 +2179,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/love-couch.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2300,17 +2304,6 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "guitar",
-    "name": "GUITAR",
-    "category": "Lounge / Living Room",
-    "volume": 8.0,
-    "image": "/inventory/guitar.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
     "id": "book-case-small",
     "name": "BOOK CASE SMALL",
     "category": "Dining Room",
@@ -2373,7 +2366,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/desk.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2384,7 +2377,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/office-chair.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2452,7 +2445,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/pedestals.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2518,7 +2511,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/boxes.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2672,7 +2665,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/double-bed-base-and-mattress.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2683,7 +2676,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/double-bed-headboard.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2694,7 +2687,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/double-bed-metal-spring.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2771,7 +2764,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/king-mattress-bed-and-base.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2859,7 +2852,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/queen-mattress-bed-and-base.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2881,7 +2874,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/single-bed-base-and-mattress.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -2892,7 +2885,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/single-bed-steel-frame.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {

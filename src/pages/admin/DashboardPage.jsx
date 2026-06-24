@@ -129,7 +129,7 @@ export default function DashboardPage() {
                 <StatCard
                     icon={TrendingUp}
                     label="Total Revenue"
-                    value={`R ${stats.totalRevenue.toLocaleString()}`}
+                    value={`R ${stats.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     subValue="Paid quotes"
                     color="text-emerald-500"
                     bg="bg-emerald-50"
@@ -137,7 +137,7 @@ export default function DashboardPage() {
                 <StatCard
                     icon={AlertCircle}
                     label="Pending Revenue"
-                    value={`R ${stats.pendingRevenue.toLocaleString()}`}
+                    value={`R ${stats.pendingRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     subValue="Potential income"
                     color="text-orange-500"
                     bg="bg-orange-50"
@@ -153,7 +153,7 @@ export default function DashboardPage() {
                 <StatCard
                     icon={AlertCircle}
                     label="Rejected Revenue"
-                    value={`R ${stats.rejectedRevenue.toLocaleString()}`}
+                    value={`R ${stats.rejectedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     subValue={`${stats.rejectedLeads} rejected quotes`}
                     color="text-red-500"
                     bg="bg-red-50"

@@ -345,6 +345,30 @@ export const emailService = {
         }
     },
 
+    sendLocationNotFoundEmail: async ({ name, email, phone, fieldName, enteredValue, comments }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'location_not_found_alert',
+                    contactData: { name, email, phone, fieldName, enteredValue, comments }
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Location alert email failed')
+            console.log('📞 Location Not Found alert email sent to admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendLocationNotFoundEmail error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
     sendEmail: async ({ type, to, quoteData, paymentLink }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''

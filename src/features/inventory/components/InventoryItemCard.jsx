@@ -34,7 +34,7 @@ const REAL_RENDERS = {
     'bean-bag-chair': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/81bf-ajW20L._AC_UF8941000_QL80_.jpg',
     'tv-entertainment-ctr': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/pngtree-rustic-tv-stand-with-two-cabinets-and-central-display-shelf-png-image_14714571.png',
     'tv-large-spec': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/360_F_1882698633_OmrhIem4MWLKoHte3vEE0pfKp8D0lmX1.jpg',
-    'tv-trolley': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/Untitled-1_eccf8779-b6c2-4503-8ee3-e56a2d2faacf_grande.jpg.webp',
+    'tv-stand': '/inventory/tv-stand.png',
     'dining-chair': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/840B0870-6294-4AFA-AF91-34AF8248B611_700x700.png.webp',
     'tea-trolley': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/TTS1002-370x480-1.jpg',
     'sideboard-large': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/31016WHT-KIT_01_2000x.jpg.webp',
@@ -213,7 +213,7 @@ export const getInventoryImage = (item) => {
     if (id.includes('ottoman')) return REAL_RENDERS['ottoman'];
     if (id.includes('bean-bag-chair') || id.includes('bean bag')) return REAL_RENDERS['bean-bag-chair'];
     if (id.includes('tv-entertainment-ctr') || id.includes('tv entertainment center')) return REAL_RENDERS['tv-entertainment-ctr'];
-    if (id.includes('tv-trolley') || id.includes('tv trolley')) return REAL_RENDERS['tv-trolley'];
+    if (id.includes('tv-stand') || id.includes('tv stand')) return REAL_RENDERS['tv-stand'];
     if (id.includes('tv-cabinet') || id.includes('tv cabinet')) return REAL_RENDERS['tv-entertainment-ctr']; // Same image as requested
     
     // Dining Room specifico
@@ -387,7 +387,14 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
     
     const hasWrapping = item.autoPackagingType && item.autoPackagingType !== 'crate'
     const hasVariationWrap = (variation === 'Glass' || variation === 'Marble')
-    const needsPackaging = hasVariationWrap || hasWrapping
+    
+    const nameLower = item.name?.toLowerCase() || ''
+    const idLower = item.id?.toLowerCase() || ''
+    const isBed = idLower.includes('bed') || nameLower.includes('bed')
+    const isCouch = idLower.includes('couch') || idLower.includes('sofa') || nameLower.includes('couch') || nameLower.includes('sofa')
+    const hasPlasticCovers = isBed || isCouch
+    
+    const needsPackaging = hasVariationWrap || hasWrapping || hasPlasticCovers
     const packagingCostPerUnit = needsPackaging ? (item.volume * 35) : 0
 
     return (
@@ -457,7 +464,7 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                     <div className="space-y-1">
                         {needsPackaging && (
                             <span className="block text-[9px] md:text-[11px] text-blue-600 font-bold uppercase tracking-wider">
-                                🛡 {item.autoPackagingType || 'Wrapping'}
+                                🛡 {hasPlasticCovers ? 'Plastic Covers' : (item.autoPackagingType || 'Wrapping')}
                             </span>
                         )}
                         <span className="text-[10px] md:text-xs text-slate-400 font-medium italic">Vol: {item.volume} ft³</span>

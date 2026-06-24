@@ -7,7 +7,7 @@ import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle } from 'lucide-react'
-import { getCityCode } from '../inventory/data/pricingRates'
+import { getCityCode, detectCityCode } from '../inventory/data/pricingRates'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
@@ -133,81 +133,206 @@ export default function Step1Details() {
     const [showLeadModal, setShowLeadModal] = React.useState(false)
     const [addressError, setAddressError] = React.useState(null)
     const [isValidating, setIsValidating] = React.useState(false)
+    const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
+    const [dropoffHelpSent, setDropoffHelpSent] = React.useState(false)
+
+    const handleLocationHelp = async (field) => {
+        const isPickup = field === 'pickup'
+        
+        if (isPickup) {
+            setPickupHelpSent(true)
+            setMoveDetails({
+                pickupManualActive: true,
+                pickupAddress: 'Custom Suburb Requested (Pending Assistance)',
+                cant_find_address: true,
+                pickupAddressVerified: true,
+                request_call_back: true
+            })
+        } else {
+            setDropoffHelpSent(true)
+            setMoveDetails({
+                dropoffManualActive: true,
+                dropoffAddress: 'Custom Suburb Requested (Pending Assistance)',
+                cant_find_address: true,
+                dropoffAddressVerified: true,
+                request_call_back: true
+            })
+        }
+
+        // Auto submit lead
+        try {
+            await submitQuote({
+                status: 'lead',
+                request_call_back: true,
+                cant_find_address: true,
+                pickup_address: isPickup ? 'Custom Suburb Requested (Pending Assistance)' : moveDetails.pickupAddress,
+                dropoff_address: !isPickup ? 'Custom Suburb Requested (Pending Assistance)' : moveDetails.dropoffAddress
+            })
+
+            // Send notification email
+            await emailService.sendLocationNotFoundEmail({
+                name: moveDetails.contactName || 'Valued Client',
+                email: moveDetails.contactEmail || 'No Email Provided',
+                phone: moveDetails.contactPhone || 'No Phone Provided',
+                fieldName: isPickup ? 'Pickup Address' : 'Dropoff Address',
+                enteredValue: isPickup ? moveDetails.pickupAddress : moveDetails.dropoffAddress,
+                comments: `User requested manual address verification. Custom Suburb Requested on ${isPickup ? 'Pickup' : 'Dropoff'} input.`
+            })
+        } catch (e) {
+            console.error('Error handling location help request:', e)
+        }
+    }
+
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
 
     const handleChange = (e) => {
-        const { name, value, city } = e.target
+        const { name, value, city, placeId, latLng, addressComponents } = e.target
         const updates = { [name]: value }
         
         // If change comes from google autocomplete select
         if (e.target.isGoogleSelect) {
-            if (name === 'pickupAddress') updates.pickupAddressVerified = true
-            if (name === 'dropoffAddress') updates.dropoffAddressVerified = true
+            if (name === 'pickupAddress') {
+                updates.pickupAddressVerified = true
+                updates.pickupPlaceId = placeId || null
+                updates.pickupLatLng = latLng || null
+                // Store the full address for better city detection
+                if (city) updates.pickupCity = city
+                if (addressComponents) updates.pickupAddressComponents = addressComponents
+            }
+            if (name === 'dropoffAddress') {
+                updates.dropoffAddressVerified = true
+                updates.dropoffPlaceId = placeId || null
+                updates.dropoffLatLng = latLng || null
+                if (city) updates.dropoffCity = city
+                if (addressComponents) updates.dropoffAddressComponents = addressComponents
+            }
         } else {
-            // If they typed manually, reset verified flag
-            if (name === 'pickupAddress') updates.pickupAddressVerified = false
-            if (name === 'dropoffAddress') updates.dropoffAddressVerified = false
+            // If they typed manually, reset verified flag and coordinates
+            // Distance calculation requires Google-verified addresses
+            if (name === 'pickupAddress') {
+                updates.pickupAddressVerified = false
+                updates.pickupPlaceId = null
+                updates.pickupLatLng = null
+                updates.pickupCity = null
+                updates.pickupAddressComponents = null
+                // Clear previous distance when address changes
+                updates.distanceKm = 0
+                updates.tripBreakdown = null
+                updates.totalBillableDistance = 0
+            }
+            if (name === 'dropoffAddress') {
+                updates.dropoffAddressVerified = false
+                updates.dropoffPlaceId = null
+                updates.dropoffLatLng = null
+                updates.dropoffCity = null
+                updates.dropoffAddressComponents = null
+                updates.distanceKm = 0
+                updates.tripBreakdown = null
+                updates.totalBillableDistance = 0
+            }
         }
 
-        if (city) {
-            if (name === 'pickupAddress') updates.pickupCity = city
-            if (name === 'dropoffAddress') updates.dropoffCity = city
-        }
         if (name === 'pickupAddress' || name === 'dropoffAddress') {
             setAddressError(null)
         }
         setMoveDetails(updates)
     }
 
-    // Auto-calculate distance in background when both addresses are filled
+    // Auto-calculate distance in background when both addresses are selected from Google Maps
     React.useEffect(() => {
         if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
             setAddressError(null)
             return
         }
 
-        const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress)
-        const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(moveDetails.dropoffAddress)
+        // Use city from address_components first (most accurate), then fall back to full address string matching
+        const pickupCityCode = detectCityCode(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng)
+        const dropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng)
 
-        // National moves are VOLUME-based — they don't need a distance from Google Maps.
-        // Skip the Distance Matrix call entirely for cross-city routes to avoid failures.
+        // National moves are VOLUME-based — distance is not required for pricing.
+        // Skip the Distance Matrix call for cross-city routes.
         const isDetectedNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
         if (isDetectedNational) {
-            // Store city codes but clear any previous error — no distance needed
-            setMoveDetails({ distanceKm: 0, tripBreakdown: null })
+            setMoveDetails({ distanceKm: 0, tripBreakdown: null, totalBillableDistance: 0 })
             setAddressError(null)
             setIsValidating(false)
             return
         }
 
-        // Local move — call Distance Matrix to get driving distance
-        const cityCode = pickupCityCode || 'JHB'
+        // Outline province check — if the Google address_components contain an
+        // outline province (Northern Cape, Free State, Limpopo, etc.) we don't
+        // need a Distance Matrix call. The quote engine will flag it as
+        // needsQuoteRequest and block automated pricing.
+        const outlineProvinces = ['free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape', 'mpumulanga', 'mphumulanga']
+        const isOutlineComponent = (components) => {
+            if (!components || !Array.isArray(components)) return false
+            return components.some(c => {
+                const val = (c.long_name || c.short_name || '').toLowerCase().trim()
+                return outlineProvinces.some(prov => val === prov || val.includes(prov))
+            })
+        }
+        const pickupIsOutline = isOutlineComponent(moveDetails.pickupAddressComponents)
+        const dropoffIsOutline = isOutlineComponent(moveDetails.dropoffAddressComponents)
+        if (pickupIsOutline || dropoffIsOutline) {
+            // Store zeros — the quote engine's hasOutlineProvince flag handles the rest
+            setMoveDetails({ distanceKm: 0, tripBreakdown: null, totalBillableDistance: 0 })
+            setAddressError(null)
+            setIsValidating(false)
+            return
+        }
+
+        // Require Google Maps selection for local moves (not just typed text)
+        // This ensures we have accurate placeId/latLng for Distance Matrix
+        const hasPickupRef = moveDetails.pickupLatLng || moveDetails.pickupPlaceId
+        const hasDropoffRef = moveDetails.dropoffLatLng || moveDetails.dropoffPlaceId
+        
+        if (!hasPickupRef || !hasDropoffRef) {
+            // Don't show an error yet — they may still be typing
+            return
+        }
+
+        // Local move — call Distance Matrix to get real driving distance
+        const cityCode = pickupCityCode || dropoffCityCode || 'JHB'
         setIsValidating(true)
         setAddressError(null)
+
+        const pickupRef = { placeId: moveDetails.pickupPlaceId, latLng: moveDetails.pickupLatLng }
+        const dropoffRef = { placeId: moveDetails.dropoffPlaceId, latLng: moveDetails.dropoffLatLng }
 
         calculateTripDistances(
             moveDetails.pickupAddress,
             moveDetails.dropoffAddress,
-            cityCode
+            cityCode,
+            pickupRef,
+            dropoffRef
         )
             .then(({ breakdown, totalDistance }) => {
                 setMoveDetails({
-                    distanceKm: breakdown.pickupToDropoff,
-                    tripBreakdown: breakdown,
-                    totalBillableDistance: totalDistance
+                    distanceKm: breakdown.pickupToDropoff,     // Pickup→Dropoff only (for reference display)
+                    tripBreakdown: breakdown,                   // Full breakdown object
+                    totalBillableDistance: totalDistance        // Full circuit: Depot→Pickup→Dropoff→Depot
                 })
                 setAddressError(null)
             })
             .catch((error) => {
                 console.error("Distance calculation error:", error)
-                setAddressError("Could not calculate the distance between these addresses. Please make sure you selected a valid address from the Google Maps dropdown.")
-                setMoveDetails({ distanceKm: 0, tripBreakdown: null })
+                setAddressError("Could not calculate the driving distance. Please make sure you selected a valid address from the Google Maps dropdown suggestions.")
+                setMoveDetails({ distanceKm: 0, tripBreakdown: null, totalBillableDistance: 0 })
             })
             .finally(() => {
                 setIsValidating(false)
             })
-    }, [moveDetails.pickupAddress, moveDetails.dropoffAddress, moveDetails.pickupCity, moveDetails.dropoffCity])
+    }, [
+        moveDetails.pickupAddress, 
+        moveDetails.dropoffAddress, 
+        moveDetails.pickupCity, 
+        moveDetails.dropoffCity, 
+        moveDetails.pickupLatLng, 
+        moveDetails.dropoffLatLng,
+        moveDetails.pickupPlaceId,
+        moveDetails.dropoffPlaceId
+    ])
 
 
     const handleSubmit = (e) => {
@@ -225,12 +350,13 @@ export default function Step1Details() {
         }
 
         // Check if this is a national move — national moves don't need distanceKm
-        const pickupCityCode = getCityCode(moveDetails.pickupCity) || getCityCode(moveDetails.pickupAddress)
-        const dropoffCityCode = getCityCode(moveDetails.dropoffCity) || getCityCode(moveDetails.dropoffAddress)
+        const pickupCityCode = detectCityCode(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng)
+        const dropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng)
         const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
+        const isManual = moveDetails.pickupManualActive || moveDetails.dropoffManualActive
 
-        // For local moves, ensure Google Maps resolved a real distance
-        if (!isNational && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
+        // For local moves, ensure Google Maps resolved a real distance (unless manual entry is selected)
+        if (!isManual && !isNational && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
             setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
             return
         }
@@ -358,22 +484,135 @@ export default function Step1Details() {
                             Where are you moving?
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <AddressAutocomplete
-                                label="Pickup Address"
-                                name="pickupAddress"
-                                placeholder="e.g. 123 Main St, Sandton"
-                                value={moveDetails.pickupAddress}
-                                onChange={handleChange}
-                                required
-                            />
-                            <AddressAutocomplete
-                                label="Dropoff Address"
-                                name="dropoffAddress"
-                                placeholder="e.g. 456 Beach Rd, Cape Town"
-                                value={moveDetails.dropoffAddress}
-                                onChange={handleChange}
-                                required
-                            />
+                            {/* Pickup Group */}
+                            <div className="space-y-4">
+                                {moveDetails.pickupManualActive ? (
+                                    <div className="space-y-1.5">
+                                        <Input
+                                            label="Pickup Suburb / Area"
+                                            name="pickupAddress"
+                                            placeholder="Please enter suburb name"
+                                            value={moveDetails.pickupAddress || ''}
+                                            onChange={handleChange}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMoveDetails({ pickupManualActive: false, pickupAddress: '', cant_find_address: false });
+                                                setPickupHelpSent(false);
+                                            }}
+                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                        >
+                                            ← Search address on map
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <AddressAutocomplete
+                                        label="Pickup Address"
+                                        name="pickupAddress"
+                                        placeholder="Please fill in as: Street Number, Street Name, Suburb"
+                                        value={moveDetails.pickupAddress || ''}
+                                        onChange={handleChange}
+                                        required
+                                    />
+                                )}
+                                {!pickupHelpSent ? (
+                                    !moveDetails.pickupManualActive && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleLocationHelp('pickup')}
+                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                        >
+                                            I cannot find my address
+                                        </button>
+                                    )
+                                ) : (
+                                    <div className="mt-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 shadow-lg shadow-emerald-100/50 animate-in fade-in slide-in-from-top-3 duration-500">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30 animate-in zoom-in duration-300">
+                                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-emerald-800 uppercase tracking-wide">Request Received</p>
+                                                <p className="text-xs text-emerald-600 mt-1 leading-relaxed">One of our sales consultants will contact you shortly to assist with your location details.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <Input
+                                    label="Unit Number & Complex Name (Optional)"
+                                    name="pickupUnitComplex"
+                                    placeholder="e.g. Unit 4, Sunset Heights"
+                                    value={moveDetails.pickupUnitComplex || ''}
+                                    onChange={handleChange}
+                                />
+                            </div>
+
+                            {/* Dropoff Group */}
+                            <div className="space-y-4">
+                                {moveDetails.dropoffManualActive ? (
+                                    <div className="space-y-1.5">
+                                        <Input
+                                            label="Dropoff Suburb / Area"
+                                            name="dropoffAddress"
+                                            placeholder="Please enter suburb name"
+                                            value={moveDetails.dropoffAddress || ''}
+                                            onChange={handleChange}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMoveDetails({ dropoffManualActive: false, dropoffAddress: '', cant_find_address: false });
+                                                setDropoffHelpSent(false);
+                                            }}
+                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                        >
+                                            ← Search address on map
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <AddressAutocomplete
+                                        label="Dropoff Address"
+                                        name="dropoffAddress"
+                                        placeholder="Please fill in as: Street Number, Street Name, Suburb"
+                                        value={moveDetails.dropoffAddress || ''}
+                                        onChange={handleChange}
+                                        required
+                                    />
+                                )}
+                                {!dropoffHelpSent ? (
+                                    !moveDetails.dropoffManualActive && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleLocationHelp('dropoff')}
+                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                        >
+                                            I cannot find my address
+                                        </button>
+                                    )
+                                ) : (
+                                    <div className="mt-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 shadow-lg shadow-emerald-100/50 animate-in fade-in slide-in-from-top-3 duration-500">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30 animate-in zoom-in duration-300">
+                                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-emerald-800 uppercase tracking-wide">Request Received</p>
+                                                <p className="text-xs text-emerald-600 mt-1 leading-relaxed">One of our sales consultants will contact you shortly to assist with your location details.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <Input
+                                    label="Unit Number & Complex Name (Optional)"
+                                    name="dropoffUnitComplex"
+                                    placeholder="e.g. Unit 12, Ocean View"
+                                    value={moveDetails.dropoffUnitComplex || ''}
+                                    onChange={handleChange}
+                                />
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -416,7 +655,38 @@ export default function Step1Details() {
                         {isValidating && (
                             <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-xl text-blue-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2 animate-in fade-in">
                                 <Loader2 className="animate-spin text-blue-500" size={16} />
-                                <span>Verifying addresses with Google Maps...</span>
+                                <span>Calculating driving route with Google Maps...</span>
+                            </div>
+                        )}
+
+                        {/* Distance Breakdown Panel — shown for local moves once Google Maps has calculated the route (ONLY IN TEST MODE) */}
+                        {window.location.pathname.includes('quote-test') && !isValidating && !addressError && moveDetails.tripBreakdown && moveDetails.totalBillableDistance > 0 && (
+                            <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Route Distance Confirmed via Google Maps</p>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Depot → Pickup</p>
+                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.depotToPickup} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                    </div>
+                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pickup → Dropoff</p>
+                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.pickupToDropoff} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                    </div>
+                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Dropoff → Depot</p>
+                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.dropoffToDepot} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                    </div>
+                                    <div className="bg-emerald-600 rounded-xl p-3 text-center">
+                                        <p className="text-[9px] font-black text-emerald-100 uppercase tracking-widest mb-1">Total Billable</p>
+                                        <p className="text-lg font-black text-white">{moveDetails.totalBillableDistance} <span className="text-xs font-bold text-emerald-200">km</span></p>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider mt-2">
+                                    ✓ {moveDetails.tripBreakdown.method === 'distance_matrix' ? 'Real road distance via Google Maps Distance Matrix' : 'Estimated via coordinate calculation (fallback)'}
+                                </p>
                             </div>
                         )}
                     </div>
