@@ -413,6 +413,25 @@ serve(async (req) => {
 
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
             `
+        } else if (type === 'location_not_found_alert') {
+            subject = `📍 Client cant find address - assist (${contactData?.name || 'Customer'})`
+            recipients = adminEmails
+
+            innerHtml = `
+                <h1 style="color:#e31837;">📍 Location Assistance Lead</h1>
+                <p>A customer could not find their address using the map search and requested assistance.</p>
+                
+                <table class="details-table">
+                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${contactData?.phone || ''}">${contactData?.phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
+                    <tr><td class="label">Field:</td><td class="value">${contactData?.fieldName || '—'}</td></tr>
+                    <tr><td class="label">Entered Value:</td><td class="value">${contactData?.enteredValue || '—'}</td></tr>
+                    <tr><td class="label">Comments:</td><td class="value">${contactData?.comments || '—'}</td></tr>
+                </table>
+
+                <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> immediately to assist with their quote.</p>
+            `
         } else if (type === 'abandoned_lead_alert') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
             subject = `⭐️ NEW LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`

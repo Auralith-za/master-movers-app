@@ -355,8 +355,20 @@ export default function Step1Details() {
         const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
         const isManual = moveDetails.pickupManualActive || moveDetails.dropoffManualActive
 
+        const outlineProvinces = ['free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape', 'mpumulanga', 'mphumulanga']
+        const isOutlineComponent = (components) => {
+            if (!components || !Array.isArray(components)) return false
+            return components.some(c => {
+                const val = (c.long_name || c.short_name || '').toLowerCase().trim()
+                return outlineProvinces.some(prov => val === prov || val.includes(prov))
+            })
+        }
+        const pickupIsOutline = isOutlineComponent(moveDetails.pickupAddressComponents)
+        const dropoffIsOutline = isOutlineComponent(moveDetails.dropoffAddressComponents)
+        const isOutline = pickupIsOutline || dropoffIsOutline
+
         // For local moves, ensure Google Maps resolved a real distance (unless manual entry is selected)
-        if (!isManual && !isNational && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
+        if (!isManual && !isNational && !isOutline && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
             setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
             return
         }
