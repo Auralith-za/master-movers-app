@@ -9,7 +9,7 @@ import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle } from 'lucide-react'
 import { getCityCode, detectCityCode } from '../inventory/data/pricingRates'
 
-export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {} }) => {
+export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
     const [isSuccess, setIsSuccess] = useState(false)
     
@@ -42,8 +42,8 @@ export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initial
                     <>
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Request a Call Back</h3>
-                                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">We'll contact you shortly</p>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{title}</h3>
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">{subtitle}</p>
                             </div>
                             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                                 <X size={20} />
@@ -131,6 +131,7 @@ export default function Step1Details() {
     const location = useLocation()
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
+    const [showOutlineModal, setShowOutlineModal] = React.useState(false)
     const [addressError, setAddressError] = React.useState(null)
     const [isValidating, setIsValidating] = React.useState(false)
     const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
@@ -370,6 +371,11 @@ export default function Step1Details() {
         // For local moves, ensure Google Maps resolved a real distance (unless manual entry is selected)
         if (!isManual && !isNational && !isOutline && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
             setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
+            return
+        }
+
+        if (isOutline) {
+            setShowOutlineModal(true)
             return
         }
 
@@ -780,6 +786,61 @@ export default function Step1Details() {
                             console.error("Lead submission error:", err)
                             alert("Submission Error: " + (err.message || "Failed to reach server") + ". Please call us directly if this persists.")
                             // Keep modal open so user knows it failed
+                        } finally {
+                            setIsSubmittingLead(false)
+                        }
+                    }}
+                />
+
+                <LeadCaptureModal 
+                    isOpen={showOutlineModal} 
+                    onClose={() => setShowOutlineModal(false)}
+                    isLoading={isSubmittingLead}
+                    title="Outline Area Request"
+                    subtitle="Our trucks don't regularly service this area. Please request a custom quote."
+                    onSubmit={async (formData) => {
+                        setIsSubmittingLead(true)
+                        try {
+                            setMoveDetails({
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone
+                            })
+                            await submitQuote({ 
+                                status: 'lead', 
+                                request_call_back: true,
+                                contactName: `${formData.name} ${formData.surname}`,
+                                contactEmail: formData.email,
+                                contactPhone: formData.phone,
+                                customer_comments: '[OUTLINE AREA] User requested a custom quote for an outline area.',
+                                forceNew: true
+                            })
+                            
+                            // Send custom outline email
+                            if (window.emailService && window.emailService.sendOutlineAreaEmail) {
+                                await window.emailService.sendOutlineAreaEmail({
+                                    name: `${formData.name} ${formData.surname}`,
+                                    email: formData.email,
+                                    phone: formData.phone,
+                                    pickup: moveDetails.pickupAddress,
+                                    dropoff: moveDetails.dropoffAddress
+                                })
+                            } else {
+                                // Fallback if we have to import emailService
+                                const { emailService } = await import('../../services/emailService')
+                                await emailService.sendOutlineAreaEmail({
+                                    name: `${formData.name} ${formData.surname}`,
+                                    email: formData.email,
+                                    phone: formData.phone,
+                                    pickup: moveDetails.pickupAddress,
+                                    dropoff: moveDetails.dropoffAddress
+                                })
+                            }
+                            
+                            return true
+                        } catch (err) {
+                            console.error("Outline lead submission error:", err)
+                            alert("Submission Error: " + (err.message || "Failed to reach server") + ".")
                         } finally {
                             setIsSubmittingLead(false)
                         }

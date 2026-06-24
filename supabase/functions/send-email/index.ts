@@ -413,6 +413,24 @@ serve(async (req) => {
 
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
             `
+        } else if (type === 'outline_area_alert') {
+            subject = `🚛 Outline area request for quote (${contactData?.name || 'Customer'})`
+            recipients = adminEmails
+
+            innerHtml = `
+                <h1 style="color:#e31837;">🚛 Outline Area Custom Quote Request</h1>
+                <p>A customer has selected an outline area that our trucks don't regularly service. They have requested a custom quote.</p>
+                
+                <table class="details-table">
+                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${contactData?.phone || ''}">${contactData?.phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
+                    <tr><td class="label">From:</td><td class="value">${contactData?.pickup || '—'}</td></tr>
+                    <tr><td class="label">To:</td><td class="value">${contactData?.dropoff || '—'}</td></tr>
+                </table>
+
+                <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> to discuss their requirements and prepare a custom quote.</p>
+            `
         } else if (type === 'location_not_found_alert') {
             subject = `📍 Client cant find address - assist (${contactData?.name || 'Customer'})`
             recipients = adminEmails

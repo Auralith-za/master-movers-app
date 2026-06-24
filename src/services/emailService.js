@@ -369,6 +369,30 @@ export const emailService = {
         }
     },
 
+    sendOutlineAreaEmail: async ({ name, email, phone, pickup, dropoff }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'outline_area_alert',
+                    contactData: { name, email, phone, pickup, dropoff }
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Outline area email failed')
+            console.log('🚛 Outline Area alert email sent to admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendOutlineAreaEmail error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
     sendEmail: async ({ type, to, quoteData, paymentLink }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
