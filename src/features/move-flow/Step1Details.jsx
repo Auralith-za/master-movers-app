@@ -792,60 +792,68 @@ export default function Step1Details() {
                     }}
                 />
 
-                <LeadCaptureModal 
-                    isOpen={showOutlineModal} 
-                    onClose={() => setShowOutlineModal(false)}
-                    isLoading={isSubmittingLead}
-                    title="Outline Area Request"
-                    subtitle="Our trucks don't regularly service this area. Please request a custom quote."
-                    onSubmit={async (formData) => {
-                        setIsSubmittingLead(true)
-                        try {
-                            setMoveDetails({
-                                contactName: `${formData.name} ${formData.surname}`,
-                                contactEmail: formData.email,
-                                contactPhone: formData.phone
-                            })
-                            await submitQuote({ 
-                                status: 'lead', 
-                                request_call_back: true,
-                                contactName: `${formData.name} ${formData.surname}`,
-                                contactEmail: formData.email,
-                                contactPhone: formData.phone,
-                                customer_comments: '[OUTLINE AREA] User requested a custom quote for an outline area.',
-                                forceNew: true
-                            })
+                {showOutlineModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Outline Area Request</h3>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Our trucks don't regularly service this area.</p>
+                                </div>
+                                <button onClick={() => setShowOutlineModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-50">
+                                    <X size={20} />
+                                </button>
+                            </div>
                             
-                            // Send custom outline email
-                            if (window.emailService && window.emailService.sendOutlineAreaEmail) {
-                                await window.emailService.sendOutlineAreaEmail({
-                                    name: `${formData.name} ${formData.surname}`,
-                                    email: formData.email,
-                                    phone: formData.phone,
-                                    pickup: moveDetails.pickupAddress,
-                                    dropoff: moveDetails.dropoffAddress
-                                })
-                            } else {
-                                // Fallback if we have to import emailService
-                                const { emailService } = await import('../../services/emailService')
-                                await emailService.sendOutlineAreaEmail({
-                                    name: `${formData.name} ${formData.surname}`,
-                                    email: formData.email,
-                                    phone: formData.phone,
-                                    pickup: moveDetails.pickupAddress,
-                                    dropoff: moveDetails.dropoffAddress
-                                })
-                            }
-                            
-                            return true
-                        } catch (err) {
-                            console.error("Outline lead submission error:", err)
-                            alert("Submission Error: " + (err.message || "Failed to reach server") + ".")
-                        } finally {
-                            setIsSubmittingLead(false)
-                        }
-                    }}
-                />
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-600">
+                                    Because this is an outline area, we need to manually calculate your quote based on our availability and custom routes.
+                                </p>
+                                
+                                {isSubmittingLead ? (
+                                    <div className="w-full flex items-center justify-center py-4 text-red-600 bg-red-50 rounded-xl">
+                                        <Loader2 className="animate-spin" size={24} />
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            setIsSubmittingLead(true)
+                                            try {
+                                                await submitQuote({ 
+                                                    status: 'lead', 
+                                                    request_call_back: true,
+                                                    customer_comments: '[OUTLINE AREA] User requested a custom quote for an outline area.',
+                                                    forceNew: true
+                                                })
+                                                
+                                                if (window.emailService && window.emailService.sendOutlineAreaEmail) {
+                                                    await window.emailService.sendOutlineAreaEmail({
+                                                        name: moveDetails.contactName,
+                                                        email: moveDetails.contactEmail,
+                                                        phone: moveDetails.contactPhone,
+                                                        pickup: moveDetails.pickupAddress,
+                                                        dropoff: moveDetails.dropoffAddress
+                                                    })
+                                                }
+                                                alert("Request Sent! We will call you shortly to discuss your custom route.")
+                                                setShowOutlineModal(false)
+                                            } catch (err) {
+                                                console.error("Outline lead error:", err)
+                                            } finally {
+                                                setIsSubmittingLead(false)
+                                            }
+                                        }}
+                                        className="w-full py-4 text-sm uppercase tracking-[0.1em] font-black shadow-lg shadow-red-600/20 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Phone size={18} />
+                                        Request a Call Back
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </form>
     )
