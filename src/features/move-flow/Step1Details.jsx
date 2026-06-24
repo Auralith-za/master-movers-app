@@ -827,15 +827,13 @@ export default function Step1Details() {
                                                     forceNew: true
                                                 })
                                                 
-                                                if (window.emailService && window.emailService.sendOutlineAreaEmail) {
-                                                    await window.emailService.sendOutlineAreaEmail({
-                                                        name: moveDetails.contactName,
-                                                        email: moveDetails.contactEmail,
-                                                        phone: moveDetails.contactPhone,
-                                                        pickup: moveDetails.pickupAddress,
-                                                        dropoff: moveDetails.dropoffAddress
-                                                    })
-                                                }
+                                                await emailService.sendOutlineAreaEmail({
+                                                    name: moveDetails.contactName,
+                                                    email: moveDetails.contactEmail,
+                                                    phone: moveDetails.contactPhone,
+                                                    pickup: moveDetails.pickupAddress,
+                                                    dropoff: moveDetails.dropoffAddress
+                                                })
                                                 alert("Request Sent! We will call you shortly to discuss your custom route.")
                                                 setShowOutlineModal(false)
                                             } catch (err) {
