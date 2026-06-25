@@ -185,6 +185,7 @@ export default function QuoteDetailPage() {
             pickupCity: editForm.pickup_address,
             dropoffCity: editForm.dropoff_address,
             distanceKm: editForm.distance_km,
+            totalBillableDistance: editForm.distance_km,  // key field used for pricing
             moveDate: editForm.move_date,
             packagingOption: editForm.packaging_option || 'none',
             st7Boxes: editForm.st7_boxes || 0,
@@ -434,25 +435,29 @@ export default function QuoteDetailPage() {
         ).slice(0, 5)
     }, [searchQuery])
 
-    const downloadInventoryPDF = () => {
-        const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
-
-        generateProfessionalQuote({
-            quoteId: quote.id,
-            clientName: quote.client_name,
-            clientEmail: quote.client_email,
-            clientPhone: quote.client_phone,
-            pickupAddress: quote.pickup_address,
-            dropoffAddress: quote.dropoff_address,
-            moveDate: quote.move_date,
-            inventory: inventoryForPdf,
-            total: quote.total_price,
-            vat: (quote.total_price || 0) * 0.15 / 1.15,
-            subTotal: (quote.total_price || 0) / 1.15,
-            inventoryItems: INVENTORY_ITEMS,
-            breakdown: recalculatedData?.breakdown,
-            boxQty: recalculatedData?.boxQty
-        })
+    const downloadInventoryPDF = async () => {
+        try {
+            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            await generateProfessionalQuote({
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                inventory: inventoryForPdf,
+                total: Number(quote.total_price) || 0,
+                vat: (Number(quote.total_price) || 0) * 0.15 / 1.15,
+                subTotal: (Number(quote.total_price) || 0) / 1.15,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: recalculatedData?.breakdown || quote.breakdown_json,
+                boxQty: recalculatedData?.boxQty
+            })
+        } catch (err) {
+            console.error('PDF generation error:', err)
+            alert('Failed to generate PDF: ' + err.message)
+        }
     }
 
     if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>

@@ -51,11 +51,16 @@ export default function Step3Inventory() {
     const [isSubmittingLead, setIsSubmittingLead] = useState(false)
 
     const { totalVolume, breakdown, currentVehicleName } = React.useMemo(() => {
-        const result = calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
-        return { 
-            totalVolume: result.totalVolumeCuFt, 
-            breakdown: result.breakdown,
-            currentVehicleName: result.breakdown?.vehicleType 
+        try {
+            const result = calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
+            return { 
+                totalVolume: result.totalVolumeCuFt || 0, 
+                breakdown: result.breakdown,
+                currentVehicleName: result.breakdown?.vehicleType 
+            }
+        } catch (err) {
+            console.error('Step3 calculateQuote error:', err)
+            return { totalVolume: 0, breakdown: null, currentVehicleName: null }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
