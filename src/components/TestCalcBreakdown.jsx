@@ -138,10 +138,9 @@ export default function TestCalcBreakdown() {
         const [itemId] = idKey.split('_')
         const item = INVENTORY_ITEMS.find(i => i.id === itemId)
         if (item) {
+            totalVolume += item.volume * qty
             if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
                 boxQty += qty
-            } else {
-                totalVolume += item.volume * qty
             }
         }
     })
@@ -150,7 +149,7 @@ export default function TestCalcBreakdown() {
     const isNational = result?.isNationalMove || false
     const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
     const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
-    const volumeForVehicle = totalVolume + (4.25 * boxQty)
+    const volumeForVehicle = totalVolume + (4.25 * (moveDetails.st7Boxes || 0))
     const assignedVehicle = !isNational
         ? (vehicleList.find(v => v.capacityCuFt >= volumeForVehicle) || vehicleList[vehicleList.length - 1])
         : null

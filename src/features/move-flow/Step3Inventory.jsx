@@ -77,8 +77,9 @@ export default function Step3Inventory() {
     }, [currentVehicleName, lastVehicleName])
 
     const getQuantity = (itemId) => {
+        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
         return Object.entries(inventory)
-            .filter(([idKey]) => idKey === itemId || idKey.startsWith(`${itemId}_`))
+            .filter(([idKey]) => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`))
             .reduce((sum, [_, qty]) => sum + qty, 0);
     }
 
