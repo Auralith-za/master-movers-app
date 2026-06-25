@@ -16,9 +16,9 @@ export const generateProfessionalQuote = (data) => {
             moveDate,
             inventory = {},
             breakdown = {},
-            total,
-            vat,
-            subTotal,
+            total = 0,
+            vat = 0,
+            subTotal = 0,
             inventoryItems = [], // The raw catalog for lookups
             isSharedLoad = false,
             shouldSave = true
@@ -124,8 +124,11 @@ export const generateProfessionalQuote = (data) => {
             
             currentY += 8;
 
-            const serviceFees = subTotal || 0;
-            const finalSubtotal = total ? (total / 1.15) : serviceFees;
+            const numTotal = Number(total) || 0;
+            const numSubTotal = Number(subTotal) || 0;
+            
+            const serviceFees = numSubTotal;
+            const finalSubtotal = numTotal ? (numTotal / 1.15) : serviceFees;
             const discountAmount = serviceFees - finalSubtotal;
 
             const { breakdown, boxQty } = data;
@@ -157,8 +160,8 @@ export const generateProfessionalQuote = (data) => {
                 ['Service Fees (Excl. VAT)', `R ${serviceFees.toFixed(2)}`],
                 ...(discountAmount > 0.01 ? [['Discount Applied', `- R ${discountAmount.toFixed(2)}`]] : []),
                 ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],
-                ['VAT (15%)', `R ${(total - finalSubtotal).toFixed(2)}`],
-                ['TOTAL AMOUNT DUE', `R ${total?.toFixed(2) || '0.00'}`]
+                ['VAT (15%)', `R ${(numTotal - finalSubtotal).toFixed(2)}`],
+                ['TOTAL AMOUNT DUE', `R ${numTotal.toFixed(2)}`]
             );
 
             autoTable(doc, {
