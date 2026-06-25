@@ -607,6 +607,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     let hasShuttle = false
     let longCarryCost = 0
     let shuttleCost = 0
+    let detailedAccess = []
 
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc, prefix) => {
@@ -758,21 +759,27 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const documentationFee = PRICING_CONSTANTS.documentationFee || 175
     const autoPackagingCost = plasticSleeveCost + wrappingCost
 
-    let exclVatSubTotal = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + manualServiceChargesTotal + standardInsurance + documentationFee
+    // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs)
+    // Packaging add-ons are kept separate so they always apply ON TOP of the minimum charge
+    let baseCost = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
-    // Apply mid-month discount (10%) on the ex-VAT subtotal
+    // Apply mid-month discount (10%) only to the base move cost
     let exclVatDiscount = 0
     if (moveDetails.moveDate) {
         const day = new Date(moveDetails.moveDate).getDate()
-        if (day >= 5 && day <= 24) exclVatDiscount = exclVatSubTotal * 0.10
+        if (day >= 5 && day <= 24) exclVatDiscount = baseCost * 0.10
     }
 
-    let exclVatAfterDiscount = exclVatSubTotal - exclVatDiscount
+    let baseAfterDiscount = baseCost - exclVatDiscount
 
-    // Enforce minimums on the EX-VAT amount (before VAT is added)
-    if (!isNationalMove && exclVatAfterDiscount < PRICING_CONSTANTS.minOrder) {
-        exclVatAfterDiscount = PRICING_CONSTANTS.minOrder
+    // Enforce minimum charge on the base (packaging costs always apply on top)
+    if (!isNationalMove && baseAfterDiscount < PRICING_CONSTANTS.minOrder) {
+        baseAfterDiscount = PRICING_CONSTANTS.minOrder
     }
+
+    // Add packaging add-ons AFTER minimum enforcement so they are never lost
+    let exclVatSubTotal = baseAfterDiscount + autoPackagingCost + specialWrappingCost
+    let exclVatAfterDiscount = exclVatSubTotal
 
     // Now add 15% VAT to get the final incl-VAT total
     const vatAmount = exclVatAfterDiscount * VAT_RATE

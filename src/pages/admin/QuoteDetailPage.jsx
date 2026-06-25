@@ -169,36 +169,44 @@ export default function QuoteDetailPage() {
         if (success) setNewNote('')
     }
 
-    // Re-calculate live price during editing
+    // Calculate live price — runs always so PDF always has a full breakdown
     const recalculatedData = useMemo(() => {
-        if (!isEditing) return null
-        
-        // Prepare data for calculateQuote
+        // Use editForm when editing, otherwise compute from saved quote data
+        const sourceItems = isEditing ? (editForm.items_json || {}) : (quote?.items_json?.items || quote?.items_json || {})
         const inventory = {}
-        Object.entries(editForm.items_json || {}).forEach(([itemId, qty]) => {
+        Object.entries(sourceItems).forEach(([itemId, qty]) => {
             inventory[itemId] = Number(qty)
         })
 
+        const srcPickup  = isEditing ? editForm.pickup_address  : (quote?.pickup_address  || '')
+        const srcDropoff = isEditing ? editForm.dropoff_address : (quote?.dropoff_address || '')
+        const srcDist    = isEditing ? editForm.distance_km     : (quote?.distance_km     || 0)
+        const srcDate    = isEditing ? editForm.move_date       : (quote?.move_date       || '')
+        const srcPkg     = isEditing ? (editForm.packaging_option || 'none') : (quote?.packaging_option || 'none')
+        const srcSt7     = isEditing ? (editForm.st7_boxes || 0)     : (quote?.st7_boxes     || 0)
+        const srcLinen   = isEditing ? (editForm.linen_boxes || 0)   : (quote?.linen_boxes   || 0)
+        const srcAccess  = isEditing ? editForm.access_details : (quote?.access_details  || {})
+
         const moveDetails = {
-            pickupAddress: editForm.pickup_address,
-            dropoffAddress: editForm.dropoff_address,
-            pickupCity: editForm.pickup_address,
-            dropoffCity: editForm.dropoff_address,
-            distanceKm: editForm.distance_km,
-            totalBillableDistance: editForm.distance_km,  // key field used for pricing
-            moveDate: editForm.move_date,
-            packagingOption: editForm.packaging_option || 'none',
-            st7Boxes: editForm.st7_boxes || 0,
-            linenBoxes: editForm.linen_boxes || 0,
-            insuranceEnabled: editForm.insurance_enabled || false,
-            isSharedLoad: editForm.is_shared_load || false
+            pickupAddress: srcPickup,
+            dropoffAddress: srcDropoff,
+            pickupCity: srcPickup,
+            dropoffCity: srcDropoff,
+            distanceKm: srcDist,
+            totalBillableDistance: srcDist,
+            moveDate: srcDate,
+            packagingOption: srcPkg,
+            st7Boxes: srcSt7,
+            linenBoxes: srcLinen,
+            insuranceEnabled: isEditing ? (editForm.insurance_enabled || false) : (quote?.insurance_enabled || false),
+            isSharedLoad: isEditing ? (editForm.is_shared_load || false) : (quote?.is_shared_load || false)
         }
 
-        // Include individual item wrapping fees into calculation!
-        const manualServiceCharges = { ...(editForm.manual_service_charges || {}) }
+        const manualServiceCharges = { ...(isEditing ? (editForm.manual_service_charges || {}) : (quote?.manual_service_charges || {})) }
         let individualWrappingCost = 0
-        if (editForm.special_wrapping) {
-            Object.entries(editForm.special_wrapping).forEach(([itemId, wrap]) => {
+        const srcWrapping = isEditing ? (editForm.special_wrapping || {}) : (quote?.items_json?.special_wrapping || {})
+        if (srcWrapping) {
+            Object.entries(srcWrapping).forEach(([itemId, wrap]) => {
                 if (wrap?.enabled && wrap?.fee) {
                     individualWrappingCost += (parseFloat(wrap.fee) || 0) * (inventory[itemId] || 0)
                 }
@@ -207,12 +215,12 @@ export default function QuoteDetailPage() {
         manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost
 
         try {
-            return calculateQuote(inventory, moveDetails, editForm.access_details, INVENTORY_ITEMS, manualServiceCharges)
+            return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges)
         } catch (err) {
             console.error("calculateQuote error:", err)
             return { error: err.message }
         }
-    }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, isEditing])
+    }, [isEditing, editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, quote])
 
     const handleUpdateQuantity = (itemId, newQty) => {
         const updatedItems = { ...editForm.items_json }
