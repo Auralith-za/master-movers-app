@@ -1986,7 +1986,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Office / Study",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2483,7 +2483,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-lounge",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Lounge / Living Room",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2494,7 +2494,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-dining",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Dining Room",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2505,7 +2505,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-bedrooms",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Bedrooms",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2516,7 +2516,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-office",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Office / Study",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2527,7 +2527,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-appliances",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Appliances/Kitchen",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2538,7 +2538,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-general",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "General Furniture",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2549,7 +2549,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-outdoor",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Outdoor & Patio",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2604,7 +2604,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-or-cartons",
-    "name": "BOXES / CARTONS",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Boxes & Loose Items",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2912,7 +2912,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-special",
-    "name": "BOXES",
+    "name": "SELF SUPPLIED BOXES",
     "category": "Special Handling Items",
     "volume": 4.25,
     "image": "/inventory/boxes.png",

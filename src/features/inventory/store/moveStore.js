@@ -353,11 +353,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_') : null
         const item = items.find(i => i.id === itemId)
         if (item) {
-            if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
-                boxQty += qty
-            } else {
-                totalVolume += item.volume * qty
-            }
+            // All inventory items add to volume (including self-supplied boxes)
+            totalVolume += item.volume * qty
+
             
             const sleeves = getPlasticSleevesCount(item, idKey)
             if (sleeves > 0) {
@@ -584,7 +582,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         // Local logic: Vehicle selection by volume + ft3 charge
         const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
         const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
-        const volumeForVehicle = totalVolumeCuFt + (4.25 * boxQty)
+        // Add volume for ordered boxes (4.25 cu ft per box)
+        const orderedSt7Volume = (moveDetails.st7Boxes || 0) * 4.25
+        const volumeForVehicle = totalVolumeCuFt + orderedSt7Volume
         const vehicle = vehicleList.find(v => v.capacityCuFt >= volumeForVehicle) || vehicleList[vehicleList.length - 1]
         
         transportRate = vehicle.ratePerKm || 0
@@ -729,7 +729,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             ? PACKAGING_RATES.sendMeBoxesOnly 
             : PACKAGING_RATES.boxesAndPacking
             
-        const totalSt7 = (moveDetails.st7Boxes || 0) + boxQty
+        const totalSt7 = (moveDetails.st7Boxes || 0)
         const st7Cost = totalSt7 * rates.st7
         const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
         
@@ -812,8 +812,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         vat: needsQuoteRequest ? 0 : vat,                              // VAT amount (15% of ex-VAT subtotal)
         totalVolume,
         totalVolumeCuFt,
-        boxQty,
-        volumeForVehicle: totalVolumeCuFt + (4.25 * boxQty),
+        boxQty: moveDetails.st7Boxes || 0,
+        volumeForVehicle: totalVolumeCuFt + ((moveDetails.st7Boxes || 0) * 4.25),
         isNationalMove,
         needsQuoteRequest,
         packagingCost: packagingCost + autoPackagingCost,
