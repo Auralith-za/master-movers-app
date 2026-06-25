@@ -733,8 +733,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         const st7Cost = totalSt7 * rates.st7
         const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
         
-        // Only apply delivery fee if they explicitly used Step 2 and asked for boxes_only delivery
-        const deliveryFee = (moveDetails.packagingOption === 'boxes_only') ? (rates.deliveryFee || 0) : 0
+        // Apply delivery fee from rates if they explicitly used a packaging service
+        const deliveryFee = hasStep2Packaging ? (rates.deliveryFee || 0) : 0
         
         packagingCost = st7Cost + linenCost + deliveryFee
     }
