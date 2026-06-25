@@ -213,6 +213,10 @@ export default function TestCalcBreakdown() {
             return 1
         }
         
+        if (idKey.endsWith('_Plastic Sleeve') || idKey.includes('_Plastic Sleeve_')) {
+            return 1
+        }
+        
         return 0
     }
 
@@ -240,7 +244,7 @@ export default function TestCalcBreakdown() {
         const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
         const appliesWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
         
-        if (appliesWrapping || isGlassOrMarble) {
+        if (appliesWrapping || isGlassOrMarble || variation.includes('Wrapped')) {
             const rate = item.volume * 5.90
             wrappingLines.push({
                 name: item.name,
