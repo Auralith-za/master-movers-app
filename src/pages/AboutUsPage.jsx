@@ -14,7 +14,7 @@ export default function AboutUsPage() {
                 'JHB | Cape Town | Durban | International',
                 'Long Distance & Inter-Provincial Moves',
                 'Weekly Shuttles between JHB, DBN, and CPT',
-                'Remote & Outlying Area Services',
+                'Remote & Outlaying Area Services',
                 'Secure Storage Hubs in Major Cities'
             ],
             customVisual: (

@@ -205,7 +205,12 @@ export default function QuoteDetailPage() {
         }
         manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost
 
-        return calculateQuote(inventory, moveDetails, editForm.access_details, INVENTORY_ITEMS, manualServiceCharges)
+        try {
+            return calculateQuote(inventory, moveDetails, editForm.access_details, INVENTORY_ITEMS, manualServiceCharges)
+        } catch (err) {
+            console.error("calculateQuote error:", err)
+            return null
+        }
     }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, isEditing])
 
     const handleUpdateQuantity = (itemId, newQty) => {
@@ -444,7 +449,9 @@ export default function QuoteDetailPage() {
             total: quote.total_price,
             vat: (quote.total_price || 0) * 0.15 / 1.15,
             subTotal: (quote.total_price || 0) / 1.15,
-            inventoryItems: INVENTORY_ITEMS
+            inventoryItems: INVENTORY_ITEMS,
+            breakdown: recalculatedQuote?.breakdown,
+            boxQty: recalculatedQuote?.boxQty
         })
     }
 
@@ -461,6 +468,9 @@ export default function QuoteDetailPage() {
                     <ArrowLeft size={20} className="mr-2" /> Back to Quotes
                 </button>
                 <div className="flex gap-2">
+                    <button onClick={downloadInventoryPDF} className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium hover:bg-indigo-100 transition-colors">
+                        <Download size={18} className="mr-2" /> Download Quote
+                    </button>
                     <button onClick={handleResendQuote} className="flex items-center px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800">
                         <Send size={18} className="mr-2" /> Resend Quote
                     </button>
@@ -760,8 +770,10 @@ export default function QuoteDetailPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {Object.entries(displayInventory).map(([itemId, qty]) => {
-                                        const [id] = itemId.split('_')
+                                    {(() => {
+                                        try {
+                                            return Object.entries(displayInventory).map(([itemId, qty]) => {
+                                                const [id] = itemId.split('_')
                                         const item = INVENTORY_ITEMS.find(i => i.id === id)
                                         const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, fee: 0 }
                                         return (
@@ -789,7 +801,35 @@ export default function QuoteDetailPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    {isEditing ? (
+                                                    {(() => {
+                                                        const variation = itemId.includes('_') ? itemId.split('_').slice(1).join('_') : null
+                                                        const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
+                                                        const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
+                                                        const isAutoWrapped = (item?.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble
+                                                        const isAutoSleeve = itemId.endsWith('_Plastic Sleeve') || itemId.includes('_Plastic Sleeve_') || item?.autoPackagingType === 'Plastic Covers' ||
+                                                            itemId.includes('bed') || (item?.name || '').toLowerCase().includes('bed') ||
+                                                            itemId.includes('mattress') || (item?.name || '').toLowerCase().includes('mattress') ||
+                                                            itemId.includes('couch') || (item?.name || '').toLowerCase().includes('couch') ||
+                                                            itemId.includes('sofa') || (item?.name || '').toLowerCase().includes('sofa') ||
+                                                            itemId.includes('seater') || (item?.name || '').toLowerCase().includes('seater') ||
+                                                            itemId.includes('suite') || (item?.name || '').toLowerCase().includes('suite') ||
+                                                            itemId.includes('futon') || (item?.name || '').toLowerCase().includes('futon');
+                                                        
+                                                        if (isAutoWrapped) {
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                                                                    ✓ Auto-Wrapped
+                                                                </span>
+                                                            )
+                                                        }
+                                                        if (isAutoSleeve) {
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
+                                                                    ✓ Auto-Sleeve
+                                                                </span>
+                                                            )
+                                                        }
+                                                        return isEditing ? (
                                                         <div className="flex flex-col items-center gap-1">
                                                             <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
                                                                 <input
@@ -839,7 +879,8 @@ export default function QuoteDetailPage() {
                                                         ) : (
                                                             <span className="text-slate-400 text-xs">—</span>
                                                         )
-                                                    )}
+                                                    );
+                                                    })()}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     {isEditing ? (
@@ -865,7 +906,11 @@ export default function QuoteDetailPage() {
                                                 </td>
                                             </tr>
                                         )
-                                    })}
+                                    })
+                                    } catch (err) {
+                                        return <tr><td colSpan="4" className="text-red-500 font-bold p-4">Error rendering inventory: {err.message}</td></tr>
+                                    }
+                                    })()}
                                 </tbody>
                             </table>
                         </div>
@@ -1127,19 +1172,19 @@ export default function QuoteDetailPage() {
                                 )}
                                 {isEditing && recalculatedData?.breakdown?.packaging > 0 && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Box Supplies</span>
+                                        <span>Box Supplies {editForm.st7_boxes > 0 && `(${editForm.st7_boxes} x R85)`} {editForm.linen_boxes > 0 && `(${editForm.linen_boxes} x R165)`}</span>
                                         <span className="font-bold">+ R {recalculatedData.breakdown.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {isEditing && recalculatedData?.breakdown?.wrappingCost > 0 && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Specialized Wrapping</span>
+                                        <span>Specialized Wrapping {recalculatedData?.breakdown?.wrappingVolume > 0 && `(${recalculatedData.breakdown.wrappingVolume.toFixed(2)} ft³ x R5.90)`}</span>
                                         <span className="font-bold">+ R {recalculatedData.breakdown.wrappingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {isEditing && recalculatedData?.breakdown?.plasticSleeveCost > 0 && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Plastic Sleeves</span>
+                                        <span>Plastic Sleeves {recalculatedData?.breakdown?.plasticSleeveCount > 0 && `(${recalculatedData.breakdown.plasticSleeveCount} x R55)`}</span>
                                         <span className="font-bold">+ R {recalculatedData.breakdown.plasticSleeveCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}

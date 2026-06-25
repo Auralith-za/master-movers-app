@@ -382,19 +382,28 @@ export const getInventoryImage = (item) => {
     return localPath;
 }
 
-export default function InventoryItemCard({ item, quantity, onAdd, onRemove, variation }) {
+export default function InventoryItemCard({ item, quantity = 0, variation, onAdd, onRemove, onToggleModifier }) {
     const realisticImage = getInventoryImage(item);
     
     const hasWrapping = item.autoPackagingType && item.autoPackagingType !== 'crate'
-    const hasVariationWrap = (variation === 'Glass' || variation === 'Marble')
+    // Determine auto-wrap / auto-sleeve states for visual cues and to prevent manual toggling
+    const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
+    const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
+    const isAutoWrapped = (item?.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble
     
-    const nameLower = item.name?.toLowerCase() || ''
-    const idLower = item.id?.toLowerCase() || ''
-    const isBed = idLower.includes('bed') || nameLower.includes('bed')
-    const isCouch = idLower.includes('couch') || idLower.includes('sofa') || nameLower.includes('couch') || nameLower.includes('sofa')
-    const hasPlasticCovers = isBed || isCouch
+    const isAutoSleeve = item.id.includes('bed') || (item.name || '').toLowerCase().includes('bed') ||
+                         item.id.includes('mattress') || (item.name || '').toLowerCase().includes('mattress') ||
+                         item.id.includes('couch') || (item.name || '').toLowerCase().includes('couch') ||
+                         item.id.includes('sofa') || (item.name || '').toLowerCase().includes('sofa') ||
+                         item.id.includes('seater') || (item.name || '').toLowerCase().includes('seater') ||
+                         item.id.includes('suite') || (item.name || '').toLowerCase().includes('suite') ||
+                         item.id.includes('futon') || (item.name || '').toLowerCase().includes('futon') ||
+                         item?.autoPackagingType === 'Plastic Covers'
     
-    const needsPackaging = hasVariationWrap || hasWrapping || hasPlasticCovers
+    const isManuallyWrapped = variation?.includes('Wrapped') || false
+    const isManuallySleeved = variation?.includes('Plastic Sleeve') || false
+    
+    const needsPackaging = isAutoWrapped || isAutoSleeve || isManuallyWrapped || isManuallySleeved
     const packagingCostPerUnit = needsPackaging ? (item.volume * 35) : 0
 
     return (
@@ -462,19 +471,56 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                     </h4>
                     
                     <div className="space-y-1">
-                        {needsPackaging && (
-                            <span className="block text-[9px] md:text-[11px] text-blue-600 font-bold uppercase tracking-wider">
-                                🛡 {hasPlasticCovers ? 'Plastic Covers' : (item.autoPackagingType || 'Wrapping')}
+                        {(isAutoWrapped || isManuallyWrapped) && (
+                            <span className="block text-[9px] md:text-[11px] text-emerald-600 font-bold uppercase tracking-wider">
+                                🛡 {isAutoWrapped ? 'Auto-Wrapped' : 'Wrapped'}
+                            </span>
+                        )}
+                        {(isAutoSleeve || isManuallySleeved) && (
+                            <span className="block text-[9px] md:text-[11px] text-amber-600 font-bold uppercase tracking-wider">
+                                🛡 {isAutoSleeve ? 'Auto-Sleeve' : 'Plastic Sleeve'}
                             </span>
                         )}
                         <span className="text-[10px] md:text-xs text-slate-400 font-medium italic">Vol: {item.volume} ft³</span>
                     </div>
                 </div>
 
+                <div className="flex flex-col gap-1 mt-1">
+                    {!isAutoSleeve && quantity > 0 && onToggleModifier && (
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="checkbox" 
+                                id={`ps-${item.id}`}
+                                checked={isManuallySleeved}
+                                onChange={(e) => { e.stopPropagation(); onToggleModifier(item.id, 'Plastic Sleeve'); }}
+                                className="w-3.5 h-3.5 text-red-600 rounded border-gray-300"
+                            />
+                            <label htmlFor={`ps-${item.id}`} className="text-[10px] md:text-xs text-slate-500 font-bold cursor-pointer uppercase tracking-tight">
+                                Add Plastic Sleeve (R55)
+                            </label>
+                        </div>
+                    )}
+
+                    {!isAutoWrapped && quantity > 0 && onToggleModifier && (
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="checkbox" 
+                                id={`wr-${item.id}`}
+                                checked={isManuallyWrapped}
+                                onChange={(e) => { e.stopPropagation(); onToggleModifier(item.id, 'Wrapped'); }}
+                                className="w-3.5 h-3.5 text-red-600 rounded border-gray-300"
+                            />
+                            <label htmlFor={`wr-${item.id}`} className="text-[10px] md:text-xs text-slate-500 font-bold cursor-pointer uppercase tracking-tight">
+                                Add Wrapping (Vol)
+                            </label>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center justify-between pt-2 md:pt-4 border-t border-slate-50">
                     <div className="flex items-center gap-1 md:gap-2">
                         <button
-                            onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+                            onClick={(e) => { e.stopPropagation(); onRemove(item.id, variation); }}
                             className={clsx(
                                 "w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center transition-all",
                                 quantity > 0 
@@ -490,7 +536,7 @@ export default function InventoryItemCard({ item, quantity, onAdd, onRemove, var
                     </div>
 
                     <button
-                        onClick={(e) => { e.stopPropagation(); onAdd(item.id); }}
+                        onClick={(e) => { e.stopPropagation(); onAdd(item.id, variation); }}
                         className={clsx(
                             "w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all shadow-md active:scale-95",
                             quantity > 0

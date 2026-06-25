@@ -182,7 +182,7 @@ export default function LandingPage() {
                                 {[
                                     'Long Distance & Inter-Provincial Moves',
                                     'Weekly Shuttles between JHB, DBN, and CPT',
-                                    'Remote & Outlying Area Services',
+                                    'Remote & Outlaying Area Services',
                                     'Secure Storage Hubs in Major Cities'
                                 ].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-slate-700 font-medium">

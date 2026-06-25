@@ -77,7 +77,7 @@ export default function Step3Inventory() {
             .reduce((sum, [_, qty]) => sum + qty, 0);
     }
 
-    const handleAddItem = (itemId) => {
+    const handleAddItem = (itemId, existingVariation = null) => {
         const item = INVENTORY_ITEMS.find(i => i.id === itemId);
         if (!item) return;
 
@@ -106,7 +106,7 @@ export default function Step3Inventory() {
                     title: 'Photo Verification Needed',
                     message: 'This item requires a photo for accurate quoting. Please add it to your inventory and remember to send us a photo!',
                     onConfirm: () => {
-                        addItem(resolvedId);
+                        addItem(resolvedId, existingVariation);
                         setWarningModal({ show: false });
                     }
                 });
@@ -114,17 +114,44 @@ export default function Step3Inventory() {
             }
         }
 
-        addItem(resolvedId);
+        addItem(resolvedId, existingVariation);
     }
 
-    const handleRemoveItem = (itemId) => {
+    const handleRemoveItem = (itemId, existingVariation = null) => {
         const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
-        const idKeys = Object.keys(inventory).filter(idKey => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`));
-        if (idKeys.length > 0) {
-            const parts = idKeys[0].split('_');
-            removeItem(parts[0], parts[1] || null);
+        const idKey = existingVariation ? `${resolvedId}_${existingVariation}` : resolvedId;
+        
+        if (inventory[idKey]) {
+            removeItem(resolvedId, existingVariation);
+        } else {
+            // Fallback for removing other variations
+            const idKeys = Object.keys(inventory).filter(k => k === resolvedId || k.startsWith(`${resolvedId}_`));
+            if (idKeys.length > 0) {
+                const parts = idKeys[0].split('_');
+                removeItem(parts[0], parts.slice(1).join('_') || null);
+            }
         }
     }
+
+    const handleToggleModifier = (itemId, modifier) => {
+        const idKeys = Object.keys(inventory).filter(k => k === itemId || k.startsWith(`${itemId}_`));
+        if (idKeys.length === 0) return;
+        
+        const currentKey = idKeys[0];
+        const currentQty = inventory[currentKey];
+        
+        let newKey = currentKey;
+        if (newKey.includes(`_${modifier}`)) {
+            newKey = newKey.replace(`_${modifier}`, '');
+        } else {
+            newKey = `${newKey}_${modifier}`;
+        }
+        
+        const newInventory = { ...inventory };
+        delete newInventory[currentKey];
+        newInventory[newKey] = currentQty;
+        setInventory(newInventory);
+    };
 
     const [showVolumeModal, setShowVolumeModal] = useState(false)
     const VOLUME_THRESHOLD_FT3 = 10594 // 300m3
@@ -396,6 +423,7 @@ export default function Step3Inventory() {
                                         variation={variation}
                                         onAdd={handleAddItem}
                                         onRemove={handleRemoveItem}
+                                        onToggleModifier={handleToggleModifier}
                                     />
                                 );
                             })}

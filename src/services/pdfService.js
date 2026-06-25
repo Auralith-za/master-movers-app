@@ -128,13 +128,38 @@ export const generateProfessionalQuote = (data) => {
             const finalSubtotal = total ? (total / 1.15) : serviceFees;
             const discountAmount = serviceFees - finalSubtotal;
 
-            const costs = [
+            const { breakdown, boxQty } = data;
+            const costs = [];
+
+            if (breakdown) {
+                if (breakdown.shuttleCost > 0) costs.push(['Shuttle Vehicle', `R ${breakdown.shuttleCost.toFixed(2)}`]);
+                if (breakdown.longCarryCost > 0) costs.push(['Long Carry', `R ${breakdown.longCarryCost.toFixed(2)}`]);
+                if (breakdown.packaging > 0) {
+                    const st7 = data.moveDetails?.st7Boxes || data.moveDetails?.st7_boxes || 0;
+                    const linen = data.moveDetails?.linenBoxes || data.moveDetails?.linen_boxes || 0;
+                    const labels = [];
+                    if (st7 > 0) labels.push(`${st7} Std`);
+                    if (linen > 0) labels.push(`${linen} Linen`);
+                    const boxText = labels.length > 0 ? `Box Supplies (${labels.join(', ')})` : `Box Supplies`;
+                    costs.push([boxText, `R ${breakdown.packaging.toFixed(2)}`]);
+                }
+                if (breakdown.plasticSleeveCost > 0) {
+                    const sleevesQty = breakdown.plasticSleeveCount || Math.round(breakdown.plasticSleeveCost / 55);
+                    costs.push([`Plastic Sleeves (${sleevesQty} qty x R55)`, `R ${breakdown.plasticSleeveCost.toFixed(2)}`]);
+                }
+                if (breakdown.wrappingCost > 0) {
+                    const volText = breakdown.wrappingVolume > 0 ? ` (${breakdown.wrappingVolume.toFixed(2)} ft³ x R5.90)` : '';
+                    costs.push([`Specialized Wrapping${volText}`, `R ${breakdown.wrappingCost.toFixed(2)}`]);
+                }
+            }
+
+            costs.push(
                 ['Service Fees (Excl. VAT)', `R ${serviceFees.toFixed(2)}`],
                 ...(discountAmount > 0.01 ? [['Discount Applied', `- R ${discountAmount.toFixed(2)}`]] : []),
                 ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],
                 ['VAT (15%)', `R ${(total - finalSubtotal).toFixed(2)}`],
                 ['TOTAL AMOUNT DUE', `R ${total?.toFixed(2) || '0.00'}`]
-            ];
+            );
 
             autoTable(doc, {
                 startY: currentY,

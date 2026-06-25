@@ -289,7 +289,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let plasticSleeveCost = 0
+    let plasticSleeveCount = 0
     let wrappingCost = 0
+    let wrappingVolume = 0
     let requiresCrateFlag = false
     let requiresPhotoFlag = false
 
@@ -337,6 +339,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             return 1
         }
         
+        if (idKey.endsWith('_Plastic Sleeve') || idKey.includes('_Plastic Sleeve_')) {
+            return 1
+        }
+        
         return 0
     }
 
@@ -354,6 +360,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             
             const sleeves = getPlasticSleevesCount(item, idKey)
             if (sleeves > 0) {
+                plasticSleeveCount += (qty * sleeves)
                 plasticSleeveCost += (qty * sleeves * 55)
             }
             
@@ -365,8 +372,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
             const appliesWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
             
-            if (appliesWrapping || isGlassOrMarble) {
+            if (appliesWrapping || isGlassOrMarble || variation?.includes('Wrapped')) {
                 // R5.90 per cubic FOOT
+                wrappingVolume += (qty * item.volume)
                 wrappingCost += qty * (item.volume * 5.90);
             }
             
@@ -596,7 +604,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let accessFees = 0
     let hasShuttle = false
-    const detailedAccess = []
+    let longCarryCost = 0
+    let shuttleCost = 0
 
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc, prefix) => {
@@ -664,6 +673,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
         if (appliedLongCarryCost > 0) {
             accessFees += appliedLongCarryCost
+            longCarryCost += appliedLongCarryCost
             if (isLongCarryAuto) {
                 detailedAccess.push(`${prefix} Long Carry (Floor 3+ Auto): R${appliedLongCarryCost}`)
             } else {
@@ -675,8 +685,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     if (accessDetails?.destination) addAccess(accessDetails.destination, 'Dest')
 
     if (hasShuttle) {
-        accessFees += ADDITIONAL_COSTS.shuttle.flatRate
-        detailedAccess.push(`Shuttle: R${ADDITIONAL_COSTS.shuttle.flatRate}`)
+        shuttleCost = ADDITIONAL_COSTS.shuttle.flatRate
     }
 
     let additionalCrewCost = 0
@@ -748,7 +757,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const documentationFee = PRICING_CONSTANTS.documentationFee || 175
     const autoPackagingCost = plasticSleeveCost + wrappingCost
 
-    let exclVatSubTotal = transportCost + volumeCost + accessFees + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + manualServiceChargesTotal + standardInsurance + documentationFee
+    let exclVatSubTotal = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + autoPackagingCost + packagingCost + specialWrappingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
     // Apply mid-month discount (10%) on the ex-VAT subtotal
     let exclVatDiscount = 0
@@ -814,8 +823,14 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             extraDistance: extraDistanceFees,
             detailedExtraDistance: detailedExtraDistance.length > 0 ? detailedExtraDistance.join(' | ') : 'No Depot Surcharges',
             packaging: packagingCost,
+            wrapping: autoPackagingCost,
+            wrappingVolume: wrappingVolume,
+            wrappingCost: wrappingCost,
             plasticSleeveCost: plasticSleeveCost,
-            wrappingCost: wrappingCost + specialWrappingCost,
+            plasticSleeveCount: plasticSleeveCount,
+            specialWrapping: specialWrappingCost,
+            shuttleCost: shuttleCost,
+            longCarryCost: longCarryCost,
             standardInsurance: standardInsurance,
             distance: totalDistance,
             transportRate: transportRate,

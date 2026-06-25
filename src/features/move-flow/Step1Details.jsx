@@ -797,7 +797,7 @@ export default function Step1Details() {
                         <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Outline Area Request</h3>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Outlaying Area Request</h3>
                                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Our trucks don't regularly service this area.</p>
                                 </div>
                                 <button onClick={() => setShowOutlineModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-50">
@@ -807,7 +807,7 @@ export default function Step1Details() {
                             
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-600">
-                                    Because this is an outline area, we need to manually calculate your quote based on our availability and custom routes.
+                                    Because this is an outlaying area, we need to manually calculate your quote based on our availability and custom routes.
                                 </p>
                                 
                                 {isSubmittingLead ? (
@@ -823,7 +823,7 @@ export default function Step1Details() {
                                                 await submitQuote({ 
                                                     status: 'lead', 
                                                     request_call_back: true,
-                                                    customer_comments: '[OUTLINE AREA] User requested a custom quote for an outline area.',
+                                                    customer_comments: '[OUTLAYING AREA] User requested a custom quote for an outlaying area.',
                                                     forceNew: true
                                                 })
                                                 

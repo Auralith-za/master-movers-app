@@ -382,12 +382,8 @@ export default function TestCalcBreakdown() {
                         )}
 
                         {/* Shuttle */}
-                        {result.breakdown?.detailedAccess && (
-                            Array.isArray(result.breakdown.detailedAccess)
-                                ? result.breakdown.detailedAccess.some(d => d.includes('Shuttle'))
-                                : String(result.breakdown.detailedAccess).includes('Shuttle')
-                        ) && (
-                            <Row label="Shuttle Vehicle" value="R 2,500.00" warn />
+                        {result.breakdown?.shuttleCost > 0 && (
+                            <Row label="Shuttle Vehicle" value={`R ${result.breakdown.shuttleCost.toFixed(2)}`} warn />
                         )}
 
                         {/* Additional crew (heavy items) */}
@@ -400,8 +396,8 @@ export default function TestCalcBreakdown() {
                         )}
 
                         {/* Box Supplies (Step 2) */}
-                        {result.packagingCost > 0 ? (
-                            <Row label="Box Supplies / Packaging" value={R(result.packagingCost)} warn />
+                        {result.breakdown?.packaging > 0 ? (
+                            <Row label={`Box Supplies / Packaging ${moveDetails?.st7Boxes > 0 ? `(${moveDetails.st7Boxes} Std x R85)` : ''} ${moveDetails?.linenBoxes > 0 ? `(${moveDetails.linenBoxes} Linen x R165)` : ''}`} value={R(result.breakdown.packaging)} warn />
                         ) : (
                             <Row label="Box Supplies / Packaging" value="✓ None" />
                         )}

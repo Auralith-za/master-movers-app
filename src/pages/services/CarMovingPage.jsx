@@ -80,7 +80,7 @@ export default function CarMovingPage() {
                                     Nationwide Network
                                 </dt>
                                 <dd className="mt-2 text-base leading-7 text-slate-600">
-                                    We cover all major routes including Johannesburg, Cape Town, Durban, and Port Elizabeth, as well as outlying areas.
+                                    We cover all major routes including Johannesburg, Cape Town, Durban, and Port Elizabeth, as well as outlaying areas.
                                 </dd>
                             </div>
                             <div className="relative pl-16">

@@ -384,8 +384,8 @@ export const emailService = {
                 })
             })
             const result = await response.json()
-            if (!response.ok) throw new Error(result.error || 'Outline area email failed')
-            console.log('🚛 Outline Area alert email sent to admins')
+            if (!response.ok) throw new Error(result.error || 'Outlaying area email failed')
+            console.log('🚛 Outlaying Area alert email sent to admins')
             return { success: true }
         } catch (error) {
             console.error('sendOutlineAreaEmail error:', error)
