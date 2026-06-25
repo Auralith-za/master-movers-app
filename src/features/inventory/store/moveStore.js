@@ -651,15 +651,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
         // Long Carry / Shuttle based on distance:
         let appliedLongCarryCost = 0
-        let isLongCarryAuto = false
 
-        // Auto-apply long carry at R450 when floor access is 3rd floor and above (or multiple_stairs)
-        const fl = loc?.floorLevel
-        const flNum = parseInt(fl) || 0
-        if (fl === 'multiple_stairs' || flNum >= 3) {
-            appliedLongCarryCost = 450
-            isLongCarryAuto = true
-        }
 
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance) || 0
