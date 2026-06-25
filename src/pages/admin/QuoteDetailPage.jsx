@@ -450,8 +450,8 @@ export default function QuoteDetailPage() {
             vat: (quote.total_price || 0) * 0.15 / 1.15,
             subTotal: (quote.total_price || 0) / 1.15,
             inventoryItems: INVENTORY_ITEMS,
-            breakdown: recalculatedQuote?.breakdown,
-            boxQty: recalculatedQuote?.boxQty
+            breakdown: recalculatedData?.breakdown,
+            boxQty: recalculatedData?.boxQty
         })
     }
 
