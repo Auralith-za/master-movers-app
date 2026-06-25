@@ -378,7 +378,7 @@ export default function MoveWizard() {
                         <div>
                             <h4 className="font-bold text-slate-800">Long Carry Surcharge</h4>
                             <p className="text-slate-600 mt-1">
-                                Applies when the distance between where the moving truck can safely park and the entrance of your residence exceeds 50 meters. Carrying items over long distances increases labor and time.
+                                Applies when the distance between where the moving truck can safely park and the entrance of your residence exceeds 60 meters. Carrying items over long distances increases labor and time.
                             </p>
                         </div>
                     </div>
