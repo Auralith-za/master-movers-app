@@ -19,9 +19,12 @@ export const generateProfessionalQuote = (data) => {
             total = 0,
             vat = 0,
             subTotal = 0,
-            inventoryItems = [], // The raw catalog for lookups
+            inventoryItems = [],
             isSharedLoad = false,
-            shouldSave = true
+            shouldSave = true,
+            totalVolume = 0,
+            st7Boxes = 0,
+            linenBoxes = 0
         } = data;
 
         const doc = new jsPDF();
@@ -126,41 +129,49 @@ export const generateProfessionalQuote = (data) => {
 
             const numTotal = Number(total) || 0;
             const numSubTotal = Number(subTotal) || 0;
+            const numVat = Number(vat) || (numTotal - numTotal / 1.15);
             
-            const serviceFees = numSubTotal;
-            const finalSubtotal = numTotal ? (numTotal / 1.15) : serviceFees;
-            const discountAmount = serviceFees - finalSubtotal;
+            const serviceFees = numSubTotal || (numTotal / 1.15);
+            const discountAmount = 0; // discount is already baked in to subTotal
 
-            const { breakdown, boxQty } = data;
+            const { breakdown: bd, boxQty } = data;
             const costs = [];
 
-            if (breakdown) {
-                if (breakdown.shuttleCost > 0) costs.push(['Shuttle Vehicle', `R ${breakdown.shuttleCost.toFixed(2)}`]);
-                if (breakdown.longCarryCost > 0) costs.push(['Long Carry', `R ${breakdown.longCarryCost.toFixed(2)}`]);
-                if (breakdown.packaging > 0) {
-                    const st7 = data.moveDetails?.st7Boxes || data.moveDetails?.st7_boxes || 0;
-                    const linen = data.moveDetails?.linenBoxes || data.moveDetails?.linen_boxes || 0;
+            // Inventory Volume line
+            const displayVolume = totalVolume || bd?.totalVolume || 0;
+            if (displayVolume > 0) {
+                costs.push(['Inventory Volume', `${Number(displayVolume).toFixed(2)} m³`]);
+            }
+
+            if (bd) {
+                if (bd.shuttleCost > 0) costs.push(['Shuttle Vehicle', `R ${Number(bd.shuttleCost).toFixed(2)}`]);
+                if (bd.longCarryCost > 0) costs.push(['Long Carry', `R ${Number(bd.longCarryCost).toFixed(2)}`]);
+                if (bd.access > 0) costs.push(['Access Fees (Stairs/Elevator/Hoisting)', `R ${Number(bd.access).toFixed(2)}`]);
+                if (bd.crew > 0) costs.push(['Additional Crew', `R ${Number(bd.crew).toFixed(2)}`]);
+                if (bd.packaging > 0) {
+                    const numSt7 = st7Boxes || data.st7Boxes || 0;
+                    const numLinen = linenBoxes || data.linenBoxes || 0;
                     const labels = [];
-                    if (st7 > 0) labels.push(`${st7} Std`);
-                    if (linen > 0) labels.push(`${linen} Linen`);
-                    const boxText = labels.length > 0 ? `Box Supplies (${labels.join(', ')})` : `Box Supplies`;
-                    costs.push([boxText, `R ${breakdown.packaging.toFixed(2)}`]);
+                    if (numSt7 > 0) labels.push(`${numSt7} x R85`);
+                    if (numLinen > 0) labels.push(`${numLinen} x R165`);
+                    const boxText = labels.length > 0 ? `Box Supplies (${labels.join(', ')})` : 'Box Supplies';
+                    costs.push([boxText, `R ${Number(bd.packaging).toFixed(2)}`]);
                 }
-                if (breakdown.plasticSleeveCost > 0) {
-                    const sleevesQty = breakdown.plasticSleeveCount || Math.round(breakdown.plasticSleeveCost / 55);
-                    costs.push([`Plastic Sleeves (${sleevesQty} qty x R55)`, `R ${breakdown.plasticSleeveCost.toFixed(2)}`]);
+                if (bd.plasticSleeveCost > 0) {
+                    const sleevesQty = bd.plasticSleeveCount || Math.round(bd.plasticSleeveCost / 55);
+                    costs.push([`Plastic Sleeves (${sleevesQty} qty x R55)`, `R ${Number(bd.plasticSleeveCost).toFixed(2)}`]);
                 }
-                if (breakdown.wrappingCost > 0) {
-                    const volText = breakdown.wrappingVolume > 0 ? ` (${breakdown.wrappingVolume.toFixed(2)} ft³ x R5.90)` : '';
-                    costs.push([`Specialized Wrapping${volText}`, `R ${breakdown.wrappingCost.toFixed(2)}`]);
+                if (bd.wrappingCost > 0) {
+                    const volText = bd.wrappingVolume > 0 ? ` (${Number(bd.wrappingVolume).toFixed(2)} ft³ x R5.90)` : '';
+                    costs.push([`Specialized Wrapping${volText}`, `R ${Number(bd.wrappingCost).toFixed(2)}`]);
                 }
+                if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
             }
 
             costs.push(
                 ['Service Fees (Excl. VAT)', `R ${serviceFees.toFixed(2)}`],
-                ...(discountAmount > 0.01 ? [['Discount Applied', `- R ${discountAmount.toFixed(2)}`]] : []),
-                ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],
-                ['VAT (15%)', `R ${(numTotal - finalSubtotal).toFixed(2)}`],
+                ['Subtotal Excl. VAT', `R ${serviceFees.toFixed(2)}`],
+                ['VAT (15%)', `R ${numVat.toFixed(2)}`],
                 ['TOTAL AMOUNT DUE', `R ${numTotal.toFixed(2)}`]
             );
 

@@ -204,15 +204,29 @@ export default function QuoteDetailPage() {
 
         const manualServiceCharges = { ...(isEditing ? (editForm.manual_service_charges || {}) : (quote?.manual_service_charges || {})) }
         let individualWrappingCost = 0
+        let individualSleeveCost = 0
         const srcWrapping = isEditing ? (editForm.special_wrapping || {}) : (quote?.items_json?.special_wrapping || {})
         if (srcWrapping) {
             Object.entries(srcWrapping).forEach(([itemId, wrap]) => {
-                if (wrap?.enabled && wrap?.fee) {
-                    individualWrappingCost += (parseFloat(wrap.fee) || 0) * (inventory[itemId] || 0)
+                const qty = inventory[itemId] || 0
+                const baseItemId = itemId.split('_')[0]
+                const itemDef = INVENTORY_ITEMS.find(i => i.id === baseItemId)
+                const vol = itemDef?.volume || 0
+                // New format: wrap:true means vol × qty × R5.90
+                if (wrap?.wrap === true) {
+                    individualWrappingCost += vol * qty * 5.90
+                } else if (wrap?.enabled && wrap?.fee) {
+                    // Legacy flat-fee format (backwards compat)
+                    individualWrappingCost += parseFloat(wrap.fee) || 0
+                }
+                // Plastic sleeves: n × R55
+                if (wrap?.sleeves > 0) {
+                    individualSleeveCost += (wrap.sleeves * 55)
                 }
             })
         }
-        manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost
+        manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost + individualSleeveCost
+
 
         try {
             return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges)
@@ -455,12 +469,16 @@ export default function QuoteDetailPage() {
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
                 inventory: inventoryForPdf,
-                total: Number(quote.total_price) || 0,
-                vat: (Number(quote.total_price) || 0) * 0.15 / 1.15,
-                subTotal: (Number(quote.total_price) || 0) / 1.15,
+                // Always prefer live recalculated values so PDF matches sidebar
+                total: recalculatedData?.total || Number(quote.total_price) || 0,
+                vat: recalculatedData?.vat || (Number(quote.total_price) || 0) * 0.15 / 1.15,
+                subTotal: recalculatedData?.subTotal || (Number(quote.total_price) || 0) / 1.15,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.breakdown_json,
-                boxQty: recalculatedData?.boxQty
+                boxQty: recalculatedData?.boxQty,
+                totalVolume: recalculatedData?.totalVolume || quote.total_volume || 0,
+                st7Boxes: quote.st7_boxes || 0,
+                linenBoxes: quote.linen_boxes || 0
             })
         } catch (err) {
             console.error('PDF generation error:', err)
@@ -783,7 +801,8 @@ export default function QuoteDetailPage() {
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-500">
                                         <th className="px-6 py-3 font-medium">Item Name</th>
-                                        <th className="px-6 py-3 font-medium text-center">Special Wrapping</th>
+                                        <th className="px-6 py-3 font-medium text-center">Wrapping<br/><span className="text-[10px] font-normal text-slate-400">vol × R5.90</span></th>
+                                        <th className="px-6 py-3 font-medium text-center">Plastic Sleeves<br/><span className="text-[10px] font-normal text-slate-400">qty × R55</span></th>
                                         <th className="px-6 py-3 font-medium w-32 text-center">Quantity</th>
                                         <th className="px-6 py-3 font-medium w-24 text-right">Action</th>
                                     </tr>
@@ -794,7 +813,7 @@ export default function QuoteDetailPage() {
                                             return Object.entries(displayInventory).map(([itemId, qty]) => {
                                                 const [id] = itemId.split('_')
                                         const item = INVENTORY_ITEMS.find(i => i.id === id)
-                                        const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, fee: 0 }
+                                        const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, wrap: false, sleeves: 0, fee: 0, sleeveFee: 0 }
                                         return (
                                             <tr key={itemId} className="hover:bg-slate-50/50">
                                                 <td className="px-6 py-4 flex items-center gap-3">
@@ -816,16 +835,58 @@ export default function QuoteDetailPage() {
                                                     </div>
                                                     <div>
                                                         <p className="font-bold text-slate-900">{item?.name || itemId}</p>
-                                                        <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'}</p>
+                                                        <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'} · Vol: {item?.volume || 0} ft³/unit</p>
                                                     </div>
                                                 </td>
+
+                                                {/* WRAPPING COLUMN — vol × R5.90 */}
                                                 <td className="px-6 py-4 text-center">
                                                     {(() => {
                                                         const variation = itemId.includes('_') ? itemId.split('_').slice(1).join('_') : null
                                                         const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
-                                                        const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
-                                                        const isAutoWrapped = (item?.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble
-                                                        const isAutoSleeve = itemId.endsWith('_Plastic Sleeve') || itemId.includes('_Plastic Sleeve_') || item?.autoPackagingType === 'Plastic Covers' ||
+                                                        const isAutoWrapped = isGlassOrMarble
+
+                                                        if (isAutoWrapped) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">✓ Auto-Wrapped (Glass/Marble)</span>
+
+                                                        // Wrapping cost = item volume × qty × R5.90
+                                                        const wrappingEnabled = wrapInfo.wrap === true
+                                                        const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0
+
+                                                        return isEditing ? (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={wrappingEnabled}
+                                                                        onChange={(e) => {
+                                                                            const updatedWrap = {
+                                                                                ...(editForm.special_wrapping || {}),
+                                                                                [itemId]: { ...wrapInfo, wrap: e.target.checked, fee: e.target.checked ? ((item?.volume || 0) * qty * 5.90) : 0 }
+                                                                            }
+                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                        }}
+                                                                        className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
+                                                                    />
+                                                                    Add Wrapping
+                                                                </label>
+                                                                {wrappingEnabled && (
+                                                                    <span className="text-[10px] text-emerald-600 font-bold">
+                                                                        {(item?.volume || 0)} ft³ × {qty} × R5.90 = R {wrappingCostCalc.toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            wrappingEnabled
+                                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Wrapped (+R {wrappingCostCalc.toFixed(2)})</span>
+                                                                : <span className="text-slate-400 text-xs">—</span>
+                                                        );
+                                                    })()}
+                                                </td>
+
+                                                {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
+                                                <td className="px-6 py-4 text-center">
+                                                    {(() => {
+                                                        const isAutoSleeve = item?.autoPackagingType === 'Plastic Covers' ||
                                                             itemId.includes('bed') || (item?.name || '').toLowerCase().includes('bed') ||
                                                             itemId.includes('mattress') || (item?.name || '').toLowerCase().includes('mattress') ||
                                                             itemId.includes('couch') || (item?.name || '').toLowerCase().includes('couch') ||
@@ -833,72 +894,34 @@ export default function QuoteDetailPage() {
                                                             itemId.includes('seater') || (item?.name || '').toLowerCase().includes('seater') ||
                                                             itemId.includes('suite') || (item?.name || '').toLowerCase().includes('suite') ||
                                                             itemId.includes('futon') || (item?.name || '').toLowerCase().includes('futon');
-                                                        
-                                                        if (isAutoWrapped) {
-                                                            return (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">
-                                                                    ✓ Auto-Wrapped
-                                                                </span>
-                                                            )
-                                                        }
-                                                        if (isAutoSleeve) {
-                                                            return (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
-                                                                    ✓ Auto-Sleeve
-                                                                </span>
-                                                            )
-                                                        }
+
+                                                        if (isAutoSleeve) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">✓ Auto-Sleeve ({qty} × R55)</span>
+
+                                                        const sleeveQty = wrapInfo.sleeves || 0
+                                                        const sleeveCost = sleeveQty * 55
+
                                                         return isEditing ? (
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={wrapInfo.enabled || false}
-                                                                    onChange={(e) => {
-                                                                        const enabled = e.target.checked
-                                                                        const updatedWrap = {
-                                                                            ...(editForm.special_wrapping || {}),
-                                                                            [itemId]: {
-                                                                                ...wrapInfo,
-                                                                                enabled,
-                                                                                fee: enabled ? (wrapInfo.fee || 600) : 0
-                                                                            }
-                                                                        }
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="flex items-center gap-1">
+                                                                    <button onClick={() => {
+                                                                        const newQty = Math.max(0, sleeveQty - 1)
+                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty, sleeveFee: newQty * 55 } }
                                                                         setEditForm({ ...editForm, special_wrapping: updatedWrap })
-                                                                    }}
-                                                                    className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
-                                                                />
-                                                                Wrap
-                                                            </label>
-                                                            {wrapInfo.enabled && (
-                                                                <div className="relative mt-1 flex items-center justify-center">
-                                                                    <span className="absolute left-2 text-[10px] font-bold text-slate-400">R</span>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={wrapInfo.fee || ''}
-                                                                        placeholder="Fee"
-                                                                        onChange={(e) => {
-                                                                            const fee = parseFloat(e.target.value) || 0
-                                                                            const updatedWrap = {
-                                                                                ...(editForm.special_wrapping || {}),
-                                                                                [itemId]: { ...wrapInfo, fee }
-                                                                            }
-                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
-                                                                        }}
-                                                                        className="w-20 pl-5 pr-1 py-0.5 text-xs border border-slate-200 rounded text-center focus:border-primary-500 outline-none"
-                                                                    />
+                                                                    }} className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">−</button>
+                                                                    <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                    <button onClick={() => {
+                                                                        const newQty = sleeveQty + 1
+                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty, sleeveFee: newQty * 55 } }
+                                                                        setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                    }} className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">+</button>
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        wrapInfo.enabled ? (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                                                                Wrapped (+R {wrapInfo.fee})
-                                                            </span>
+                                                                {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × R55 = R {sleeveCost.toFixed(2)}</span>}
+                                                            </div>
                                                         ) : (
-                                                            <span className="text-slate-400 text-xs">—</span>
-                                                        )
-                                                    );
+                                                            sleeveQty > 0
+                                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{sleeveQty} sleeves (+R {sleeveCost})</span>
+                                                                : <span className="text-slate-400 text-xs">—</span>
+                                                        );
                                                     })()}
                                                 </td>
                                                 <td className="px-6 py-4">
