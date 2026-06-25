@@ -165,7 +165,15 @@ export const generateProfessionalQuote = (data) => {
                     const volText = bd.wrappingVolume > 0 ? ` (${Number(bd.wrappingVolume).toFixed(2)} ft³ x R5.90)` : '';
                     costs.push([`Specialized Wrapping${volText}`, `R ${Number(bd.wrappingCost).toFixed(2)}`]);
                 }
-                if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
+                if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping / Sleeves', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
+                // Move Protection — always shown as a separate service line
+                const protection = bd.standardInsurance || 0;
+                if (protection > 0) {
+                    const protectionLabel = protection >= 450
+                        ? 'Transport Services / Move Protection (300+ cubes)'
+                        : 'Transport Services / Move Protection';
+                    costs.push([protectionLabel, `R ${Number(protection).toFixed(2)}`]);
+                }
             }
 
             costs.push(
