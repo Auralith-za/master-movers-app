@@ -205,9 +205,7 @@ export default function TestCalcBreakdown() {
                                           itemId.includes('armchair') || name.includes('armchair') ||
                                           itemId.includes('daybed') || name.includes('daybed')
                                           
-        if (isReclinerOrPoofOrLounger) {
-            return 1
-        }
+        // Removed auto-sleeving for recliners, ottomans, and loungers so they can be manually ticked
         
         if (item.autoPackagingType === 'Plastic Covers') {
             return 1

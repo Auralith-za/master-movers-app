@@ -332,9 +332,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
                                           itemId.includes('armchair') || name.includes('armchair') ||
                                           itemId.includes('daybed') || name.includes('daybed')
                                           
-        if (isReclinerOrPoofOrLounger) {
-            return 1
-        }
+        // Removed auto-sleeving for recliners, ottomans, and loungers so they can be manually ticked
         
         if (item.autoPackagingType === 'Plastic Covers') {
             return 1
@@ -655,11 +653,11 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance) || 0
-            // Shuttle applied only if greater than 80m according to the new 50-80m flat rate
-            if (dist > 80) {
+            // Shuttle applied if greater than 60m
+            if (dist > 60) {
                 hasShuttle = true
             }
-            if (dist >= 50 && dist <= 80) {
+            if (dist >= 50 && dist <= 60) {
                 if (appliedLongCarryCost < 750) {
                     appliedLongCarryCost = 750
                 }
