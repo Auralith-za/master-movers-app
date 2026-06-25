@@ -262,7 +262,7 @@ export default function Step2Access() {
                                 />
                                 <span className="text-xs font-bold text-slate-400 uppercase">meters</span>
                             </div>
-                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: 50–60m incurs a flat rate of R450. Distances over 60m will be charged a shuttle vehicle fee.</p>
+                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: 50–80m incurs a flat rate of R750. Distances over 80m will be charged a shuttle vehicle fee.</p>
                         </div>
                     )}
 

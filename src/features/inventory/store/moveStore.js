@@ -660,9 +660,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
                 hasShuttle = true
             }
             if (dist >= 50 && dist <= 80) {
-                if (appliedLongCarryCost < 450) {
-                    // We use 450 based on screenshot ("Flat rate of 50-80 M @R450")
-                    appliedLongCarryCost = 450
+                if (appliedLongCarryCost < 750) {
+                    appliedLongCarryCost = 750
                 }
             }
         }
