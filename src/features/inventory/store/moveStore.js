@@ -628,13 +628,13 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
                 const flNum = parseInt(fl) || 0
                 if (flNum === 2) {
                     accessFees += 450
-                    detailedAccess.push(`${prefix} Stairs (2nd flr): R450`)
+                    detailedAccess.push(`${prefix} Long Carry Floors (2nd floor): R450`)
                 } else if (flNum === 3 || flNum === 4) {
                     accessFees += 750
-                    detailedAccess.push(`${prefix} Stairs (${flNum}rd/th flr): R750`)
+                    detailedAccess.push(`${prefix} Long Carry Floors (3rd-4th floor): R750`)
                 } else if (flNum >= 5) {
                     accessFees += 950
-                    detailedAccess.push(`${prefix} Stairs (${flNum}th+ flr): R950`)
+                    detailedAccess.push(`${prefix} Long Carry Floors (5th+ floor): R950`)
                 }
             }
         }
@@ -663,11 +663,13 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance) || 0
-            if (dist >= 50) {
+            // Shuttle applied only if greater than 80m according to the new 50-80m flat rate
+            if (dist > 80) {
                 hasShuttle = true
             }
             if (dist >= 50 && dist <= 80) {
                 if (appliedLongCarryCost < 450) {
+                    // We use 450 based on screenshot ("Flat rate of 50-80 M @R450")
                     appliedLongCarryCost = 450
                 }
             }
@@ -676,11 +678,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         if (appliedLongCarryCost > 0) {
             accessFees += appliedLongCarryCost
             longCarryCost += appliedLongCarryCost
-            if (isLongCarryAuto) {
-                detailedAccess.push(`${prefix} Long Carry (Floor 3+ Auto): R${appliedLongCarryCost}`)
-            } else {
-                detailedAccess.push(`${prefix} Long Carry (${loc.longCarryDistance}m): R${appliedLongCarryCost}`)
-            }
+            detailedAccess.push(`${prefix} Long Carry from street: R${appliedLongCarryCost}`)
         }
     }
     if (accessDetails?.origin) addAccess(accessDetails.origin, 'Origin')

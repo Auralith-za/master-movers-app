@@ -137,10 +137,11 @@ export const generateProfessionalQuote = (data) => {
             const { breakdown: bd, boxQty } = data;
             const costs = [];
 
-            // Inventory Volume line
+            // Transport Services line
             const displayVolume = totalVolume || bd?.totalVolume || 0;
             if (displayVolume > 0) {
-                costs.push(['Inventory Volume', `${Number(displayVolume).toFixed(2)} m³`]);
+                const transportCost = (bd?.transport || 0) + (bd?.volume || 0);
+                costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
             }
 
             if (bd) {
