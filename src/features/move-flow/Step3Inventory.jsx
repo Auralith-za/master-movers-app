@@ -39,7 +39,7 @@ export default function Step3Inventory() {
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
-    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
+    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, setInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState(orderedCategories[0])
 

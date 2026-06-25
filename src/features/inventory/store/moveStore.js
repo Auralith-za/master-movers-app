@@ -141,6 +141,7 @@ export const useMoveStore = create(
                 })
             },
             clearInventory: () => set((state) => ({ inventory: {}, undoHistory: [...state.undoHistory, state.inventory] })),
+            setInventory: (newInventory) => set((state) => ({ inventory: newInventory, undoHistory: [...state.undoHistory, state.inventory] })),
             
             manualServiceCharges: {},
             updateManualServiceCharge: (key, value) => set((state) => ({

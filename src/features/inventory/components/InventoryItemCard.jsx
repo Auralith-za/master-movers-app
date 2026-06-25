@@ -386,11 +386,17 @@ export default function InventoryItemCard({ item, quantity = 0, variation, onAdd
     const realisticImage = getInventoryImage(item);
     
     const hasWrapping = item.autoPackagingType && item.autoPackagingType !== 'crate'
-    // Determine auto-wrap / auto-sleeve states for visual cues and to prevent manual toggling
+    // AUTO-WRAP rules:
+    // • Items with variation options: ONLY Glass or Marble = auto-wrap. Standard/Wood = show tick.
+    // • Items WITHOUT variation options that have autoPackagingType='Wrapping': show tick (not auto)
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
     const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
-    const isAutoWrapped = (item?.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble
-    
+    // Only truly auto-wrap when a Glass/Marble variation is explicitly selected
+    const isAutoWrapped = isGlassOrMarble
+    // Show the optional wrapping tick when: not auto-wrapped, and either has a non-Glass/Marble variation OR has no variation at all
+    const showWrappingTick = !isAutoWrapped
+
+    // AUTO-SLEEVE rules: only beds, mattresses, couches/sofas get auto sleeves
     const isAutoSleeve = item.id.includes('bed') || (item.name || '').toLowerCase().includes('bed') ||
                          item.id.includes('mattress') || (item.name || '').toLowerCase().includes('mattress') ||
                          item.id.includes('couch') || (item.name || '').toLowerCase().includes('couch') ||
