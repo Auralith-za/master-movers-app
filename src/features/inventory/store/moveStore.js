@@ -296,9 +296,9 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     let requiresPhotoFlag = false
 
     const getPlasticSleevesCount = (item, idKey) => {
-        const itemId = item.id.toLowerCase()
-        const name = item.name.toLowerCase()
-        const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
+        const itemId = (item?.id || '').toLowerCase()
+        const name = (item?.name || '').toLowerCase()
+        const variation = (idKey || '').includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
         
         const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
         const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 

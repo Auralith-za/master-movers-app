@@ -209,7 +209,7 @@ export default function QuoteDetailPage() {
             return calculateQuote(inventory, moveDetails, editForm.access_details, INVENTORY_ITEMS, manualServiceCharges)
         } catch (err) {
             console.error("calculateQuote error:", err)
-            return null
+            return { error: err.message }
         }
     }, [editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, isEditing])
 
@@ -476,6 +476,12 @@ export default function QuoteDetailPage() {
                     </button>
                 </div>
             </div>
+
+            {recalculatedData?.error && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-lg font-bold">
+                    Calculation Error: {recalculatedData.error}
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
