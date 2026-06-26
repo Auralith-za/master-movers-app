@@ -1,10 +1,13 @@
 import React, { useMemo } from 'react'
 import { Truck } from 'lucide-react'
 import TruckVisual from './TruckVisual'
+import { useMoveStore } from '../store/moveStore'
 
 export default function VolumeSummary({ items, inventory, breakdown = {}, children }) {
+    const { moveDetails } = useMoveStore()
+    
     const totalVolume = useMemo(() => {
-        return Object.entries(inventory).reduce((total, [idKey, qty]) => {
+        let baseVolume = Object.entries(inventory).reduce((total, [idKey, qty]) => {
             const [itemId] = idKey.split('_')
             if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
                 return total
@@ -12,19 +15,28 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
             const item = items.find(i => i.id === itemId)
             return total + (item ? item.volume * qty : 0)
         }, 0)
-    }, [items, inventory])
+        
+        const orderedSt7Boxes = moveDetails?.st7Boxes || 0
+        const orderedLinenBoxes = moveDetails?.linenBoxes || 0
+        return baseVolume + (orderedSt7Boxes * 4) + (orderedLinenBoxes * 7)
+    }, [items, inventory, moveDetails?.st7Boxes, moveDetails?.linenBoxes])
 
     const boxQty = useMemo(() => {
-        return Object.entries(inventory).reduce((total, [idKey, qty]) => {
+        let baseQty = Object.entries(inventory).reduce((total, [idKey, qty]) => {
             const [itemId] = idKey.split('_')
             if (itemId === 'boxes' || itemId.startsWith('boxes-')) {
                 return total + qty
             }
             return total
         }, 0)
-    }, [inventory])
+        
+        const orderedSt7Boxes = moveDetails?.st7Boxes || 0
+        const orderedLinenBoxes = moveDetails?.linenBoxes || 0
+        return baseQty + orderedSt7Boxes + orderedLinenBoxes
+    }, [inventory, moveDetails?.st7Boxes, moveDetails?.linenBoxes])
 
-    const volumeForTruck = totalVolume + 4.25 * boxQty
+    // Remove the 4.25 multiplier for boxQty since we already included precise box volumes in totalVolume
+    const volumeForTruck = totalVolume
     const truckSize = 883
     const usagePercent = Math.min((volumeForTruck / truckSize) * 100, 100)
 

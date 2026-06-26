@@ -15,7 +15,7 @@ serve(async (req) => {
         const supabase = createClient(supabaseUrl, serviceKey)
 
         const body = await req.json().catch(() => ({}))
-        const { action, code, discount_percent, description, max_uses, expires_at, coupon_id } = body
+        const { action, code, discount_type, discount_percent, discount_amount, description, max_uses, expires_at, coupon_id } = body
 
         // ── SETUP: Create table + seed via direct Postgres REST ──────────
         if (action === 'setup') {
@@ -24,13 +24,19 @@ serve(async (req) => {
                 CREATE TABLE IF NOT EXISTS public.coupons (
                   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
                   code text NOT NULL UNIQUE,
-                  discount_percent integer NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
+                  discount_type text NOT NULL DEFAULT 'percent' CHECK (discount_type IN ('percent', 'fixed')),
+                  discount_percent integer,
+                  discount_amount numeric,
                   description text DEFAULT '',
                   is_active boolean DEFAULT true,
                   max_uses integer DEFAULT NULL,
                   times_used integer DEFAULT 0,
                   expires_at timestamptz DEFAULT NULL,
-                  created_at timestamptz DEFAULT now()
+                  created_at timestamptz DEFAULT now(),
+                  CONSTRAINT coupons_discount_percent_check CHECK (
+                    (discount_type = 'percent' AND discount_percent > 0 AND discount_percent <= 100) OR
+                    (discount_type = 'fixed' AND discount_percent IS NULL AND discount_amount > 0)
+                  )
                 );
                 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
                 DO $$ BEGIN
@@ -38,10 +44,10 @@ serve(async (req) => {
                     CREATE POLICY anon_read_active ON public.coupons FOR SELECT USING (is_active = true);
                   END IF;
                 END $$;
-                INSERT INTO public.coupons (code, discount_percent, description) VALUES
-                  ('TESTMOVE10', 10, '10% off for testing'),
-                  ('LAUNCH20', 20, '20% launch discount'),
-                  ('STAFF50', 50, 'Staff 50% testing discount')
+                INSERT INTO public.coupons (code, discount_type, discount_percent, description) VALUES
+                  ('TESTMOVE10', 'percent', 10, '10% off for testing'),
+                  ('LAUNCH20', 'percent', 20, '20% launch discount'),
+                  ('STAFF50', 'percent', 50, 'Staff 50% testing discount')
                 ON CONFLICT (code) DO NOTHING;
             `
             const pgRes = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
@@ -59,9 +65,9 @@ serve(async (req) => {
 
             // Just try inserting the seed data - table may already exist from dashboard
             const seed = await supabase.from('coupons').upsert([
-                { code: 'TESTMOVE10', discount_percent: 10, description: '10% off for testing' },
-                { code: 'LAUNCH20', discount_percent: 20, description: '20% launch discount' },
-                { code: 'STAFF50', discount_percent: 50, description: 'Staff 50% testing discount' }
+                { code: 'TESTMOVE10', discount_type: 'percent', discount_percent: 10, description: '10% off for testing' },
+                { code: 'LAUNCH20', discount_type: 'percent', discount_percent: 20, description: '20% launch discount' },
+                { code: 'STAFF50', discount_type: 'percent', discount_percent: 50, description: 'Staff 50% testing discount' }
             ], { onConflict: 'code' })
 
             return new Response(JSON.stringify({
@@ -95,7 +101,9 @@ serve(async (req) => {
 
             return new Response(JSON.stringify({
                 valid: true,
+                discount_type: data.discount_type || 'percent',
                 discount_percent: data.discount_percent,
+                discount_amount: data.discount_amount,
                 description: data.description,
                 code: data.code
             }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -110,15 +118,28 @@ serve(async (req) => {
 
         // ── CREATE COUPON (admin) ─────────────────────────────────────────
         if (action === 'create') {
-            if (!code || !discount_percent) throw new Error('code and discount_percent are required')
-            const { data, error } = await supabase.from('coupons').insert({
+            if (!code) throw new Error('code is required')
+            
+            const payload: any = {
                 code: code.trim().toUpperCase(),
-                discount_percent: Number(discount_percent),
+                discount_type: discount_type || 'percent',
                 description: description || '',
                 max_uses: max_uses ? Number(max_uses) : null,
                 expires_at: expires_at || null,
                 is_active: true
-            }).select().single()
+            }
+
+            if (payload.discount_type === 'percent') {
+                if (!discount_percent) throw new Error('discount_percent is required for percent type')
+                payload.discount_percent = Number(discount_percent)
+            } else if (payload.discount_type === 'fixed') {
+                if (!discount_amount) throw new Error('discount_amount is required for fixed type')
+                payload.discount_amount = Number(discount_amount)
+            } else {
+                throw new Error('Invalid discount_type')
+            }
+
+            const { data, error } = await supabase.from('coupons').insert(payload).select().single()
             if (error) throw error
             return new Response(JSON.stringify({ success: true, coupon: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }

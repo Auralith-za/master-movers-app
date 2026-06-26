@@ -13,7 +13,7 @@ async function callCouponManager(body) {
     return res.json()
 }
 
-const emptyForm = { code: '', discount_percent: '', description: '', max_uses: '', expires_at: '' }
+const emptyForm = { code: '', discount_type: 'percent', discount_percent: '', discount_amount: '', description: '', max_uses: '', expires_at: '' }
 
 export default function AdminCoupons() {
     const [coupons, setCoupons] = useState([])
@@ -35,13 +35,17 @@ export default function AdminCoupons() {
 
     const handleCreate = async (e) => {
         e.preventDefault()
-        if (!form.code || !form.discount_percent) { setError('Code and discount % are required.'); return }
+        if (!form.code) { setError('Code is required.'); return }
+        if (form.discount_type === 'percent' && !form.discount_percent) { setError('Discount % is required.'); return }
+        if (form.discount_type === 'fixed' && !form.discount_amount) { setError('Discount amount is required.'); return }
         setSaving(true)
         setError('')
         const res = await callCouponManager({
             action: 'create',
             code: form.code,
-            discount_percent: Number(form.discount_percent),
+            discount_type: form.discount_type,
+            discount_percent: form.discount_type === 'percent' ? Number(form.discount_percent) : null,
+            discount_amount: form.discount_type === 'fixed' ? Number(form.discount_amount) : null,
             description: form.description,
             max_uses: form.max_uses ? Number(form.max_uses) : null,
             expires_at: form.expires_at || null
@@ -109,16 +113,43 @@ export default function AdminCoupons() {
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Discount % *</label>
-                            <input
-                                type="number" min="1" max="100"
-                                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:border-red-500 focus:outline-none"
-                                placeholder="e.g. 10"
-                                value={form.discount_percent}
-                                onChange={e => setForm(f => ({ ...f, discount_percent: e.target.value }))}
-                                required
-                            />
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Discount Type *</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                    <input type="radio" name="discount_type" value="percent" checked={form.discount_type === 'percent'} onChange={e => setForm(f => ({ ...f, discount_type: 'percent', discount_amount: '' }))} className="accent-red-500" />
+                                    Percentage (%)
+                                </label>
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                    <input type="radio" name="discount_type" value="fixed" checked={form.discount_type === 'fixed'} onChange={e => setForm(f => ({ ...f, discount_type: 'fixed', discount_percent: '' }))} className="accent-red-500" />
+                                    Fixed Amount (R)
+                                </label>
+                            </div>
                         </div>
+                        {form.discount_type === 'percent' ? (
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Discount % *</label>
+                                <input
+                                    type="number" min="1" max="100"
+                                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:border-red-500 focus:outline-none"
+                                    placeholder="e.g. 10"
+                                    value={form.discount_percent}
+                                    onChange={e => setForm(f => ({ ...f, discount_percent: e.target.value }))}
+                                    required={form.discount_type === 'percent'}
+                                />
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Discount Amount (R) *</label>
+                                <input
+                                    type="number" min="1"
+                                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:border-red-500 focus:outline-none"
+                                    placeholder="e.g. 500"
+                                    value={form.discount_amount}
+                                    onChange={e => setForm(f => ({ ...f, discount_amount: e.target.value }))}
+                                    required={form.discount_type === 'fixed'}
+                                />
+                            </div>
+                        )}
                         <div className="sm:col-span-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Description (shown to customer)</label>
                             <input
@@ -197,7 +228,7 @@ export default function AdminCoupons() {
                                     </td>
                                     <td className="px-4 py-4">
                                         <span className="bg-red-100 text-red-700 font-black text-xs px-2.5 py-1 rounded-full">
-                                            -{coupon.discount_percent}%
+                                            {coupon.discount_type === 'fixed' ? `-R ${coupon.discount_amount}` : `-${coupon.discount_percent}%`}
                                         </span>
                                     </td>
                                     <td className="px-4 py-4 text-slate-500 hidden sm:table-cell max-w-[180px] truncate">{coupon.description || '—'}</td>

@@ -286,20 +286,11 @@ export const useMoveStore = create(
     )
 )
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0) => {
-    const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
-    let totalVolume = 0
-    let plasticSleeveCost = 0
-    let plasticSleeveCount = 0
-    let wrappingCost = 0
-    let wrappingVolume = 0
-    let requiresCrateFlag = false
-    let requiresPhotoFlag = false
-
-    const getPlasticSleevesCount = (item, idKey) => {
-        const itemId = (item?.id || '').toLowerCase()
-        const name = (item?.name || '').toLowerCase()
-        const variation = (idKey || '').includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
+export const getPlasticSleevesCount = (item, idKey) => {
+    if (!item) return 0;
+    const itemId = (item.id || '').toLowerCase()
+    const name = (item.name || '').toLowerCase()
+    const variation = (idKey || '').includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
         
         const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
         const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 
@@ -342,8 +333,25 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             return 1
         }
         
-        return 0
-    }
+    return 0
+}
+
+export const getWrappingFlag = (item, variation) => {
+    if (!item) return false;
+    const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
+    const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
+    return (item.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble || variation?.includes('Wrapped')
+}
+
+export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null) => {
+    const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
+    let totalVolume = 0
+    let plasticSleeveCost = 0
+    let plasticSleeveCount = 0
+    let wrappingCost = 0
+    let wrappingVolume = 0
+    let requiresCrateFlag = false
+    let requiresPhotoFlag = false
 
     let boxQty = 0
     Object.entries(inventory).forEach(([idKey, qty]) => {
@@ -355,21 +363,27 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             totalVolume += item.volume * qty
 
             
-            const sleeves = getPlasticSleevesCount(item, idKey)
-            if (sleeves > 0) {
-                plasticSleeveCount += (qty * sleeves)
-                plasticSleeveCost += (qty * sleeves * 55)
-            }
+            let sleeves = getPlasticSleevesCount(item, idKey)
             
             // Wrapping only applies when:
             //  - Item has autoPackagingType = 'Wrapping' AND no variation selected (no material choice)
             //  - OR the selected variation is specifically Glass or Marble
             // Standard Wood/Other = no wrapping cost.
-            const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
-            const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
-            const appliesWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
+            let appliesWrapping = getWrappingFlag(item, variation)
+
+            // Apply overrides if any
+            if (specialWrappingOverrides && specialWrappingOverrides[idKey]) {
+                const override = specialWrappingOverrides[idKey]
+                if (override.sleeves !== undefined) sleeves = override.sleeves
+                if (override.wrap !== undefined) appliesWrapping = override.wrap
+            }
+
+            if (sleeves > 0) {
+                plasticSleeveCount += (qty * sleeves)
+                plasticSleeveCost += (qty * sleeves * 55)
+            }
             
-            if (appliesWrapping || isGlassOrMarble || variation?.includes('Wrapped')) {
+            if (appliesWrapping) {
                 // R5.90 per cubic FOOT
                 wrappingVolume += (qty * item.volume)
                 wrappingCost += qty * (item.volume * 5.90);
@@ -382,6 +396,11 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     // Add any extra volume (e.g. from manual custom items in admin)
     totalVolume += extraVolumeCuFt
+
+    // Add volume for ordered boxes
+    const orderedSt7Volume = (moveDetails.st7Boxes || 0) * 4
+    const orderedLinenVolume = (moveDetails.linenBoxes || 0) * 7
+    totalVolume += orderedSt7Volume + orderedLinenVolume
 
     const totalVolumeCuFt = totalVolume
     const pickupAddress = (moveDetails.pickupAddress || '').toLowerCase()
@@ -580,10 +599,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         // Local logic: Vehicle selection by volume + ft3 charge
         const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
         const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
-        // Add volume for ordered boxes (4.25 cu ft per box)
-        const orderedSt7Volume = (moveDetails.st7Boxes || 0) * 4.25
-        const volumeForVehicle = totalVolumeCuFt + orderedSt7Volume
-        const vehicle = vehicleList.find(v => v.capacityCuFt >= volumeForVehicle) || vehicleList[vehicleList.length - 1]
+        const vehicle = vehicleList.find(v => v.capacityCuFt >= totalVolumeCuFt) || vehicleList[vehicleList.length - 1]
         
         transportRate = vehicle.ratePerKm || 0
         volumeRate = vehicle.ratePerCuFt || 0
@@ -738,8 +754,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         })
     }
 
-    // All Risk Insurance: R250 up to 300 cubes, R450 over 300 cubes
-    const standardInsurance = totalVolumeCuFt <= 300 ? 250 : 450
+    // All Risk Insurance: R250
+    const standardInsurance = 250
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
     const VAT_RATE = 0.15
@@ -800,7 +816,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         totalVolume,
         totalVolumeCuFt,
         boxQty: moveDetails.st7Boxes || 0,
-        volumeForVehicle: totalVolumeCuFt + ((moveDetails.st7Boxes || 0) * 4.25),
+        volumeForVehicle: totalVolumeCuFt,
         isNationalMove,
         needsQuoteRequest,
         packagingCost: packagingCost + autoPackagingCost,

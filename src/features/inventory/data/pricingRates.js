@@ -134,7 +134,7 @@ export const ADDITIONAL_COSTS = {
 export const PACKAGING_RATES = {
     sendMeBoxesOnly: {
         st7:         50.00,
-        linen:       165.00,
+        linen:       125.00,
         deliveryFee: 500.00
     },
     boxesAndPacking: {

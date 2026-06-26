@@ -32,7 +32,13 @@ export default function CouponInput({ onApply, onRemove, appliedCoupon }) {
             })
             const data = await res.json()
             if (data.valid) {
-                onApply({ code: data.code, discount_percent: data.discount_percent, description: data.description })
+                onApply({ 
+                    code: data.code, 
+                    discount_type: data.discount_type,
+                    discount_percent: data.discount_percent, 
+                    discount_amount: data.discount_amount,
+                    description: data.description 
+                })
                 setCode('')
             } else {
                 setError(data.error || 'Invalid coupon code.')
@@ -58,7 +64,9 @@ export default function CouponInput({ onApply, onRemove, appliedCoupon }) {
                         <p className="text-emerald-900 font-black text-sm uppercase tracking-widest">
                             {appliedCoupon.code}
                             <span className="ml-2 bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
-                                -{appliedCoupon.discount_percent}%
+                                {appliedCoupon.discount_type === 'fixed' 
+                                    ? `-R ${appliedCoupon.discount_amount}` 
+                                    : `-${appliedCoupon.discount_percent}%`}
                             </span>
                         </p>
                         {appliedCoupon.description && (

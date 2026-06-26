@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PACKAGING_RATES } from '../features/inventory/data/pricingRates';
 
 /**
  * Service to generate professional PDF quotes for MasterMovers
@@ -153,8 +154,8 @@ export const generateProfessionalQuote = (data) => {
                     const numSt7 = st7Boxes || data.st7Boxes || 0;
                     const numLinen = linenBoxes || data.linenBoxes || 0;
                     const labels = [];
-                    if (numSt7 > 0) labels.push(`${numSt7} x R85`);
-                    if (numLinen > 0) labels.push(`${numLinen} x R165`);
+                    if (numSt7 > 0) labels.push(`${numSt7} x R${(data.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)}`);
+                    if (numLinen > 0) labels.push(`${numLinen} x R${(data.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)}`);
                     const boxText = labels.length > 0 ? `Box Supplies (${labels.join(', ')})` : 'Box Supplies';
                     costs.push([boxText, `R ${Number(bd.packaging).toFixed(2)}`]);
                 }
@@ -170,9 +171,7 @@ export const generateProfessionalQuote = (data) => {
                 // Move Protection — always shown as a separate service line
                 const protection = bd.standardInsurance || 0;
                 if (protection > 0) {
-                    const protectionLabel = protection >= 450
-                        ? 'Transport Services / Move Protection (300+ cubes)'
-                        : 'Transport Services / Move Protection';
+                    const protectionLabel = 'Transport Services / Move Protection';
                     costs.push([protectionLabel, `R ${Number(protection).toFixed(2)}`]);
                 }
             }

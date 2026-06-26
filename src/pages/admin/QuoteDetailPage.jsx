@@ -8,12 +8,14 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
-import { calculateQuote, useMoveStore } from '../../features/inventory/store/moveStore'
+import { calculateQuote, useMoveStore, getPlasticSleevesCount, getWrappingFlag } from '../../features/inventory/store/moveStore'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
 import { getInventoryImage } from '../../features/inventory/components/InventoryItemCard'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
+import { PACKAGING_RATES } from '../../features/inventory/data/pricingRates'
+import CouponInput from '../../features/payment/CouponInput'
 import clsx from 'clsx'
 
 const orderedCategories = (() => {
@@ -203,33 +205,10 @@ export default function QuoteDetailPage() {
         }
 
         const manualServiceCharges = { ...(isEditing ? (editForm.manual_service_charges || {}) : (quote?.manual_service_charges || {})) }
-        let individualWrappingCost = 0
-        let individualSleeveCost = 0
         const srcWrapping = isEditing ? (editForm.special_wrapping || {}) : (quote?.items_json?.special_wrapping || {})
-        if (srcWrapping) {
-            Object.entries(srcWrapping).forEach(([itemId, wrap]) => {
-                const qty = inventory[itemId] || 0
-                const baseItemId = itemId.split('_')[0]
-                const itemDef = INVENTORY_ITEMS.find(i => i.id === baseItemId)
-                const vol = itemDef?.volume || 0
-                // New format: wrap:true means vol × qty × R5.90
-                if (wrap?.wrap === true) {
-                    individualWrappingCost += vol * qty * 5.90
-                } else if (wrap?.enabled && wrap?.fee) {
-                    // Legacy flat-fee format (backwards compat)
-                    individualWrappingCost += parseFloat(wrap.fee) || 0
-                }
-                // Plastic sleeves: n × R55
-                if (wrap?.sleeves > 0) {
-                    individualSleeveCost += (wrap.sleeves * 55)
-                }
-            })
-        }
-        manualServiceCharges.specialWrapping = (parseFloat(manualServiceCharges.specialWrapping) || 0) + individualWrappingCost + individualSleeveCost
-
 
         try {
-            return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges)
+            return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges, 0, srcWrapping)
         } catch (err) {
             console.error("calculateQuote error:", err)
             return { error: err.message }
@@ -268,6 +247,29 @@ export default function QuoteDetailPage() {
         const newProduct = { id: Date.now(), name, cubes, price }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
         setCustomProductForm({ name: '', cubes: '', price: '' })
+    }
+
+    const handleApplyCoupon = (coupon) => {
+        const basePrice = recalculatedData?.total || editForm.total_price || 0
+        const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
+        
+        const discountAmount = coupon.discount_type === 'fixed' 
+            ? coupon.discount_amount 
+            : ((basePrice + customProductsTotal) * coupon.discount_percent) / 100
+            
+        const newProduct = { 
+            id: `coupon_${Date.now()}`, 
+            name: `Coupon (${coupon.code})`, 
+            cubes: 0, 
+            price: -Math.abs(discountAmount) 
+        }
+        
+        setEditForm(prev => ({ 
+            ...prev, 
+            custom_products: [...(prev.custom_products || []), newProduct] 
+        }))
+        
+        alert(`Coupon applied! Added as a discount of R ${discountAmount.toFixed(2)}`)
     }
 
     const handleRemoveCustomProduct = (productId) => {
@@ -843,13 +845,8 @@ export default function QuoteDetailPage() {
                                                 <td className="px-6 py-4 text-center">
                                                     {(() => {
                                                         const variation = itemId.includes('_') ? itemId.split('_').slice(1).join('_') : null
-                                                        const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
-                                                        const isAutoWrapped = isGlassOrMarble
-
-                                                        if (isAutoWrapped) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">✓ Auto-Wrapped (Glass/Marble)</span>
-
-                                                        // Wrapping cost = item volume × qty × R5.90
-                                                        const wrappingEnabled = wrapInfo.wrap === true
+                                                        const defaultWrapped = getWrappingFlag(item, variation)
+                                                        const wrappingEnabled = wrapInfo.wrap !== undefined ? wrapInfo.wrap : defaultWrapped
                                                         const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0
 
                                                         return isEditing ? (
@@ -861,13 +858,13 @@ export default function QuoteDetailPage() {
                                                                         onChange={(e) => {
                                                                             const updatedWrap = {
                                                                                 ...(editForm.special_wrapping || {}),
-                                                                                [itemId]: { ...wrapInfo, wrap: e.target.checked, fee: e.target.checked ? ((item?.volume || 0) * qty * 5.90) : 0 }
+                                                                                [itemId]: { ...wrapInfo, wrap: e.target.checked }
                                                                             }
                                                                             setEditForm({ ...editForm, special_wrapping: updatedWrap })
                                                                         }}
                                                                         className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
                                                                     />
-                                                                    Add Wrapping
+                                                                    {defaultWrapped ? "Auto-Wrap (Override)" : "Add Wrapping"}
                                                                 </label>
                                                                 {wrappingEnabled && (
                                                                     <span className="text-[10px] text-emerald-600 font-bold">
@@ -886,36 +883,26 @@ export default function QuoteDetailPage() {
                                                 {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
                                                 <td className="px-6 py-4 text-center">
                                                     {(() => {
-                                                        const isAutoSleeve = item?.autoPackagingType === 'Plastic Covers' ||
-                                                            itemId.includes('bed') || (item?.name || '').toLowerCase().includes('bed') ||
-                                                            itemId.includes('mattress') || (item?.name || '').toLowerCase().includes('mattress') ||
-                                                            itemId.includes('couch') || (item?.name || '').toLowerCase().includes('couch') ||
-                                                            itemId.includes('sofa') || (item?.name || '').toLowerCase().includes('sofa') ||
-                                                            itemId.includes('seater') || (item?.name || '').toLowerCase().includes('seater') ||
-                                                            itemId.includes('suite') || (item?.name || '').toLowerCase().includes('suite') ||
-                                                            itemId.includes('futon') || (item?.name || '').toLowerCase().includes('futon');
-
-                                                        if (isAutoSleeve) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">✓ Auto-Sleeve ({qty} × R55)</span>
-
-                                                        const sleeveQty = wrapInfo.sleeves || 0
-                                                        const sleeveCost = sleeveQty * 55
+                                                        const defaultSleeves = getPlasticSleevesCount(item, itemId)
+                                                        const sleeveQty = wrapInfo.sleeves !== undefined ? wrapInfo.sleeves : defaultSleeves
+                                                        const sleeveCost = sleeveQty * qty * 55
 
                                                         return isEditing ? (
                                                             <div className="flex flex-col items-center gap-1">
                                                                 <div className="flex items-center gap-1">
                                                                     <button onClick={() => {
                                                                         const newQty = Math.max(0, sleeveQty - 1)
-                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty, sleeveFee: newQty * 55 } }
+                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
                                                                         setEditForm({ ...editForm, special_wrapping: updatedWrap })
                                                                     }} className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">−</button>
                                                                     <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
                                                                     <button onClick={() => {
                                                                         const newQty = sleeveQty + 1
-                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty, sleeveFee: newQty * 55 } }
+                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
                                                                         setEditForm({ ...editForm, special_wrapping: updatedWrap })
                                                                     }} className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">+</button>
                                                                 </div>
-                                                                {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × R55 = R {sleeveCost.toFixed(2)}</span>}
+                                                                {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × {qty} × R55 = R {sleeveCost.toFixed(2)}</span>}
                                                             </div>
                                                         ) : (
                                                             sleeveQty > 0
@@ -1214,7 +1201,7 @@ export default function QuoteDetailPage() {
                                 )}
                                 {isEditing && recalculatedData?.breakdown?.packaging > 0 && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Box Supplies {editForm.st7_boxes > 0 && `(${editForm.st7_boxes} x R85)`} {editForm.linen_boxes > 0 && `(${editForm.linen_boxes} x R165)`}</span>
+                                        <span>Box Supplies {editForm.st7_boxes > 0 && `(${editForm.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {editForm.linen_boxes > 0 && `(${editForm.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
                                         <span className="font-bold">+ R {recalculatedData.breakdown.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
@@ -1250,7 +1237,76 @@ export default function QuoteDetailPage() {
                         </div>
                     </div>
 
+                    {/* MANUAL ADJUSTMENTS (Only visible when editing) */}
+                    {isEditing && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <Plus size={18} className="text-primary-600" /> Manual Adjustments & Coupons
+                            </h3>
+                            
+                            {/* Custom Products List */}
+                            {editForm.custom_products?.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                    {editForm.custom_products.map(p => (
+                                        <div key={p.id} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-xs">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-slate-700">{p.name}</span>
+                                                {p.cubes > 0 && <span className="text-[10px] text-slate-400">Vol: {p.cubes} ft³</span>}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`font-bold ${p.price < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                    {p.price < 0 ? '-' : '+'} R {Math.abs(p.price).toFixed(2)}
+                                                </span>
+                                                <button onClick={() => handleRemoveCustomProduct(p.id)} className="text-slate-400 hover:text-red-500">
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
+                            {/* Add Custom Item Form */}
+                            <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-gray-50">
+                                <input 
+                                    className="text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
+                                    placeholder="Item/Service/Discount Name"
+                                    value={customProductForm.name}
+                                    onChange={e => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="number"
+                                        className="w-1/2 text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
+                                        placeholder="Volume (ft³)"
+                                        value={customProductForm.cubes}
+                                        onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
+                                    />
+                                    <input 
+                                        type="number"
+                                        className="w-1/2 text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
+                                        placeholder="Price (Use - for discount)"
+                                        value={customProductForm.price}
+                                        onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
+                                    />
+                                </div>
+                                <button 
+                                    onClick={handleAddCustomProduct}
+                                    disabled={!customProductForm.name}
+                                    className="w-full mt-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded transition-colors disabled:opacity-50"
+                                >
+                                    Add Custom Adjustment
+                                </button>
+                            </div>
+
+                            {/* Apply Coupon */}
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Apply Promo Code</label>
+                                <CouponInput onApply={handleApplyCoupon} onRemove={() => {}} appliedCoupon={null} />
+                                <p className="text-[9px] text-slate-400 mt-1">Coupons are added as a negative price adjustment.</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* CLIENT CARD */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

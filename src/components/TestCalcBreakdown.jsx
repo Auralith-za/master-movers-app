@@ -11,7 +11,7 @@
 import React, { useMemo } from 'react'
 import { useMoveStore, calculateQuote } from '../features/inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems'
-import { getCityCode, detectCityCode, LOCAL_VEHICLE_RATES, NATIONAL_RATES, CITY_CODES, PRICING_CONSTANTS } from '../features/inventory/data/pricingRates'
+import { getCityCode, detectCityCode, LOCAL_VEHICLE_RATES, NATIONAL_RATES, CITY_CODES, PRICING_CONSTANTS, PACKAGING_RATES } from '../features/inventory/data/pricingRates'
 import { DEPOT_LOCATIONS } from '../services/googleMaps'
 import { FlaskConical, MapPin, Truck, Package, Calculator, BadgeCheck, AlertCircle } from 'lucide-react'
 
@@ -145,11 +145,17 @@ export default function TestCalcBreakdown() {
         }
     })
 
+    // Add ordered boxes from moveDetails
+    const orderedSt7Boxes = moveDetails.st7Boxes || 0;
+    const orderedLinenBoxes = moveDetails.linenBoxes || 0;
+    totalVolume += (orderedSt7Boxes * 4) + (orderedLinenBoxes * 7);
+    boxQty += orderedSt7Boxes + orderedLinenBoxes;
+
     // Vehicle selection (mirroring moveStore logic)
     const isNational = result?.isNationalMove || false
     const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
     const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
-    const volumeForVehicle = totalVolume + (4.25 * (moveDetails.st7Boxes || 0))
+    const volumeForVehicle = totalVolume
     const assignedVehicle = !isNational
         ? (vehicleList.find(v => v.capacityCuFt >= volumeForVehicle) || vehicleList[vehicleList.length - 1])
         : null
@@ -397,8 +403,8 @@ export default function TestCalcBreakdown() {
                         )}
 
                         {/* Box Supplies (Step 2) */}
-                        {result.breakdown?.packaging > 0 ? (
-                            <Row label={`Box Supplies / Packaging ${moveDetails?.st7Boxes > 0 ? `(${moveDetails.st7Boxes} Std x R85)` : ''} ${moveDetails?.linenBoxes > 0 ? `(${moveDetails.linenBoxes} Linen x R165)` : ''}`} value={R(result.breakdown.packaging)} warn />
+                        {result?.breakdown?.packaging > 0 ? (
+                            <Row label={`Box Supplies / Packaging ${moveDetails?.st7Boxes > 0 ? `(${moveDetails.st7Boxes} Std x R${(moveDetails.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})` : ''} ${moveDetails?.linenBoxes > 0 ? `(${moveDetails.linenBoxes} Linen x R${(moveDetails.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})` : ''}`} value={R(result.breakdown.packaging)} warn />
                         ) : (
                             <Row label="Box Supplies / Packaging" value="✓ None" />
                         )}

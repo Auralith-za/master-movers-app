@@ -144,7 +144,9 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
     // Apply coupon discount on top of calculated total
-    const couponDiscount = appliedCoupon ? (total * appliedCoupon.discount_percent) / 100 : 0
+    const couponDiscount = appliedCoupon ? (
+        appliedCoupon.discount_type === 'fixed' ? appliedCoupon.discount_amount : (total * appliedCoupon.discount_percent) / 100
+    ) : 0
     const discountedTotal = Math.max(0, total - couponDiscount)
 
     // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners.
@@ -647,7 +649,9 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Total (incl. VAT)</div>
                                         <div className="text-lg font-bold text-slate-500 line-through">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-3xl font-bold text-emerald-400">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">-{appliedCoupon.discount_percent}% Coupon Applied!</div>
+                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">
+                                            {appliedCoupon.discount_type === 'fixed' ? `-R ${appliedCoupon.discount_amount}` : `-${appliedCoupon.discount_percent}%`} Coupon Applied!
+                                        </div>
                                     </>
                                 ) : (
                                     <>
