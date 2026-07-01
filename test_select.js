@@ -8,4 +8,9 @@ const env = fs.readFileSync('.env', 'utf-8').split('\n').reduce((acc, line) => {
 }, {});
 
 const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
-supabase.from('quotes').select('id, client_name').limit(2).then(res => console.log(JSON.stringify(res, null, 2)));
+supabase.from('quotes')
+  .select('*')
+  .eq('client_email', 'shaakirahmayet14@gmail.com')
+  .then(res => {
+    console.log(res.data);
+  });

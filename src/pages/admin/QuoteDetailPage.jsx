@@ -83,6 +83,11 @@ export default function QuoteDetailPage() {
     // Auto-calculate distance when addresses change
     useEffect(() => {
         if (isEditing && editForm.pickup_address && editForm.dropoff_address) {
+            // Only recalculate if the addresses have actually changed from the saved database values
+            if (editForm.pickup_address === quote?.pickup_address && editForm.dropoff_address === quote?.dropoff_address) {
+                return;
+            }
+
             const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
             calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
                 .then(({ totalDistance }) => {
@@ -95,7 +100,7 @@ export default function QuoteDetailPage() {
                     alert("Google Maps could not process these addresses. Please fix the addresses or manually enter the correct Billable Distance (km) below.");
                 })
         }
-    }, [editForm.pickup_address, editForm.dropoff_address, isEditing])
+    }, [editForm.pickup_address, editForm.dropoff_address, isEditing, quote?.pickup_address, quote?.dropoff_address])
 
     const fetchQuote = async () => {
         try {
