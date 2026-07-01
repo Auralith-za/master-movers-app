@@ -192,7 +192,7 @@ export const useMoveStore = create(
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
                     distance_km: Number(dbOverrides.distance_km || state.moveDetails.distanceKm || 0),
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
-                    items_json: { ...(state.inventory || {}), cant_find_address: isLocationNotFound },
+                    items_json: { ...(state.inventory || {}) },
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: dbOverrides.status || overrides.status || 'new',
@@ -295,35 +295,42 @@ export const getPlasticSleevesCount = (item, idKey) => {
         const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
         const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 
                                       itemId.includes('mattress') || name.includes('mattress') || 
-                                      itemId.includes('base') || name.includes('base') ||
                                       itemId.includes('futon') || name.includes('futon')
         
         if (isBedOrMattressOrBase) {
             return isKing ? 4 : 2
         }
         
-        const isCouch = itemId.includes('couch') || name.includes('couch') || 
+        const isCouch = (itemId.includes('couch') || name.includes('couch') || 
                         itemId.includes('sofa') || name.includes('sofa') || 
                         itemId.includes('suite') || name.includes('suite') ||
-                        itemId.includes('seater') || name.includes('seater')
+                        itemId.includes('seater') || name.includes('seater')) && 
+                        !itemId.includes('table') && !name.includes('table')
                         
         if (isCouch) {
+            const isLShape = itemId.includes('l-shape') || name.includes('l shape') || name.includes('l-shape')
+            if (isLShape) return 3
+            
             const is4Seater = itemId.includes('4-seater') || name.includes('4-seater') || 
                               itemId.includes('4 seater') || name.includes('4 seater') ||
                               variation.includes('4-seater') || variation.includes('4 seater')
-            return is4Seater ? 2 : 1
+            const is3Seater = itemId.includes('3-seater') || name.includes('3-seater') || 
+                              itemId.includes('3 seater') || name.includes('3 seater') ||
+                              itemId.includes('three-seater') || name.includes('three') ||
+                              variation.includes('3-seater') || variation.includes('3 seater')
+            return (is4Seater || is3Seater) ? 2 : 1
         }
         
-        const isReclinerOrPoofOrLounger = itemId.includes('recliner') || name.includes('recliner') ||
-                                          itemId.includes('poof') || name.includes('poof') ||
-                                          itemId.includes('pouf') || name.includes('pouf') ||
+        const isReclinerOrPoofOrLounger = (itemId.includes('recliner') || name.includes('recliner') ||
                                           itemId.includes('lounger') || name.includes('lounger') ||
-                                          itemId.includes('ottoman') || name.includes('ottoman') ||
                                           itemId.includes('chaise') || name.includes('chaise') ||
                                           itemId.includes('armchair') || name.includes('armchair') ||
-                                          itemId.includes('daybed') || name.includes('daybed')
+                                          itemId.includes('daybed') || name.includes('daybed')) &&
+                                          !itemId.includes('pool') && !name.includes('pool')
                                           
-        // Removed auto-sleeving for recliners, ottomans, and loungers so they can be manually ticked
+        if (isReclinerOrPoofOrLounger) {
+            return 1
+        }
         
         if (item.autoPackagingType === 'Plastic Covers') {
             return 1
@@ -339,11 +346,10 @@ export const getPlasticSleevesCount = (item, idKey) => {
 export const getWrappingFlag = (item, variation) => {
     if (!item) return false;
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
-    const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
-    return (item.autoPackagingType === 'Wrapping' && !isStandardOrWood) || isGlassOrMarble || variation?.includes('Wrapped')
+    return isGlassOrMarble || variation?.includes('Wrapped')
 }
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null) => {
+export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null, isAdminEdit = false) => {
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let plasticSleeveCost = 0
@@ -494,7 +500,6 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     let dropoffCityCode = rawDropoffCityCode;
     if (pickupCityCode && !dropoffCityCode) dropoffCityCode = pickupCityCode;
     if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
-
     // Absolute fallback — only reached for addresses with no GPS and no text match.
     // The outline-province flag above will have already caught most real cases.
     if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
@@ -523,6 +528,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         !hasOutlineProvince && (
             (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
             isInterProvincial ||
+            (totalDistance > 250) ||
             (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
@@ -695,21 +701,6 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let additionalCrewCost = 0
     let hasHeavyItems = false
-    // Additional Costs: Heavy Items (2 Crew @ R550pp - Flat fee)
-    Object.entries(inventory).forEach(([idKey, qty]) => {
-        if (qty <= 0) return
-        const [itemId] = idKey.split('_')
-        const item = items.find(i => i.id === itemId)
-        const isHeavy = item?.isHeavy || ['piano', 'golf-cart', 'statue', 'gym', 'server', 'bulk-filer', 'jungle-gym', 'wendy-house', 'safe'].some(k => itemId.toLowerCase().includes(k))
-        
-        if (isHeavy) {
-            hasHeavyItems = true
-        }
-    })
-
-    if (hasHeavyItems) {
-        additionalCrewCost = (ADDITIONAL_COSTS.heavyItemCrew.perPerson * ADDITIONAL_COSTS.heavyItemCrew.count)
-    }
 
     // Additional Costs: Distance-based depot fees (Over 80km) - LOCAL ONLY
     let extraDistanceFees = 0
@@ -725,18 +716,20 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let packagingCost = 0
     const hasStep2Packaging = moveDetails.packagingOption && moveDetails.packagingOption !== 'none';
+    const totalSt7 = (moveDetails.st7Boxes || 0)
+    const totalLinen = (moveDetails.linenBoxes || 0)
+    const totalBoxesOrdered = totalSt7 + totalLinen
     
-    if (hasStep2Packaging || boxQty > 0) {
+    if ((hasStep2Packaging && totalBoxesOrdered > 0) || boxQty > 0) {
         const isBoxesOnly = moveDetails.packagingOption === 'boxes_only' || !hasStep2Packaging
         const rates = isBoxesOnly 
             ? PACKAGING_RATES.sendMeBoxesOnly 
             : PACKAGING_RATES.boxesAndPacking
             
-        const totalSt7 = (moveDetails.st7Boxes || 0)
         const st7Cost = totalSt7 * rates.st7
-        const linenCost = (moveDetails.linenBoxes || 0) * rates.linen
+        const linenCost = totalLinen * rates.linen
         
-        // Apply delivery fee from rates if they explicitly used a packaging service
+        // Apply delivery fee from rates if they explicitly used a packaging service and ordered boxes
         const deliveryFee = hasStep2Packaging ? (rates.deliveryFee || 0) : 0
         
         packagingCost = st7Cost + linenCost + deliveryFee
@@ -789,8 +782,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     let total = exclVatAfterDiscount + vatAmount
 
     // Payflex surcharge (+7%) applied AFTER VAT on the total
+    let payflexSurcharge = 0
     if (moveDetails.paymentMethod === 'payflex') {
-        total = total * (1 + ADDITIONAL_COSTS.payflex.surcharge)
+        payflexSurcharge = total * ADDITIONAL_COSTS.payflex.surcharge
+        total = total + payflexSurcharge
     }
 
     const vat = vatAmount
@@ -809,10 +804,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     const needsConsultation = totalDistance > 100 || totalVolumeCuFt > 3600
 
     return {
-        total: needsQuoteRequest ? 0 : total,
-        subTotal: needsQuoteRequest ? 0 : exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
-        discount: needsQuoteRequest ? 0 : exclVatDiscount,        // Ex-VAT discount amount
-        vat: needsQuoteRequest ? 0 : vat,                              // VAT amount (15% of ex-VAT subtotal)
+        total: (needsQuoteRequest && !isAdminEdit) ? 0 : total,
+        subTotal: (needsQuoteRequest && !isAdminEdit) ? 0 : exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
+        discount: (needsQuoteRequest && !isAdminEdit) ? 0 : exclVatDiscount,        // Ex-VAT discount amount
+        vat: (needsQuoteRequest && !isAdminEdit) ? 0 : vat,                              // VAT amount (15% of ex-VAT subtotal)
+        payflexSurcharge: (needsQuoteRequest && !isAdminEdit) ? 0 : payflexSurcharge,
+        paymentMethod: moveDetails.paymentMethod || 'eft',
         totalVolume,
         totalVolumeCuFt,
         boxQty: moveDetails.st7Boxes || 0,
@@ -843,10 +840,13 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             shuttleCost: shuttleCost,
             longCarryCost: longCarryCost,
             standardInsurance: standardInsurance,
+            documentationFee: documentationFee,
             distance: totalDistance,
             transportRate: transportRate,
             volumeRate: volumeRate,
-            isSharedLoad: sharedLoadPreference !== null ? sharedLoadPreference : (isNationalMove && totalVolumeCuFt < 850)
+            isSharedLoad: sharedLoadPreference !== null ? sharedLoadPreference : (isNationalMove && totalVolumeCuFt < 850),
+            payflexSurcharge,
+            paymentMethod: moveDetails.paymentMethod || 'eft'
         }
     }
 }

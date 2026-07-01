@@ -2,6 +2,7 @@ import React from 'react'
 import { Plus, Minus, Truck } from 'lucide-react'
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
+import { getPlasticSleevesCount } from '../store/moveStore'
 
 const REAL_RENDERS = {
     'piano': '/images/inventory/piano.png',
@@ -396,15 +397,9 @@ export default function InventoryItemCard({ item, quantity = 0, variation, onAdd
     // Show the optional wrapping tick when: not auto-wrapped, and either has a non-Glass/Marble variation OR has no variation at all
     const showWrappingTick = !isAutoWrapped
 
-    // AUTO-SLEEVE rules: only beds, mattresses, couches/sofas get auto sleeves
-    const isAutoSleeve = item.id.includes('bed') || (item.name || '').toLowerCase().includes('bed') ||
-                         item.id.includes('mattress') || (item.name || '').toLowerCase().includes('mattress') ||
-                         item.id.includes('couch') || (item.name || '').toLowerCase().includes('couch') ||
-                         item.id.includes('sofa') || (item.name || '').toLowerCase().includes('sofa') ||
-                         item.id.includes('seater') || (item.name || '').toLowerCase().includes('seater') ||
-                         item.id.includes('suite') || (item.name || '').toLowerCase().includes('suite') ||
-                         item.id.includes('futon') || (item.name || '').toLowerCase().includes('futon') ||
-                         item?.autoPackagingType === 'Plastic Covers'
+    // AUTO-SLEEVE rules centralized from moveStore
+    const idKey = variation ? `${item.id}_${variation}` : item.id
+    const isAutoSleeve = getPlasticSleevesCount(item, idKey) > 0
     
     const isManuallyWrapped = variation?.includes('Wrapped') || false
     const isManuallySleeved = variation?.includes('Plastic Sleeve') || false

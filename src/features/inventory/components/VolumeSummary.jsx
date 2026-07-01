@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Truck } from 'lucide-react'
 import TruckVisual from './TruckVisual'
-import { useMoveStore } from '../store/moveStore'
+import { useMoveStore, getWrappingFlag, getPlasticSleevesCount } from '../store/moveStore'
 
 export default function VolumeSummary({ items, inventory, breakdown = {}, children }) {
     const { moveDetails } = useMoveStore()
@@ -100,7 +100,8 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
                     const [itemId, variation] = idKey.split('_')
                     const item = items.find(i => i.id === itemId)
                     if (!item) return null
-                    const needsPackaging = item.autoPackagingType || (variation === 'Glass' || variation === 'Marble')
+                    const isWrapped = getWrappingFlag(item, variation)
+                    const isSleeved = getPlasticSleevesCount(item, idKey) > 0
                     return (
                         <div key={idKey} className="flex justify-between text-sm items-center py-1">
                             <span className="text-slate-300 truncate pr-2 font-medium">
@@ -108,7 +109,9 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
                                 {variation && <span className="text-slate-500 text-[10px] ml-1 uppercase">({variation})</span>}
                             </span>
                             <span className="text-[10px] font-black uppercase tracking-tighter">
-                                {needsPackaging ? <span className="text-blue-400">Wrapping ✓</span> : <span className="text-slate-600">Standard</span>}
+                                {isWrapped ? <span className="text-blue-400">Wrapping ✓</span> : 
+                                 isSleeved ? <span className="text-blue-400">Sleeve ✓</span> : 
+                                 <span className="text-slate-600">Standard</span>}
                             </span>
                         </div>
                     )

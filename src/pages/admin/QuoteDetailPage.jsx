@@ -14,7 +14,8 @@ import { emailService } from '../../services/emailService'
 import { getInventoryImage } from '../../features/inventory/components/InventoryItemCard'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { PACKAGING_RATES } from '../../features/inventory/data/pricingRates'
+import { PACKAGING_RATES, detectCityCode } from '../../features/inventory/data/pricingRates'
+import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import CouponInput from '../../features/payment/CouponInput'
 import clsx from 'clsx'
 
@@ -65,6 +66,7 @@ export default function QuoteDetailPage() {
                 insurance_enabled: false,
                 is_shared_load: false,
                 custom_products: [],
+                payment_method: 'eft',
                 access_details: { 
                     origin: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} }, 
                     destination: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} } 
@@ -81,7 +83,8 @@ export default function QuoteDetailPage() {
     // Auto-calculate distance when addresses change
     useEffect(() => {
         if (isEditing && editForm.pickup_address && editForm.dropoff_address) {
-            calculateTripDistances(editForm.pickup_address, editForm.dropoff_address)
+            const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
+            calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
                 .then(({ totalDistance }) => {
                     if (totalDistance !== editForm.distance_km) {
                         setEditForm(prev => ({ ...prev, distance_km: totalDistance }))
@@ -201,19 +204,36 @@ export default function QuoteDetailPage() {
             st7Boxes: srcSt7,
             linenBoxes: srcLinen,
             insuranceEnabled: isEditing ? (editForm.insurance_enabled || false) : (quote?.insurance_enabled || false),
-            isSharedLoad: isEditing ? (editForm.is_shared_load || false) : (quote?.is_shared_load || false)
+            isSharedLoad: isEditing ? (editForm.is_shared_load || false) : (quote?.is_shared_load || false),
+            paymentMethod: isEditing ? (editForm.payment_method || 'eft') : (quote?.payment_method || 'eft')
         }
 
         const manualServiceCharges = { ...(isEditing ? (editForm.manual_service_charges || {}) : (quote?.manual_service_charges || {})) }
         const srcWrapping = isEditing ? (editForm.special_wrapping || {}) : (quote?.items_json?.special_wrapping || {})
 
         try {
-            return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges, 0, srcWrapping)
+            return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges, 0, srcWrapping, true)
         } catch (err) {
             console.error("calculateQuote error:", err)
             return { error: err.message }
         }
-    }, [isEditing, editForm.items_json, editForm.pickup_address, editForm.dropoff_address, editForm.move_date, editForm.packaging_option, editForm.access_details, editForm.special_wrapping, quote])
+    }, [
+        isEditing,
+        editForm.items_json,
+        editForm.pickup_address,
+        editForm.dropoff_address,
+        editForm.distance_km,
+        editForm.move_date,
+        editForm.packaging_option,
+        editForm.st7_boxes,
+        editForm.linen_boxes,
+        editForm.insurance_enabled,
+        editForm.is_shared_load,
+        editForm.access_details,
+        editForm.special_wrapping,
+        editForm.manual_service_charges,
+        quote
+    ])
 
     const handleUpdateQuantity = (itemId, newQty) => {
         const updatedItems = { ...editForm.items_json }
@@ -292,6 +312,7 @@ export default function QuoteDetailPage() {
                 client_email: editForm.client_email,
                 pickup_address: editForm.pickup_address,
                 dropoff_address: editForm.dropoff_address,
+                distance_km: Number(editForm.distance_km || 0),
                 move_date: editForm.move_date,
                 status: editForm.status,
                 rejection_reason: editForm.rejection_reason,
@@ -309,7 +330,8 @@ export default function QuoteDetailPage() {
                 linen_boxes: editForm.linen_boxes,
                 insurance_enabled: editForm.insurance_enabled,
                 is_shared_load: editForm.is_shared_load,
-                custom_products: editForm.custom_products || []
+                custom_products: editForm.custom_products || [],
+                payment_method: editForm.payment_method || 'eft'
             }
 
             let error
@@ -382,11 +404,11 @@ export default function QuoteDetailPage() {
                 dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
                 moveDate: quote.move_date || editForm.move_date,
                 inventory: inventoryForPdf,
-                total: quote.total_price,
-                vat: (quote.total_price || 0) * 0.15 / 1.15,
-                subTotal: (quote.total_price || 0) / 1.15,
+                total: recalculatedData?.total || quote.total_price,
+                vat: recalculatedData?.vat || (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: recalculatedData?.subTotal || (quote.total_price || 0) / 1.15,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: quote.items_json?.breakdown || null
+                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
             })
             
             if (result.success) {
@@ -427,11 +449,11 @@ export default function QuoteDetailPage() {
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
                 inventory: inventoryForPdf,
-                total: quote.total_price,
-                vat: (quote.total_price || 0) * 0.15 / 1.15,
-                subTotal: (quote.total_price || 0) / 1.15,
+                total: recalculatedData?.total || quote.total_price,
+                vat: recalculatedData?.vat || (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: recalculatedData?.subTotal || (quote.total_price || 0) / 1.15,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: quote.items_json?.breakdown || null
+                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
             });
 
             if (result.success) {
@@ -520,7 +542,7 @@ export default function QuoteDetailPage() {
                 <div>
                     <div className="flex items-center gap-3">
                         <h1 className="text-3xl font-bold text-slate-900">
-                            {id === 'new' ? 'New Manual Quote' : `Quote #${quote.id.toString().substring(0, 6)}`}
+                            {id === 'new' ? 'New Manual Quote' : `Quote #${getSimpleQuoteNumber(quote.id)}`}
                         </h1>
                         <span className={clsx(
                             "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
@@ -658,6 +680,23 @@ export default function QuoteDetailPage() {
                                         />
                                         <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Add MasterCare Insurance</span>
                                     </label>
+                                </div>
+                                <div className="pt-2 border-t border-slate-100 mt-2">
+                                    <label className="text-[10px] font-black uppercase text-indigo-400 mb-1 block">Payment Method</label>
+                                    {isEditing ? (
+                                        <select 
+                                            className="w-full text-xs border border-gray-200 rounded p-2 bg-white"
+                                            value={editForm.payment_method || 'eft'}
+                                            onChange={e => setEditForm({...editForm, payment_method: e.target.value})}
+                                        >
+                                            <option value="eft">EFT / Debit Card (Standard Rate)</option>
+                                            <option value="payflex">Payflex (+7% Surcharge)</option>
+                                        </select>
+                                    ) : (
+                                        <span className="text-xs font-bold text-slate-900 uppercase">
+                                            {quote?.payment_method === 'payflex' ? 'Payflex (+7% Surcharge)' : 'EFT / Debit Card'}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -812,7 +851,9 @@ export default function QuoteDetailPage() {
                                 <tbody className="divide-y divide-gray-50">
                                     {(() => {
                                         try {
-                                            return Object.entries(displayInventory).map(([itemId, qty]) => {
+                                            return Object.entries(displayInventory)
+                                                .filter(([itemId]) => INVENTORY_ITEMS.some(i => i.id === itemId.split('_')[0]))
+                                                .map(([itemId, qty]) => {
                                                 const [id] = itemId.split('_')
                                         const item = INVENTORY_ITEMS.find(i => i.id === id)
                                         const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, wrap: false, sleeves: 0, fee: 0, sleeveFee: 0 }
@@ -1191,7 +1232,7 @@ export default function QuoteDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Inventory Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} m³</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³</span>
                                 </div>
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
@@ -1230,8 +1271,20 @@ export default function QuoteDetailPage() {
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xs text-slate-400">
+                                    <span>Payment Method</span>
+                                    <span className="text-white font-bold uppercase tracking-wider">
+                                        {(isEditing ? editForm.payment_method : quote?.payment_method) === 'payflex' ? 'Payflex' : 'EFT'}
+                                    </span>
+                                </div>
+                                {((isEditing ? recalculatedData?.payflexSurcharge : (quote?.breakdown_json?.payflexSurcharge || 0)) > 0) && (
+                                    <div className="flex justify-between text-xs text-indigo-400">
+                                        <span>Payflex Surcharge (7%)</span>
+                                        <span className="font-bold">+ R {(isEditing ? recalculatedData?.payflexSurcharge : (quote?.breakdown_json?.payflexSurcharge || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {((isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) * 0.15 / 1.15 : ((quote?.total_price || 0) * 0.15 / 1.15)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-white font-bold tracking-wide">R {(isEditing ? ((recalculatedData?.vat || 0) + (customProductsTotal * 0.15 / 1.15)) : ((quote?.total_price || 0) * 0.15 / 1.15)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>

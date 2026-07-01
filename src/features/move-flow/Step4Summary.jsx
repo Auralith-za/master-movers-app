@@ -646,6 +646,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
                                         <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        {breakdown?.payflexSurcharge > 0 && (
+                                            <>
+                                                <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Payflex Surcharge (7%)</div>
+                                                <div className="text-sm font-bold text-slate-300">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                            </>
+                                        )}
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Total (incl. VAT)</div>
                                         <div className="text-lg font-bold text-slate-500 line-through">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-3xl font-bold text-emerald-400">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -659,6 +665,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
                                         <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        {breakdown?.payflexSurcharge > 0 && (
+                                            <>
+                                                <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Payflex Surcharge (7%)</div>
+                                                <div className="text-sm font-bold text-slate-300">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                            </>
+                                        )}
                                         <div className="w-full border-t border-slate-700 my-2"></div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Total (incl. VAT)</div>
                                         <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -799,6 +811,23 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                         <span>Standard Goods in Transit Insurance</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Documentation Fee */}
+                        {breakdown.documentationFee > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        Documentation Fee
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.documentationFee.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <span>Standard Documentation & Admin</span>
                                     </div>
                                 </div>
                             </div>

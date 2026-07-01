@@ -261,7 +261,8 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             hasDurbanHint ||
             name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') ||
             name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') ||
-            name.includes('kloof') || name.includes('pietermaritzburg') || name.includes('westville')
+            name.includes('kloof') || name.includes('pietermaritzburg') || name.includes('westville') ||
+            name.includes('kwamashu') || name.includes('emgidweni')
         ) {
             return CITY_CODES.DBN;
         }

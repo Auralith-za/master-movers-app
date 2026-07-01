@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PACKAGING_RATES } from '../features/inventory/data/pricingRates';
+import { getSimpleQuoteNumber } from '../utils/quoteHelpers';
 
 /**
  * Service to generate professional PDF quotes for MasterMovers
@@ -174,10 +175,14 @@ export const generateProfessionalQuote = (data) => {
                     const protectionLabel = 'Transport Services / Move Protection';
                     costs.push([protectionLabel, `R ${Number(protection).toFixed(2)}`]);
                 }
+                
+                const docFee = bd.documentationFee || 0;
+                if (docFee > 0) {
+                    costs.push(['Documentation Fee', `R ${Number(docFee).toFixed(2)}`]);
+                }
             }
 
             costs.push(
-                ['Service Fees (Excl. VAT)', `R ${serviceFees.toFixed(2)}`],
                 ['Subtotal Excl. VAT', `R ${serviceFees.toFixed(2)}`],
                 ['VAT (15%)', `R ${numVat.toFixed(2)}`],
                 ['TOTAL AMOUNT DUE', `R ${numTotal.toFixed(2)}`]
@@ -259,7 +264,7 @@ export const generateProfessionalQuote = (data) => {
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
-            doc.text(`Ref: ${quoteId ? quoteId.toString().substring(0, 8).toUpperCase() : 'MM-' + Math.floor(Math.random() * 10000)}`, 190, 24, { align: 'right' });
+            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 24, { align: 'right' });
 
             renderPdfContent();
         };
@@ -278,7 +283,7 @@ export const generateProfessionalQuote = (data) => {
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
-            doc.text(`Ref: ${quoteId ? quoteId.toString().substring(0, 8).toUpperCase() : 'MM-' + Math.floor(Math.random() * 10000)}`, 190, 26, { align: 'right' });
+            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 26, { align: 'right' });
 
             renderPdfContent();
         };

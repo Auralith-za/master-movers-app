@@ -55,7 +55,7 @@ function R(n) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function TestCalcBreakdown() {
-    const { moveDetails, accessDetails, inventory } = useMoveStore()
+    const { moveDetails, accessDetails, inventory, setMoveDetails } = useMoveStore()
 
     // Run the exact same calculateQuote the production system uses
     const result = useMemo(() => {
@@ -275,6 +275,22 @@ export default function TestCalcBreakdown() {
             </div>
 
             <div className="p-3 space-y-3">
+                {hasData && (
+                    <div className="flex items-center justify-between p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Inspector Payment Method</p>
+                            <p className="text-[9px] text-slate-500 font-medium mt-0.5">Toggle to see Payflex surcharge calculations</p>
+                        </div>
+                        <select 
+                            className="bg-slate-900 text-xs text-white border border-slate-700 rounded px-2 py-1 font-bold outline-none cursor-pointer"
+                            value={moveDetails.paymentMethod || 'eft'}
+                            onChange={e => setMoveDetails({ paymentMethod: e.target.value })}
+                        >
+                            <option value="eft">EFT / Debit Card (Standard)</option>
+                            <option value="payflex">Payflex (+7% Surcharge)</option>
+                        </select>
+                    </div>
+                )}
 
                 {!hasData && (
                     <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/40">
@@ -461,9 +477,11 @@ export default function TestCalcBreakdown() {
                         {result.discount > 0 && (
                             <Row label="Discount Applied" value={`− ${R(result.discount)}`} highlight mono />
                         )}
-                        <div className="my-1.5 border-t border-emerald-700/40" />
                         <Row label="Subtotal (ex-VAT)" value={R(result.subTotal)} mono />
                         <Row label="VAT (15%)" value={R(result.vat)} mono />
+                        {result.payflexSurcharge > 0 && (
+                            <Row label="Payflex Surcharge (7%)" value={`+ ${R(result.payflexSurcharge)}`} highlight mono />
+                        )}
                         <div className="py-2 mt-1 rounded-lg bg-emerald-900/30 border border-emerald-700/40 px-3 flex justify-between items-center">
                             <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">TOTAL (incl. VAT)</span>
                             <span className="text-base font-black text-emerald-300 font-mono">{R(result.total)}</span>
