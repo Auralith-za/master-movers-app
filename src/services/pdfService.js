@@ -142,7 +142,7 @@ export const generateProfessionalQuote = (data) => {
             // Transport Services line
             const displayVolume = totalVolume || bd?.totalVolume || 0;
             if (displayVolume > 0) {
-                const transportCost = (bd?.transport || 0) + (bd?.volume || 0);
+                const transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0) + (bd?.moveProtectionCost || 0);
                 costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
             }
 
@@ -169,16 +169,31 @@ export const generateProfessionalQuote = (data) => {
                     costs.push([`Specialized Wrapping${volText}`, `R ${Number(bd.wrappingCost).toFixed(2)}`]);
                 }
                 if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping / Sleeves', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
-                // Move Protection — always shown as a separate service line
-                const protection = bd.standardInsurance || 0;
-                if (protection > 0) {
-                    const protectionLabel = 'Transport Services / Move Protection';
-                    costs.push([protectionLabel, `R ${Number(protection).toFixed(2)}`]);
+                // Move Protection is bundled into Transport Services above
+                
+                if (bd.extraDistance > 0 || bd.extraDistanceFees > 0) {
+                    const dFee = bd.extraDistance || bd.extraDistanceFees;
+                    costs.push(['Depot Distance Surcharge', `R ${Number(dFee).toFixed(2)}`]);
                 }
                 
                 const docFee = bd.documentationFee || 0;
                 if (docFee > 0) {
                     costs.push(['Documentation Fee', `R ${Number(docFee).toFixed(2)}`]);
+                }
+            }
+
+            // Auto-reconcile manually edited totals and custom products
+            const sumOfCosts = costs.reduce((acc, row) => {
+                const valStr = String(row[1]).replace(/[^\d.-]/g, '');
+                return acc + (parseFloat(valStr) || 0);
+            }, 0);
+
+            const diff = serviceFees - sumOfCosts;
+            if (Math.abs(diff) > 0.01) {
+                if (diff > 0) {
+                    costs.push(['Manual Adjustment / Custom Items', `R ${diff.toFixed(2)}`]);
+                } else {
+                    costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
                 }
             }
 

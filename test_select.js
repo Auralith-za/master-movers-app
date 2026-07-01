@@ -10,7 +10,8 @@ const env = fs.readFileSync('.env', 'utf-8').split('\n').reduce((acc, line) => {
 const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
 supabase.from('quotes')
   .select('*')
-  .eq('client_email', 'shaakirahmayet14@gmail.com')
+  .gt('total_price', 6120)
+  .lt('total_price', 6130)
   .then(res => {
-    console.log(res.data);
+    console.log(JSON.stringify(res.data, null, 2));
   });

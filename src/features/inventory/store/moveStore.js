@@ -184,13 +184,15 @@ export const useMoveStore = create(
                     ? `[LOCATION SEARCH FAILED] User could not find their address. Please contact them. ${commentsBase}`
                     : commentsBase
 
+                const defaultFullName = `${state.moveDetails.contactName || ''} ${state.moveDetails.surname || ''}`.trim() || 'Anonymous'
                 const quotePayload = {
-                    client_name: dbOverrides.client_name || overrides.contactName || state.moveDetails.contactName || 'Anonymous',
+                    client_name: dbOverrides.client_name || overrides.contactName || defaultFullName,
                     client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
                     client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
                     pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
-                    distance_km: Number(dbOverrides.distance_km || state.moveDetails.distanceKm || 0),
+                    distance_km: Number(dbOverrides.distance_km || state.moveDetails.totalBillableDistance || state.moveDetails.distanceKm || 0),
+                    trip_breakdown: dbOverrides.trip_breakdown || state.moveDetails.tripBreakdown || null,
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
                     items_json: { ...(state.inventory || {}) },
                     total_price: totals.total || 0,
@@ -747,8 +749,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         })
     }
 
-    // All Risk Insurance: R250
-    const standardInsurance = 250
+    // Move Protection (added to transport cost instead of separate line)
+    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
+    transportCost += moveProtectionCost
+    const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
     const VAT_RATE = 0.15
@@ -840,6 +844,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             shuttleCost: shuttleCost,
             longCarryCost: longCarryCost,
             standardInsurance: standardInsurance,
+            moveProtectionCost: moveProtectionCost,
             documentationFee: documentationFee,
             distance: totalDistance,
             transportRate: transportRate,

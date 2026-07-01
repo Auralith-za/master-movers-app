@@ -479,7 +479,6 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 inventoryItems: INVENTORY_ITEMS,
                 isSharedLoad: breakdown.isSharedLoad
             })
-
         } catch (err) {
             console.error('PDF Generation error:', err)
             alert("Could not generate PDF. Please try again.")
@@ -799,22 +798,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             </div>
                         )}
 
-                        {/* Move Protection */}
-                        {breakdown.standardInsurance > 0 && (
-                            <div className="space-y-2 py-4 border-b border-gray-100">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
-                                        Move Protection
-                                    </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.standardInsurance.toFixed(2)}</span>
-                                </div>
-                                <div className="pl-4 space-y-1.5 mt-1">
-                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                        <span>Standard Goods in Transit Insurance</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* Move Protection is bundled into Transport Services */}
                         
                         {/* Documentation Fee */}
                         {breakdown.documentationFee > 0 && (
@@ -985,7 +969,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                         total_price: discountedTotal,
                                                         pickup_address: moveDetails.pickupAddress,
                                                         dropoff_address: moveDetails.dropoffAddress,
-                                                        client_name: moveDetails.contactName,
+                                                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim() || 'Anonymous',
                                                         client_email: moveDetails.contactEmail
                                                     }}
                                                 />
@@ -1003,7 +987,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                     quote={{
                                                         id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
                                                         total_price: discountedTotal,
-                                                        client_name: moveDetails.contactName,
+                                                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim() || 'Anonymous',
                                                         client_email: moveDetails.contactEmail,
                                                         client_phone: moveDetails.contactPhone
                                                     }}

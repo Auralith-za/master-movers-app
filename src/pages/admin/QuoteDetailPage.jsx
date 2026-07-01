@@ -90,10 +90,12 @@ export default function QuoteDetailPage() {
 
             const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
             calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
-                .then(({ totalDistance }) => {
-                    if (totalDistance !== editForm.distance_km) {
-                        setEditForm(prev => ({ ...prev, distance_km: totalDistance }))
-                    }
+                .then(({ totalDistance, breakdown }) => {
+                    setEditForm(prev => ({ 
+                        ...prev, 
+                        distance_km: totalDistance,
+                        trip_breakdown: breakdown
+                    }))
                 })
                 .catch(err => {
                     console.error("Admin auto-dist error:", err);
@@ -204,6 +206,7 @@ export default function QuoteDetailPage() {
             dropoffCity: srcDropoff,
             distanceKm: srcDist,
             totalBillableDistance: srcDist,
+            tripBreakdown: isEditing ? editForm.trip_breakdown : quote?.trip_breakdown,
             moveDate: srcDate,
             packagingOption: srcPkg,
             st7Boxes: srcSt7,
@@ -228,6 +231,7 @@ export default function QuoteDetailPage() {
         editForm.pickup_address,
         editForm.dropoff_address,
         editForm.distance_km,
+        editForm.trip_breakdown,
         editForm.move_date,
         editForm.packaging_option,
         editForm.st7_boxes,
@@ -318,6 +322,7 @@ export default function QuoteDetailPage() {
                 pickup_address: editForm.pickup_address,
                 dropoff_address: editForm.dropoff_address,
                 distance_km: Number(editForm.distance_km || 0),
+                trip_breakdown: editForm.trip_breakdown || null,
                 move_date: editForm.move_date,
                 status: editForm.status,
                 rejection_reason: editForm.rejection_reason,
@@ -1239,6 +1244,12 @@ export default function QuoteDetailPage() {
                                     <span>Inventory Volume</span>
                                     <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³</span>
                                 </div>
+                                {isEditing && recalculatedData?.breakdown?.moveProtectionCost > 0 && (
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span title="Included in transport cost on quote">Move Protection Cost</span>
+                                        <span className="text-white font-bold tracking-wide">R {recalculatedData.breakdown.moveProtectionCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Custom Products</span>

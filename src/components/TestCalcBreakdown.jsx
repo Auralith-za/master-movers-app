@@ -442,6 +442,11 @@ export default function TestCalcBreakdown() {
                             <Row label="Auto Wrapping / Packaging" value="✓ None" />
                         )}
 
+                        {/* Move Protection Cost (For Testing Visibility) */}
+                        {result.breakdown?.moveProtectionCost > 0 && (
+                            <Row label="Move Protection Cost (Included in Transport)" value={`R ${result.breakdown.moveProtectionCost.toFixed(2)}`} />
+                        )}
+
                         {/* Documentation fee */}
                         <Row label="Documentation Fee" value="R 175.00" />
 
