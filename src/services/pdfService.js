@@ -83,17 +83,46 @@ export const generateProfessionalQuote = (data) => {
             
             currentY += 6;
 
-            const tableRows = Object.entries(inventory).map(([idKey, qty]) => {
-                const [id, variation] = idKey.split('_');
-                const item = inventoryItems.find(i => i.id === id);
-                if (!item) return null;
+            const parseKey = (idKey) => {
+                let key = idKey
+                let room = null
+                if (key.includes('__room:')) {
+                    const parts = key.split('__room:')
+                    key = parts[0]
+                    room = parts[1]
+                }
+                let variation = null
+                if (key.includes('_')) {
+                    const parts = key.split('_')
+                    key = parts[0]
+                    variation = parts.slice(1).join('_')
+                }
+                return { itemId: key, variation, room }
+            }
 
-                const varLabel = variation ? ` (${variation})` : '';
-                return [
-                    `${item.name}${varLabel}`,
-                    qty
-                ];
-            }).filter(Boolean);
+            const groupedPdfItems = {}
+            Object.entries(inventory).forEach(([idKey, qty]) => {
+                if (!qty || qty <= 0) return
+                const { itemId, variation, room } = parseKey(idKey)
+                const item = inventoryItems.find(i => i.id === itemId)
+                if (!item) return
+                const categoryName = (room || item.category || 'General Furniture').toUpperCase()
+                if (!groupedPdfItems[categoryName]) groupedPdfItems[categoryName] = []
+                const varLabel = variation ? ` (${variation})` : ''
+                groupedPdfItems[categoryName].push([`${item.name}${varLabel}`, qty])
+            })
+
+            const tableRows = []
+            Object.entries(groupedPdfItems).forEach(([category, items]) => {
+                tableRows.push([
+                    { 
+                        content: `— ${category} —`, 
+                        colSpan: 2, 
+                        styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [30, 41, 59], fontSize: 8.5 } 
+                    }
+                ])
+                items.forEach(row => tableRows.push(row))
+            })
 
             autoTable(doc, {
                 startY: currentY,
@@ -113,10 +142,9 @@ export const generateProfessionalQuote = (data) => {
             currentY = doc.lastAutoTable.finalY + 12;
 
             // --- Costs Section & Terms Page Control ---
-            // We want both the cost summary table and the Terms & Conditions to stay on the same page.
-            // Together they take up about 75-80mm. Standard page height is 297mm.
-            // If we are past 180mm, push them both to a clean page.
-            if (currentY > 180) {
+            // Cost Summary + Payflex Banner + Terms take up ~100mm. Standard page height is 297mm.
+            // If currentY is past 140mm, push Cost Summary to a clean page to prevent overlapping the footer.
+            if (currentY > 140) {
                 doc.addPage();
                 currentY = 20;
             }
@@ -161,15 +189,13 @@ export const generateProfessionalQuote = (data) => {
                     costs.push([boxText, `R ${Number(bd.packaging).toFixed(2)}`]);
                 }
                 if (bd.plasticSleeveCost > 0) {
-                    const sleevesQty = bd.plasticSleeveCount || Math.round(bd.plasticSleeveCost / 55);
-                    costs.push([`Plastic Sleeves (${sleevesQty} qty x R55)`, `R ${Number(bd.plasticSleeveCost).toFixed(2)}`]);
+                    costs.push(['Plastic Sleeves', `R ${Number(bd.plasticSleeveCost).toFixed(2)}`]);
                 }
                 if (bd.wrappingCost > 0) {
                     const volText = bd.wrappingVolume > 0 ? ` (${Number(bd.wrappingVolume).toFixed(2)} ft³ x R5.90)` : '';
                     costs.push([`Specialized Wrapping${volText}`, `R ${Number(bd.wrappingCost).toFixed(2)}`]);
                 }
                 if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping / Sleeves', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
-                // Move Protection is bundled into Transport Services above
                 
                 if (bd.extraDistance > 0 || bd.extraDistanceFees > 0) {
                     const dFee = bd.extraDistance || bd.extraDistanceFees;
@@ -179,6 +205,12 @@ export const generateProfessionalQuote = (data) => {
                 const docFee = bd.documentationFee || 0;
                 if (docFee > 0) {
                     costs.push(['Documentation Fee', `R ${Number(docFee).toFixed(2)}`]);
+                }
+
+                const storageFeeCalc = Number(bd.storageCost || data.storage_cost || data.storageCost || 0) ||
+                                       ((data.dropoffAddress?.toLowerCase().includes('storage') || data.storage_destination || bd.storageDestination) ? Math.max(650, Math.round(displayVolume * 1.50 * 100)/100) : 0);
+                if (storageFeeCalc > 0) {
+                    costs.push([`Master Movers Storage (Monthly Fee)`, `R ${Number(storageFeeCalc).toFixed(2)}`]);
                 }
             }
 
@@ -205,27 +237,37 @@ export const generateProfessionalQuote = (data) => {
 
             autoTable(doc, {
                 startY: currentY,
+                head: [['Service / Item Description', 'Amount (EX-VAT)']],
                 body: costs,
-                theme: 'plain',
-                styles: { fontSize: 9.5, cellPadding: 2.5 },
-                columnStyles: {
-                    0: { fontStyle: 'normal', halign: 'left' },
-                    1: { fontStyle: 'bold', halign: 'right' }
-                },
-                margin: { left: 110, right: 20 }
+                theme: 'striped',
+                headStyles: { fillColor: slate900, textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 8.5, cellPadding: 2.5 },
+                columnStyles: { 0: { cellWidth: 130 }, 1: { cellWidth: 40, halign: 'right' } },
+                didParseCell: (data) => {
+                    if (data.row.index === costs.length - 1) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [248, 250, 252];
+                    }
+                }
             });
 
             currentY = doc.lastAutoTable.finalY + 8;
 
-            // Payflex Option
-            doc.setFillColor(79, 70, 229); // Indigo
-            doc.rect(110, currentY, 80, 8, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(8);
+            // Payflex Banner
+            doc.setFillColor(238, 242, 255); // Indigo 50
+            doc.roundedRect(20, currentY, 170, 8, 2, 2, 'F');
+            doc.setTextColor(79, 70, 229); // Indigo 600
+            doc.setFontSize(7.5);
             doc.setFont('helvetica', 'bold');
-            doc.text('PAY IN 4 WITH PAYFLEX AVAILABLE (INTEREST-FREE)', 150, currentY + 5.5, { align: 'center' });
+            doc.text('PAY IN 4 WITH PAYFLEX AVAILABLE (INTEREST-FREE)', 105, currentY + 5.5, { align: 'center' });
 
             currentY += 16;
+
+            // Check if Terms & Conditions will overflow page 2
+            if (currentY > 215) {
+                doc.addPage();
+                currentY = 20;
+            }
 
             // --- Terms & Payment ---
             doc.setTextColor(...slate900);
@@ -239,23 +281,31 @@ export const generateProfessionalQuote = (data) => {
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
 
+            const hasStorageInQuote = (bd?.storageCost > 0) || !!data?.storageDestination || data?.dropoffAddress?.toLowerCase().includes('storage');
+
             const terms = [
                 '- Full payment is required 48 hours prior to the move date to confirm booking.',
                 '- We accept PayFast, Payflex (Pay in 4), and Direct Bank EFT.',
                 '- Pricing provided is valid for 7 days from the date of issue and is subject to change thereafter.',
                 '- Items not listed in the inventory may incur additional charges on move day.',
-                '- Standard liability insurance is included. Platinum cover available on request.'
+                '- Standard liability insurance is included. Platinum cover available on request.',
+                ...(hasStorageInQuote ? ['- STORAGE NOTE: Delivery out of storage is not included in this quote.'] : [])
             ];
 
             terms.forEach((line, i) => {
                 doc.text(line, 20, currentY + (i * 4.5));
             });
 
-            // --- Footer ---
-            doc.setFontSize(7.5);
-            doc.setTextColor(148, 163, 184); // Slate 400
-            doc.text('MasterMovers NextGen - Professional Moving & Logistics Solutions', 105, 285, { align: 'center' });
-            doc.text('MasterMovers.co.za | +27 11 493 7569 | info@mastermovers.co.za', 105, 289, { align: 'center' });
+            // --- Add Footer & Page Numbers across all pages ---
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7.5);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(148, 163, 184); // Slate 400
+                doc.text('MasterMovers NextGen - Professional Moving & Logistics Solutions', 105, 283, { align: 'center' });
+                doc.text(`MasterMovers.co.za | +27 11 493 7569 | info@mastermovers.co.za  ·  Page ${i} of ${totalPages}`, 105, 287, { align: 'center' });
+            }
 
             if (shouldSave) {
                 doc.save(`MasterMovers_Quote_${quoteId || 'New'}.pdf`);

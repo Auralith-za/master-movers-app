@@ -163,18 +163,7 @@ export const INVENTORY_ITEMS = [
     "autoPackagingType": null,
     "variationOptions": null
 },
-{
-    "id": "bulk-filers-single-bay",
-    "name": "BULK FILERS SINGLE BAY",
-    "category": "Special Handling Items",
-    "volume": 115,
-    "image": "/inventory/bulk-filers-single-bay.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "isHeavy": true,
-    "variationOptions": null
-},
+
 {
     "id": "server-cabinets",
     "name": "SERVER CABINETS",
@@ -893,18 +882,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "fridge-double-upright",
-    "name": "FRIDGE DOUBLE UPRIGHT",
-    "category": "Appliances/Kitchen",
-    "volume": 42.5,
-    "image": "/inventory/fridge-double-upright.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
-    "variationOptions": null
-},
-{
-    "id": "fridge-d-door",
-    "name": "FRIDGE D DOOR",
+    "name": "DOUBLE DOOR FRIDGE",
     "category": "Appliances/Kitchen",
     "volume": 42.5,
     "image": "/inventory/fridge-d-door.png",
@@ -914,11 +892,11 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "fridge-large-s-door",
-    "name": "FRIDGE LARGE S DOOR",
+    "id": "fridge-d-door",
+    "name": "SINGLE UPRIGHT FRIDGE",
     "category": "Appliances/Kitchen",
     "volume": 34,
-    "image": "/inventory/fridge-large-s-door.png",
+    "image": "/inventory/fridge-double-upright.png",
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": "Wrapping",
@@ -1199,39 +1177,8 @@ export const INVENTORY_ITEMS = [
     "autoPackagingType": null,
     "variationOptions": null
 },
-{
-    "id": "book-case",
-    "name": "BOOK CASE",
-    "category": "General Furniture",
-    "volume": 8.0,
-    "image": "/inventory/book-case.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
-    "id": "large-bookcase",
-    "name": "LARGE BOOKCASE",
-    "category": "General Furniture",
-    "volume": 34,
-    "image": "/inventory/large-bookcase.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
-    "id": "large-bookcase-glass",
-    "name": "LARGE BOOKCASE GLASS",
-    "category": "General Furniture",
-    "volume": 34,
-    "image": "/inventory/large-bookcase-glass.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
-    "variationOptions": null
-},
+
+
 {
     "id": "pictures-mirrors",
     "name": "PICTURES/MIRRORS",
@@ -1315,17 +1262,6 @@ export const INVENTORY_ITEMS = [
     "category": "General Furniture",
     "volume": 8,
     "image": "/inventory/toy-box.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
-    "id": "table-bases",
-    "name": "TABLE BASES",
-    "category": "General Furniture",
-    "volume": 17,
-    "image": "/inventory/table-bases.png",
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
@@ -1854,17 +1790,6 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "bulk-filler",
-    "name": "BULK FILLER",
-    "category": "Office / Study",
-    "volume": 115.0,
-    "image": "/inventory/bulk-filler.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
     "id": "desk-lamp",
     "name": "DESK LAMP",
     "category": "Office / Study",
@@ -1910,13 +1835,13 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "whiteboard",
-    "name": "WHITEBOARD",
+    "name": "GLASS WHITEBOARD",
     "category": "Office / Study",
     "volume": 2.0,
     "image": "/inventory/white-board.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": null,
+    "autoPackagingType": "Wrapping",
     "variationOptions": null
 },
 {
@@ -1986,22 +1911,22 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "boxes",
-    "name": "SELF SUPPLIED BOXES",
+    "id": "small-bookcase",
+    "name": "SMALL BOOKCASE",
     "category": "Office / Study",
-    "volume": 4.25,
-    "image": "/inventory/boxes.png",
+    "volume": 8.0,
+    "image": "/inventory/small-bookcase.png",
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
     "variationOptions": null
 },
 {
-    "id": "small-bookcase",
-    "name": "SMALL BOOKCASE",
+    "id": "large-bookcase",
+    "name": "LARGE BOOK CASE",
     "category": "Office / Study",
-    "volume": 8.0,
-    "image": "/inventory/small-bookcase.png",
+    "volume": 34.0,
+    "image": "/inventory/book-case.png",
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
@@ -2166,7 +2091,7 @@ export const INVENTORY_ITEMS = [
     "name": "CAMP COT",
     "category": "Bedrooms",
     "volume": 8.0,
-    "image": "/inventory/camp-cot.png",
+    "image": "/inventory/camp-cot-additional.jpeg",
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
@@ -2495,7 +2420,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-lounge",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - LOUNGE",
     "category": "Lounge / Living Room",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2506,7 +2431,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-dining",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - DINING",
     "category": "Dining Room",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2517,7 +2442,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-bedrooms",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - BEDROOMS",
     "category": "Bedrooms",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2528,7 +2453,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-office",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - OFFICE/STUDY",
     "category": "Office / Study",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2539,7 +2464,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-appliances",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - KITCHEN",
     "category": "Appliances/Kitchen",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2550,7 +2475,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-general",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - GENERAL",
     "category": "General Furniture",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2561,7 +2486,7 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "boxes-outdoor",
-    "name": "SELF SUPPLIED BOXES",
+    "name": "SELF SUPPLIED BOXES - OUTDOOR",
     "category": "Outdoor & Patio",
     "volume": 4.25,
     "image": "/inventory/boxes.png",
@@ -2901,28 +2826,6 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
-    "id": "tv-entertainment-centre",
-    "name": "TV ENTERTAINMENT CENTRE",
-    "category": "Lounge / Living Room",
-    "volume": 51.0,
-    "image": "/inventory/tv-entertainment-centre.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
-    "id": "table-tops",
-    "name": "TABLE TOPS",
-    "category": "General Furniture",
-    "volume": 10.0,
-    "image": "/inventory/table-tops.png",
-    "requiresPhoto": false,
-    "requiresCrate": false,
-    "autoPackagingType": null,
-    "variationOptions": null
-},
-{
     "id": "boxes-special",
     "name": "SELF SUPPLIED BOXES",
     "category": "Special Handling Items",
@@ -2931,6 +2834,259 @@ export const INVENTORY_ITEMS = [
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
+    "variationOptions": null
+},
+{
+    "id": "airfryer",
+    "name": "AIRFRYER",
+    "category": "Appliances/Kitchen",
+    "volume": 4.25,
+    "image": "/inventory/air-fryer.webp",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "plastic-container-additional",
+    "name": "PLASTIC CONTAINER",
+    "category": "Boxes & Loose Items",
+    "volume": 6,
+    "image": "/inventory/plastic-container.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "rocking-chair",
+    "name": "ROCKING CHAIR",
+    "category": "Bedrooms",
+    "volume": 17,
+    "image": "/inventory/rocking-chair.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "skottle-braai",
+    "name": "SKOTTLE BRAAI",
+    "category": "Outdoor & Patio",
+    "volume": 22,
+    "image": "/inventory/skottle-braai.webp",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "gas-braai",
+    "name": "GAS BRAAI",
+    "category": "Outdoor & Patio",
+    "volume": 34,
+    "image": "/inventory/gas-braai.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "hanging-chair",
+    "name": "HANGING CHAIR",
+    "category": "Outdoor & Patio",
+    "volume": 34,
+    "image": "/inventory/hanging-chair.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "metal-garden-table",
+    "name": "METAL GARDEN TABLE",
+    "category": "Outdoor & Patio",
+    "volume": 51,
+    "image": "/inventory/metal-garden-table.png",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "metal-garden-chairs",
+    "name": "METAL GARDEN CHAIRS",
+    "category": "Outdoor & Patio",
+    "volume": 9,
+    "image": "/inventory/metal-garden-chairs.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "edge-cutter",
+    "name": "EDGE CUTTER",
+    "category": "Outdoor & Patio",
+    "volume": 8,
+    "image": "/inventory/edge-cutter.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "cat-scratch-post",
+    "name": "CAT SCRATCH POST",
+    "category": "General Furniture",
+    "volume": 8,
+    "image": "/inventory/cat-scratch.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "sleeper-couch",
+    "name": "SLEEPER COUCH",
+    "category": "Lounge / Living Room",
+    "volume": 37,
+    "image": "/inventory/sleeper-couch.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "three-quarter-bed",
+    "name": "3/4 BED",
+    "category": "Bedrooms",
+    "volume": 46,
+    "image": "/inventory/three-quarter-bed.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "surf-board",
+    "name": "SURF BOARD",
+    "category": "Outdoor & Patio",
+    "volume": 17,
+    "image": "/inventory/surf-board.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "golf-trolley",
+    "name": "GOLF TROLLEY",
+    "category": "Outdoor & Patio",
+    "volume": 8,
+    "image": "/inventory/golf-trolley.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "chest-freezer",
+    "name": "CHEST FREEZER",
+    "category": "Appliances/Kitchen",
+    "volume": 26,
+    "image": "/inventory/chest-freezer.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "steel-trunk",
+    "name": "STEEL TRUNK",
+    "category": "Boxes & Loose Items",
+    "volume": 13,
+    "image": "/inventory/steel-trunk.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "grass-blower",
+    "name": "GRASS BLOWER",
+    "category": "Outdoor & Patio",
+    "volume": 8,
+    "image": "/inventory/grass-blower.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "glass-doors-display-unit",
+    "name": "GLASS DOORS DISPLAY UNIT",
+    "category": "Dining Room",
+    "volume": 34,
+    "image": "/inventory/glass-doors-display-unit.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+
+{
+    "id": "gazebo-additional",
+    "name": "GAZEBO",
+    "category": "Outdoor & Patio",
+    "volume": 13,
+    "image": "/inventory/gazebo.webp",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "camping-tent",
+    "name": "CAMPING TENT",
+    "category": "Outdoor & Patio",
+    "volume": 8,
+    "image": "/inventory/camping-tent.jpeg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
+    "variationOptions": null
+},
+{
+    "id": "kids-bicycles",
+    "name": "KIDS BICYCLE",
+    "category": "Outdoor & Patio",
+    "volume": 8,
+    "image": "/inventory/kids-bicycles.jpg",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "isHeavy": false,
     "variationOptions": null
 }
 ];

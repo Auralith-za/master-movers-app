@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
-import { calculateQuote, useMoveStore, getPlasticSleevesCount, getWrappingFlag } from '../../features/inventory/store/moveStore'
+import { calculateQuote, useMoveStore, getPlasticSleevesCount, getWrappingFlag, parseInventoryKey } from '../../features/inventory/store/moveStore'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
 import { getInventoryImage } from '../../features/inventory/components/InventoryItemCard'
@@ -29,6 +29,23 @@ const orderedCategories = (() => {
     return list;
 })();
 
+const getStatusBadgeClass = (status) => {
+    switch (status) {
+        case 'new': return 'bg-blue-50 text-blue-700 ring-blue-600/20'
+        case 'processing': return 'bg-purple-50 text-purple-700 ring-purple-600/20'
+        case 'pending_payment': return 'bg-amber-50 text-amber-700 ring-amber-600/20'
+        case 'booked':
+        case 'paid':
+        case 'booked_paid': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+        case 'on_hold': return 'bg-orange-50 text-orange-700 ring-orange-600/20'
+        case 'rejected': return 'bg-red-50 text-red-700 ring-red-600/10'
+        case 'completed': return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+        case 'lead': return 'bg-slate-50 text-slate-700 ring-slate-600/20'
+        case 'payment_cancelled': return 'bg-red-100 text-red-800 ring-red-600/30'
+        default: return 'bg-slate-50 text-slate-700 ring-slate-600/20'
+    }
+}
+
 export default function QuoteDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -38,6 +55,9 @@ export default function QuoteDetailPage() {
     const [editForm, setEditForm] = useState({})
     const [activities, setActivities] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
+    const [mapsStatus, setMapsStatus] = useState('Idle')
+    const [priceOffset, setPriceOffset] = useState(0)
+    const [hasCalculatedOffset, setHasCalculatedOffset] = useState(false)
     
     const [selectedCategory, setSelectedCategory] = useState(orderedCategories[0])
     const [showCatalog, setShowCatalog] = useState(false)
@@ -80,29 +100,39 @@ export default function QuoteDetailPage() {
         }
     }, [id])
 
-    // Auto-calculate distance when addresses change
+    // Auto-calculate distance when addresses change OR when trip breakdown is missing
     useEffect(() => {
-        if (isEditing && editForm.pickup_address && editForm.dropoff_address) {
-            // Only recalculate if the addresses have actually changed from the saved database values
-            if (editForm.pickup_address === quote?.pickup_address && editForm.dropoff_address === quote?.dropoff_address) {
-                return;
-            }
+        if (editForm.pickup_address && editForm.dropoff_address) {
+            const hasValidBreakdown = editForm.trip_breakdown && 
+                                      typeof editForm.trip_breakdown === 'object' &&
+                                      editForm.trip_breakdown.depotToPickup !== undefined;
 
-            const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
-            calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
-                .then(({ totalDistance, breakdown }) => {
-                    setEditForm(prev => ({ 
-                        ...prev, 
-                        distance_km: totalDistance,
-                        trip_breakdown: breakdown
-                    }))
-                })
-                .catch(err => {
-                    console.error("Admin auto-dist error:", err);
-                    alert("Google Maps could not process these addresses. Please fix the addresses or manually enter the correct Billable Distance (km) below.");
-                })
+            const needsCalculation = isEditing 
+                ? (editForm.pickup_address !== quote?.pickup_address || editForm.dropoff_address !== quote?.dropoff_address || !hasValidBreakdown)
+                : (!hasValidBreakdown && editForm.pickup_address && editForm.dropoff_address);
+
+            if (needsCalculation) {
+                setMapsStatus("Calculating distance matrix via Google Maps...");
+                const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
+                calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
+                    .then(({ totalDistance, breakdown }) => {
+                        setMapsStatus(`Success: ${totalDistance}km (Breakdown: ${JSON.stringify(breakdown)})`);
+                        setEditForm(prev => ({ 
+                            ...prev, 
+                            distance_km: totalDistance,
+                            trip_breakdown: breakdown
+                        }))
+                    })
+                    .catch(err => {
+                        console.error("Admin auto-dist error:", err);
+                        setMapsStatus(`Failed: ${err.message}`);
+                        if (isEditing) {
+                            alert("Google Maps could not process these addresses. Please fix the addresses or manually enter the correct Billable Distance (km) below.");
+                        }
+                    })
+            }
         }
-    }, [editForm.pickup_address, editForm.dropoff_address, isEditing, quote?.pickup_address, quote?.dropoff_address])
+    }, [editForm.pickup_address, editForm.dropoff_address, isEditing, quote?.pickup_address, quote?.dropoff_address, editForm.trip_breakdown])
 
     const fetchQuote = async () => {
         try {
@@ -114,12 +144,28 @@ export default function QuoteDetailPage() {
 
             if (error) throw error
             setQuote(data)
+            setHasCalculatedOffset(false)
+            setPriceOffset(0)
             
             // Fix items_json if it's nested or legacy
             const rawItems = data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {})
             const rawSpecialWrapping = data.items_json?.special_wrapping || {}
+            
+            // If the quote already has a trip breakdown, ensure distance_km represents the full billable circuit (depot legs included)
+            let initialDistance = Number(data.distance_km || 0);
+            if (data.trip_breakdown && typeof data.trip_breakdown === 'object') {
+                const breakdown = data.trip_breakdown;
+                const pickupToDropoff = breakdown.pickupToDropoff || 0;
+                const totalCircuit = (breakdown.depotToPickup || 0) + (breakdown.pickupToDropoff || 0) + (breakdown.dropoffToDepot || 0);
+                
+                if (Math.abs(initialDistance - pickupToDropoff) < Math.abs(initialDistance - totalCircuit)) {
+                    initialDistance = totalCircuit;
+                }
+            }
+
             setEditForm({
                 ...data,
+                distance_km: initialDistance,
                 items_json: rawItems,
                 special_wrapping: rawSpecialWrapping,
                 custom_products: data.custom_products || []
@@ -183,21 +229,21 @@ export default function QuoteDetailPage() {
 
     // Calculate live price — runs always so PDF always has a full breakdown
     const recalculatedData = useMemo(() => {
-        // Use editForm when editing, otherwise compute from saved quote data
-        const sourceItems = isEditing ? (editForm.items_json || {}) : (quote?.items_json?.items || quote?.items_json || {})
+        // Always compute from editForm since it acts as the staging copy of the quote
+        const sourceItems = editForm.items_json || {}
         const inventory = {}
         Object.entries(sourceItems).forEach(([itemId, qty]) => {
             inventory[itemId] = Number(qty)
         })
 
-        const srcPickup  = isEditing ? editForm.pickup_address  : (quote?.pickup_address  || '')
-        const srcDropoff = isEditing ? editForm.dropoff_address : (quote?.dropoff_address || '')
-        const srcDist    = isEditing ? editForm.distance_km     : (quote?.distance_km     || 0)
-        const srcDate    = isEditing ? editForm.move_date       : (quote?.move_date       || '')
-        const srcPkg     = isEditing ? (editForm.packaging_option || 'none') : (quote?.packaging_option || 'none')
-        const srcSt7     = isEditing ? (editForm.st7_boxes || 0)     : (quote?.st7_boxes     || 0)
-        const srcLinen   = isEditing ? (editForm.linen_boxes || 0)   : (quote?.linen_boxes   || 0)
-        const srcAccess  = isEditing ? editForm.access_details : (quote?.access_details  || {})
+        const srcPickup  = editForm.pickup_address  || ''
+        const srcDropoff = editForm.dropoff_address || ''
+        const srcDist    = editForm.distance_km     || 0
+        const srcDate    = editForm.move_date       || ''
+        const srcPkg     = editForm.packaging_option || 'none'
+        const srcSt7     = editForm.st7_boxes       || 0
+        const srcLinen   = editForm.linen_boxes     || 0
+        const srcAccess  = editForm.access_details  || {}
 
         const moveDetails = {
             pickupAddress: srcPickup,
@@ -206,18 +252,19 @@ export default function QuoteDetailPage() {
             dropoffCity: srcDropoff,
             distanceKm: srcDist,
             totalBillableDistance: srcDist,
-            tripBreakdown: isEditing ? editForm.trip_breakdown : quote?.trip_breakdown,
+            tripBreakdown: editForm.trip_breakdown || null,
             moveDate: srcDate,
             packagingOption: srcPkg,
             st7Boxes: srcSt7,
             linenBoxes: srcLinen,
-            insuranceEnabled: isEditing ? (editForm.insurance_enabled || false) : (quote?.insurance_enabled || false),
-            isSharedLoad: isEditing ? (editForm.is_shared_load || false) : (quote?.is_shared_load || false),
-            paymentMethod: isEditing ? (editForm.payment_method || 'eft') : (quote?.payment_method || 'eft')
+            insuranceEnabled: editForm.insurance_enabled || false,
+            isSharedLoad: editForm.is_shared_load || false,
+            paymentMethod: editForm.payment_method || 'eft',
+            storageDestination: editForm.storage_destination || quote?.storage_destination || null
         }
 
-        const manualServiceCharges = { ...(isEditing ? (editForm.manual_service_charges || {}) : (quote?.manual_service_charges || {})) }
-        const srcWrapping = isEditing ? (editForm.special_wrapping || {}) : (quote?.items_json?.special_wrapping || {})
+        const manualServiceCharges = { ...(editForm.manual_service_charges || {}) }
+        const srcWrapping = editForm.special_wrapping || {}
 
         try {
             return calculateQuote(inventory, moveDetails, srcAccess, INVENTORY_ITEMS, manualServiceCharges, 0, srcWrapping, true)
@@ -226,7 +273,6 @@ export default function QuoteDetailPage() {
             return { error: err.message }
         }
     }, [
-        isEditing,
         editForm.items_json,
         editForm.pickup_address,
         editForm.dropoff_address,
@@ -240,9 +286,10 @@ export default function QuoteDetailPage() {
         editForm.is_shared_load,
         editForm.access_details,
         editForm.special_wrapping,
-        editForm.manual_service_charges,
-        quote
+        editForm.manual_service_charges
     ])
+
+
 
     const handleUpdateQuantity = (itemId, newQty) => {
         const updatedItems = { ...editForm.items_json }
@@ -308,10 +355,44 @@ export default function QuoteDetailPage() {
     const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
     const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes) || 0), 0)
 
+    useEffect(() => {
+        // Block offset calculation if Google Maps is actively running in the background.
+        // This avoids race conditions where the baseline offset is calculated against a temporary distance (e.g. 10km) 
+        // before Google Maps has finished resolving the correct circuit distance (e.g. 64km).
+        const hasValidBreakdown = editForm.trip_breakdown && 
+                                  typeof editForm.trip_breakdown === 'object' &&
+                                  editForm.trip_breakdown.depotToPickup !== undefined;
+        const isMapsRunning = !hasValidBreakdown && !mapsStatus.startsWith('Failed');
+
+        if (quote && recalculatedData && !recalculatedData.error && !hasCalculatedOffset && !isEditing && !isMapsRunning) {
+            const dbPrice = Number(quote.total_price || 0);
+            const recalcPrice = Number((recalculatedData.total || 0) + customProductsTotal);
+            if (dbPrice > 0 && recalcPrice > 0) {
+                const offset = dbPrice - recalcPrice;
+                if (Math.abs(offset) > 0.01) {
+                    setPriceOffset(offset);
+                }
+                setHasCalculatedOffset(true);
+            }
+        }
+    }, [quote, recalculatedData, hasCalculatedOffset, isEditing, customProductsTotal, editForm.trip_breakdown, mapsStatus])
+
+    const finalPrice = isEditing 
+        ? (((recalculatedData?.total || 0) + customProductsTotal) + priceOffset)
+        : (Number(quote?.total_price) || 0);
+
+    const finalVat = isEditing
+        ? ((recalculatedData?.vat || 0) + (priceOffset * 0.15 / 1.15))
+        : ((Number(quote?.total_price) || 0) * 0.15 / 1.15);
+
+    const finalSubTotal = isEditing
+        ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
+        : ((Number(quote?.total_price) || 0) / 1.15);
+
     const handleSave = async () => {
         try {
             const basePrice = recalculatedData?.total || editForm.total_price || 0
-            const finalPrice = basePrice + customProductsTotal
+            const finalPrice = basePrice + customProductsTotal + priceOffset
             const baseVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
             const finalVolume = baseVolume + customProductsVolume
 
@@ -414,9 +495,9 @@ export default function QuoteDetailPage() {
                 dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
                 moveDate: quote.move_date || editForm.move_date,
                 inventory: inventoryForPdf,
-                total: recalculatedData?.total || quote.total_price,
-                vat: recalculatedData?.vat || (quote.total_price || 0) * 0.15 / 1.15,
-                subTotal: recalculatedData?.subTotal || (quote.total_price || 0) / 1.15,
+                total: finalPrice,
+                vat: finalVat,
+                subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
             })
@@ -459,9 +540,9 @@ export default function QuoteDetailPage() {
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
                 inventory: inventoryForPdf,
-                total: recalculatedData?.total || quote.total_price,
-                vat: recalculatedData?.vat || (quote.total_price || 0) * 0.15 / 1.15,
-                subTotal: recalculatedData?.subTotal || (quote.total_price || 0) / 1.15,
+                total: finalPrice,
+                vat: finalVat,
+                subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
             });
@@ -504,11 +585,11 @@ export default function QuoteDetailPage() {
                 moveDate: quote.move_date,
                 inventory: inventoryForPdf,
                 // Always prefer live recalculated values so PDF matches sidebar
-                total: recalculatedData?.total || Number(quote.total_price) || 0,
-                vat: recalculatedData?.vat || (Number(quote.total_price) || 0) * 0.15 / 1.15,
-                subTotal: recalculatedData?.subTotal || (Number(quote.total_price) || 0) / 1.15,
+                total: finalPrice,
+                vat: finalVat,
+                subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: recalculatedData?.breakdown || quote.breakdown_json,
+                breakdown: recalculatedData?.breakdown || null,
                 boxQty: recalculatedData?.boxQty,
                 totalVolume: recalculatedData?.totalVolume || quote.total_volume || 0,
                 st7Boxes: quote.st7_boxes || 0,
@@ -524,7 +605,7 @@ export default function QuoteDetailPage() {
     if (!quote) return <div className="p-8 text-center"><p className="text-red-500">Quote not found</p></div>
 
     const displayInventory = isEditing ? (editForm.items_json || {}) : (quote?.items_json?.items || quote?.items_json || {})
-    const isManualEditable = quote?.status === 'lead' || quote?.status === 'new' || quote?.status === 'processing'
+    const isManualEditable = true
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto px-4">
@@ -548,6 +629,12 @@ export default function QuoteDetailPage() {
                 </div>
             )}
 
+            {mapsStatus && (
+                <div className="bg-amber-50 text-amber-700 p-4 rounded-lg font-bold border border-amber-200 text-xs">
+                    Google Maps Status: {mapsStatus}
+                </div>
+            )}
+
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
                     <div className="flex items-center gap-3">
@@ -555,10 +642,10 @@ export default function QuoteDetailPage() {
                             {id === 'new' ? 'New Manual Quote' : `Quote #${getSimpleQuoteNumber(quote.id)}`}
                         </h1>
                         <span className={clsx(
-                            "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
-                            quote.status === 'booked' ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"
+                            "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ring-1 ring-inset uppercase tracking-wider",
+                            getStatusBadgeClass(isEditing ? editForm.status : quote.status)
                         )}>
-                            {quote.status}
+                            {isEditing ? editForm.status : quote.status}
                         </span>
                         {quote.terms_accepted && (
                             <span className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
@@ -648,6 +735,32 @@ export default function QuoteDetailPage() {
                                             <p className="text-xs text-slate-600">{quote?.client_phone}</p>
                                         )}
                                     </div>
+                                </div>
+                                <div className="pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Quote Status</label>
+                                    {isEditing ? (
+                                        <select 
+                                            className="w-full text-xs border border-gray-200 rounded p-2 bg-white font-medium text-slate-800 focus:border-indigo-500 outline-none"
+                                            value={editForm.status || 'new'}
+                                            onChange={e => setEditForm({...editForm, status: e.target.value})}
+                                        >
+                                            <option value="lead">Lead</option>
+                                            <option value="new">New</option>
+                                            <option value="processing">Processing</option>
+                                            <option value="pending_payment">Pending Payment</option>
+                                            <option value="booked_paid">Booked / Paid</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="on_hold">On Hold</option>
+                                        </select>
+                                    ) : (
+                                        <span className={clsx(
+                                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ring-1 ring-inset uppercase",
+                                            getStatusBadgeClass(quote?.status)
+                                        )}>
+                                            {quote?.status}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -861,135 +974,165 @@ export default function QuoteDetailPage() {
                                 <tbody className="divide-y divide-gray-50">
                                     {(() => {
                                         try {
-                                            return Object.entries(displayInventory)
-                                                .filter(([itemId]) => INVENTORY_ITEMS.some(i => i.id === itemId.split('_')[0]))
-                                                .map(([itemId, qty]) => {
-                                                const [id] = itemId.split('_')
-                                        const item = INVENTORY_ITEMS.find(i => i.id === id)
-                                        const wrapInfo = editForm.special_wrapping?.[itemId] || { enabled: false, wrap: false, sleeves: 0, fee: 0, sleeveFee: 0 }
-                                        return (
-                                            <tr key={itemId} className="hover:bg-slate-50/50">
-                                                <td className="px-6 py-4 flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100 flex-shrink-0">
-                                                        {item ? (
-                                                            <img 
-                                                                src={getInventoryImage(item)} 
-                                                                alt={item.name} 
-                                                                className="w-full h-full object-contain"
-                                                                style={{ mixBlendMode: 'multiply' }}
-                                                                onError={(e) => {
-                                                                    e.target.onerror = null;
-                                                                    e.target.src = "https://img.icons8.com/3d-fluency/100/box.png";
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <span className="text-lg">📦</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-900">{item?.name || itemId}</p>
-                                                        <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{item?.category || 'General'} · Vol: {item?.volume || 0} ft³/unit</p>
-                                                    </div>
-                                                </td>
+                                            const grouped = {}
+                                            Object.entries(displayInventory).forEach(([itemIdKey, qty]) => {
+                                                if (!qty || qty <= 0) return
+                                                const parsed = parseInventoryKey(itemIdKey)
+                                                const item = INVENTORY_ITEMS.find(i => i.id === parsed.itemId)
+                                                const roomCategory = parsed.room || item?.category || 'General Furniture'
+                                                if (!grouped[roomCategory]) grouped[roomCategory] = []
+                                                grouped[roomCategory].push({ itemId: itemIdKey, id: parsed.itemId, variation: parsed.variation, room: roomCategory, item, qty })
+                                            })
 
-                                                {/* WRAPPING COLUMN — vol × R5.90 */}
-                                                <td className="px-6 py-4 text-center">
-                                                    {(() => {
-                                                        const variation = itemId.includes('_') ? itemId.split('_').slice(1).join('_') : null
-                                                        const defaultWrapped = getWrappingFlag(item, variation)
-                                                        const wrappingEnabled = wrapInfo.wrap !== undefined ? wrapInfo.wrap : defaultWrapped
-                                                        const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0
+                                            if (Object.keys(grouped).length === 0) {
+                                                return <tr><td colSpan="5" className="text-center py-8 text-slate-400 font-medium">No inventory items in this quote.</td></tr>
+                                            }
 
-                                                        return isEditing ? (
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={wrappingEnabled}
-                                                                        onChange={(e) => {
-                                                                            const updatedWrap = {
-                                                                                ...(editForm.special_wrapping || {}),
-                                                                                [itemId]: { ...wrapInfo, wrap: e.target.checked }
-                                                                            }
-                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
-                                                                        }}
-                                                                        className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
-                                                                    />
-                                                                    {defaultWrapped ? "Auto-Wrap (Override)" : "Add Wrapping"}
-                                                                </label>
-                                                                {wrappingEnabled && (
-                                                                    <span className="text-[10px] text-emerald-600 font-bold">
-                                                                        {(item?.volume || 0)} ft³ × {qty} × R5.90 = R {wrappingCostCalc.toFixed(2)}
+                                            return Object.entries(grouped).map(([category, itemsList]) => {
+                                                const totalQtyInRoom = itemsList.reduce((acc, i) => acc + i.qty, 0)
+                                                const totalVolInRoom = itemsList.reduce((acc, i) => acc + (i.item?.volume || 0) * i.qty, 0)
+
+                                                return (
+                                                    <React.Fragment key={`room-cat-${category}`}>
+                                                        <tr className="bg-slate-100/90 border-y border-slate-200">
+                                                            <td colSpan="5" className="px-6 py-2.5">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                                                                        🏠 {category}
                                                                     </span>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            wrappingEnabled
-                                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Wrapped (+R {wrappingCostCalc.toFixed(2)})</span>
-                                                                : <span className="text-slate-400 text-xs">—</span>
-                                                        );
-                                                    })()}
-                                                </td>
-
-                                                {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
-                                                <td className="px-6 py-4 text-center">
-                                                    {(() => {
-                                                        const defaultSleeves = getPlasticSleevesCount(item, itemId)
-                                                        const sleeveQty = wrapInfo.sleeves !== undefined ? wrapInfo.sleeves : defaultSleeves
-                                                        const sleeveCost = sleeveQty * qty * 55
-
-                                                        return isEditing ? (
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <div className="flex items-center gap-1">
-                                                                    <button onClick={() => {
-                                                                        const newQty = Math.max(0, sleeveQty - 1)
-                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
-                                                                        setEditForm({ ...editForm, special_wrapping: updatedWrap })
-                                                                    }} className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">−</button>
-                                                                    <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
-                                                                    <button onClick={() => {
-                                                                        const newQty = sleeveQty + 1
-                                                                        const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
-                                                                        setEditForm({ ...editForm, special_wrapping: updatedWrap })
-                                                                    }} className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">+</button>
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                                                        {totalQtyInRoom} item{totalQtyInRoom === 1 ? '' : 's'} · {totalVolInRoom.toFixed(2)} ft³
+                                                                    </span>
                                                                 </div>
-                                                                {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × {qty} × R55 = R {sleeveCost.toFixed(2)}</span>}
-                                                            </div>
-                                                        ) : (
-                                                            sleeveQty > 0
-                                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{sleeveQty} sleeves (+R {sleeveCost})</span>
-                                                                : <span className="text-slate-400 text-xs">—</span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {isEditing ? (
-                                                        <div className="flex items-center justify-center gap-3">
-                                                            <button onClick={() => handleUpdateQuantity(itemId, qty - 1)} className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
-                                                                <Trash2 size={14} className={qty === 1 ? "text-red-500" : ""} />
-                                                            </button>
-                                                            <span className="font-bold min-w-[20px] text-center">{qty}</span>
-                                                            <button onClick={() => handleUpdateQuantity(itemId, qty + 1)} className="p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
-                                                                <Plus size={14} />
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-center font-bold text-slate-900">{qty}</div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {isEditing && (
-                                                        <button onClick={() => handleUpdateQuantity(itemId, 0)} className="text-red-400 hover:text-red-600 p-1">
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })
-                                    } catch (err) {
-                                        return <tr><td colSpan="4" className="text-red-500 font-bold p-4">Error rendering inventory: {err.message}</td></tr>
-                                    }
+                                                            </td>
+                                                        </tr>
+                                                        {itemsList.map(({ itemId, item, qty, variation }) => {
+                                                            const wrapInfo = editForm.special_wrapping?.[itemId] || {}
+                                                            return (
+                                                                <tr key={itemId} className="hover:bg-slate-50/50">
+                                                                    <td className="px-6 py-4 flex items-center gap-3">
+                                                                        <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100 flex-shrink-0">
+                                                                            {item ? (
+                                                                                <img 
+                                                                                    src={getInventoryImage(item)} 
+                                                                                    alt={item.name} 
+                                                                                    className="w-full h-full object-contain"
+                                                                                    style={{ mixBlendMode: 'multiply' }}
+                                                                                    onError={(e) => {
+                                                                                        e.target.onerror = null;
+                                                                                        e.target.src = "https://img.icons8.com/3d-fluency/100/box.png";
+                                                                                    }}
+                                                                                />
+                                                                            ) : (
+                                                                                <span className="text-lg">📦</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="font-bold text-slate-900">{item?.name || itemId}</p>
+                                                                            <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{category} · Vol: {item?.volume || 0} ft³/unit</p>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    {/* WRAPPING COLUMN — vol × R5.90 */}
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {(() => {
+                                                                            const defaultWrapped = getWrappingFlag(item, variation)
+                                                                            const wrappingEnabled = wrapInfo.wrap !== undefined ? wrapInfo.wrap : defaultWrapped
+                                                                            const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0
+
+                                                                            return isEditing ? (
+                                                                                <div className="flex flex-col items-center gap-1">
+                                                                                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={wrappingEnabled}
+                                                                                            onChange={(e) => {
+                                                                                                const updatedWrap = {
+                                                                                                    ...(editForm.special_wrapping || {}),
+                                                                                                    [itemId]: { ...wrapInfo, wrap: e.target.checked }
+                                                                                                }
+                                                                                                setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                                            }}
+                                                                                            className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
+                                                                                        />
+                                                                                        {defaultWrapped ? "Auto-Wrap (Override)" : "Add Wrapping"}
+                                                                                    </label>
+                                                                                    {wrappingEnabled && (
+                                                                                        <span className="text-[10px] text-emerald-600 font-bold">
+                                                                                            {(item?.volume || 0)} ft³ × {qty} × R5.90 = R {wrappingCostCalc.toFixed(2)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                wrappingEnabled
+                                                                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Wrapped (+R {wrappingCostCalc.toFixed(2)})</span>
+                                                                                    : <span className="text-slate-400 text-xs">—</span>
+                                                                            );
+                                                                        })()}
+                                                                    </td>
+
+                                                                    {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {(() => {
+                                                                            const defaultSleeves = getPlasticSleevesCount(item, itemId)
+                                                                            const sleeveQty = wrapInfo.sleeves !== undefined ? wrapInfo.sleeves : defaultSleeves
+                                                                            const sleeveCost = sleeveQty * qty * 55
+
+                                                                            return isEditing ? (
+                                                                                <div className="flex flex-col items-center gap-1">
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <button onClick={() => {
+                                                                                            const newQty = Math.max(0, sleeveQty - 1)
+                                                                                            const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
+                                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                                        }} className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">−</button>
+                                                                                        <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                                        <button onClick={() => {
+                                                                                            const newQty = sleeveQty + 1
+                                                                                            const updatedWrap = { ...(editForm.special_wrapping || {}), [itemId]: { ...wrapInfo, sleeves: newQty } }
+                                                                                            setEditForm({ ...editForm, special_wrapping: updatedWrap })
+                                                                                        }} className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">+</button>
+                                                                                    </div>
+                                                                                    {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × {qty} × R55 = R {sleeveCost.toFixed(2)}</span>}
+                                                                                </div>
+                                                                            ) : (
+                                                                                sleeveQty > 0
+                                                                                    ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{sleeveQty} sleeves (+R {sleeveCost})</span>
+                                                                                    : <span className="text-slate-400 text-xs">—</span>
+                                                                            );
+                                                                        })()}
+                                                                    </td>
+                                                                    <td className="px-6 py-4">
+                                                                        {isEditing ? (
+                                                                            <div className="flex items-center justify-center gap-3">
+                                                                                <button onClick={() => handleUpdateQuantity(itemId, qty - 1)} className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                                                                    <Trash2 size={14} className={qty === 1 ? "text-red-500" : ""} />
+                                                                                </button>
+                                                                                <span className="font-bold min-w-[20px] text-center">{qty}</span>
+                                                                                <button onClick={() => handleUpdateQuantity(itemId, qty + 1)} className="p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-colors">
+                                                                                    <Plus size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-center font-bold text-slate-900">{qty}</div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        {isEditing && (
+                                                                            <button onClick={() => handleUpdateQuantity(itemId, 0)} className="text-red-400 hover:text-red-600 p-1">
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            )
+                                                        })}
+                                                    </React.Fragment>
+                                                )
+                                            })
+                                        } catch (err) {
+                                            return <tr><td colSpan="5" className="text-red-500 font-bold p-4">Error rendering inventory: {err.message}</td></tr>
+                                        }
                                     })()}
                                 </tbody>
                             </table>
@@ -1229,7 +1372,7 @@ export default function QuoteDetailPage() {
                         <div className="relative z-10">
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-white">R {(isEditing ? ((recalculatedData?.total || 0) + customProductsTotal) : (quote?.total_price || 0))?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-4xl font-black text-white">R {finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 {isEditing && (
                                     <span className="text-emerald-400 text-xs font-bold animate-pulse">Live</span>
                                 )}
@@ -1238,18 +1381,13 @@ export default function QuoteDetailPage() {
                             <div className="mt-8 space-y-3 pt-6 border-t border-white/10">
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Assigned Vehicle</span>
-                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">{(isEditing ? recalculatedData?.breakdown?.vehicleType : quote?.breakdown_json?.vehicleType) || 'Standard'}</span>
+                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">{recalculatedData?.breakdown?.vehicleType || 'Standard'}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Inventory Volume</span>
                                     <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³</span>
                                 </div>
-                                {isEditing && recalculatedData?.breakdown?.moveProtectionCost > 0 && (
-                                    <div className="flex justify-between text-xs text-slate-400">
-                                        <span title="Included in transport cost on quote">Move Protection Cost</span>
-                                        <span className="text-white font-bold tracking-wide">R {recalculatedData.breakdown.moveProtectionCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                )}
+
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Custom Products</span>
@@ -1286,21 +1424,30 @@ export default function QuoteDetailPage() {
                                         <span className="font-bold">+ R {recalculatedData.breakdown.crew.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
+                                {((isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)) > 0) && (
+                                    <div className="flex flex-col gap-1 text-xs text-amber-400/90 py-1 border-t border-slate-700/50">
+                                        <div className="flex justify-between">
+                                            <span>Master Movers Storage (Monthly Fee)</span>
+                                            <span className="font-bold">+ R {(isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <p className="text-[10px] text-amber-300/80 font-medium">Note: Delivery out of storage is not included</p>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Payment Method</span>
                                     <span className="text-white font-bold uppercase tracking-wider">
                                         {(isEditing ? editForm.payment_method : quote?.payment_method) === 'payflex' ? 'Payflex' : 'EFT'}
                                     </span>
                                 </div>
-                                {((isEditing ? recalculatedData?.payflexSurcharge : (quote?.breakdown_json?.payflexSurcharge || 0)) > 0) && (
+                                {(recalculatedData?.payflexSurcharge > 0) && (
                                     <div className="flex justify-between text-xs text-indigo-400">
                                         <span>Payflex Surcharge (7%)</span>
-                                        <span className="font-bold">+ R {(isEditing ? recalculatedData?.payflexSurcharge : (quote?.breakdown_json?.payflexSurcharge || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold">+ R {recalculatedData.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {(isEditing ? ((recalculatedData?.vat || 0) + (customProductsTotal * 0.15 / 1.15)) : ((quote?.total_price || 0) * 0.15 / 1.15)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-white font-bold tracking-wide">R {finalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>

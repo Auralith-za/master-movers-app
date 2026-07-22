@@ -69,3 +69,33 @@ export const trackQuoteSubmit = ({ value = 0 } = {}) => {
         currency: 'ZAR',
     })
 }
+
+// ─── Google Ads: Step 1 Complete (Soft Conversion) ───────────────────────────
+// Fires when a user successfully completes Step 1 and navigates to Step 2.
+// Used as the primary conversion while pricing is temporarily hidden behind
+// a "get in touch" message (no payment flow = no purchase conversion).
+// Label: AW-930634357/XJmACObty78cEPW04bsD (reuses Lead label — or set up a
+// dedicated "Step 1 Complete" conversion action in Google Ads and swap label).
+export const trackStep1Complete = () => {
+    if (typeof window.gtag === 'undefined') return
+    console.log('[Google Ads] ✅ Step 1 Complete conversion fired')
+    // Primary: fire as dedicated Google Ads "Step 1 Complete — Quote Started" conversion
+    window.gtag('event', 'conversion', {
+        send_to: 'AW-930634357/WB1qCPHLrc0cEPW04bsD',  // ← Step 1 Complete — Quote Started
+        value: 1,
+        currency: 'ZAR',
+    })
+    // Secondary: GA4 custom event so you can see it separately in Analytics
+    window.gtag('event', 'quote_step1_complete', {
+        event_category: 'Quote Funnel',
+        event_label: 'Step 1 → Step 2',
+    })
+}
+
+// ─── Google Ads: Callback / Lead from any step ───────────────────────────────
+// Convenience wrapper — identical to trackLeadConversion but named clearly.
+// Use this on Steps 1, 2, 3 callback buttons so they all fire the same
+// "Request Call Back Web App" conversion action that is already Active in Ads.
+export const trackCallbackRequest = ({ step = '', value = 0 } = {}) => {
+    trackLeadConversion({ label: `Call Back Request — ${step}`, value })
+}

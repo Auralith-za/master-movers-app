@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
+import { useMoveStore, calculateQuote, parseInventoryKey } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
 import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone, ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
@@ -798,6 +798,24 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             </div>
                         )}
 
+                        {/* Shuttle Vehicle Fee */}
+                        {breakdown.shuttleCost > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        Shuttle Vehicle Surcharge
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.shuttleCost.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <span>Required due to site restrictions or carry distance &gt; 90m</span>
+                                        <span className="text-slate-500">R {breakdown.shuttleCost.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Move Protection is bundled into Transport Services */}
                         
                         {/* Documentation Fee */}
@@ -816,6 +834,25 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </div>
                             </div>
                         )}
+                        {/* Master Movers Storage Fee */}
+                        {breakdown.storageCost > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        📦 Master Movers Storage (Monthly Fee)
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.storageCost.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <span>{breakdown.storageDestination} Depot · {totalVolume?.toFixed(2)} ft³ × R1.50/cuft/mo{breakdown.storageCost === 650 && (totalVolume * 1.5 < 650) ? ' (Min. R650/mo)' : ''}</span>
+                                        <span className="text-slate-500">R {breakdown.storageCost.toFixed(2)}</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Note: Delivery out of storage is not included</p>
+                                </div>
+                            </div>
+                        )}
+
                         {(requiresCrateFlag || requiresPhotoFlag) && (
                             <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 animate-in fade-in slide-in-from-top-2">
                                 <h4 className="text-amber-800 font-bold text-sm mb-2 flex items-center gap-2">Quote Attention Required</h4>
@@ -1046,48 +1083,74 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                            <Truck size={18} className="text-red-600" /> Top Items
+                        <h3 className="font-semibold text-slate-900 mb-4 flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                                <Truck size={18} className="text-red-600" /> Inventory Items by Room
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
+                                {Object.values(inventory || {}).reduce((a, b) => a + b, 0)} Items Total
+                            </span>
                         </h3>
-                        <ul className="space-y-3 text-sm">
-                            {Object.entries(inventory || {})
-                                .slice(0, showAllItems ? undefined : 8)
-                                .map(([idKey, qty]) => {
-                                    const [id, variation] = idKey.split('_')
-                                    const item = INVENTORY_ITEMS.find(i => i.id === id)
-                                    if (!item) return null;
-                                    const hasShield = item.autoPackagingType || (variation === 'Glass' || variation === 'Marble')
-                                    return (
-                                        <li key={idKey} className="pb-2 border-b border-gray-50 last:border-0">
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-600 font-medium">{qty}x {item?.name} {variation ? <span className="text-slate-400 text-xs ml-1 font-normal uppercase">({variation})</span> : ''}</span>
-                                                <span className="font-black text-slate-300 uppercase text-[10px]">Included</span>
+                        {(() => {
+                            const grouped = {}
+                            Object.entries(inventory || {}).forEach(([idKey, qty]) => {
+                                if (!qty || qty <= 0) return
+                                const parsed = parseInventoryKey(idKey)
+                                const item = INVENTORY_ITEMS.find(i => i.id === parsed.itemId)
+                                const roomCategory = parsed.room || item?.category || 'General Furniture'
+                                if (!grouped[roomCategory]) grouped[roomCategory] = []
+                                grouped[roomCategory].push({ idKey, itemId: parsed.itemId, variation: parsed.variation, room: roomCategory, item, qty })
+                            })
+
+                            if (Object.keys(grouped).length === 0) {
+                                return <p className="text-xs text-slate-400">No inventory items added.</p>
+                            }
+
+                            return (
+                                <div className="space-y-4 text-sm">
+                                    {Object.entries(grouped).map(([room, itemsList]) => {
+                                        const roomQty = itemsList.reduce((acc, i) => acc + i.qty, 0)
+                                        return (
+                                            <div key={room} className="border border-slate-100 rounded-xl overflow-hidden shadow-2xs">
+                                                <div className="bg-slate-50/80 px-4 py-2 flex items-center justify-between border-b border-slate-100">
+                                                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                                        🏠 {room}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                        {roomQty} item{roomQty === 1 ? '' : 's'}
+                                                    </span>
+                                                </div>
+                                                <ul className="divide-y divide-gray-50 px-4 py-1">
+                                                    {itemsList.map(({ idKey, item, qty, variation }) => {
+                                                        const hasShield = item?.autoPackagingType || (variation === 'Glass' || variation === 'Marble')
+                                                        return (
+                                                            <li key={idKey} className="py-2 text-xs">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-slate-700 font-bold">
+                                                                        {qty}× {item?.name || idKey} {variation ? <span className="text-slate-400 text-[10px] font-normal uppercase">({variation})</span> : ''}
+                                                                    </span>
+                                                                    <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-50 px-1.5 py-0.5 rounded">Included</span>
+                                                                </div>
+                                                                {hasShield && (
+                                                                    <div className="text-[10px] text-emerald-600 font-semibold italic mt-0.5">
+                                                                        🛡 Protective wrapping included
+                                                                    </div>
+                                                                )}
+                                                                {item?.requiresPhoto && (
+                                                                    <div className="text-[10px] text-purple-600 font-semibold italic mt-0.5">
+                                                                        📸 Photo verification required
+                                                                    </div>
+                                                                )}
+                                                            </li>
+                                                        )
+                                                    })}
+                                                </ul>
                                             </div>
-                                            {hasShield && (
-                                                <div className="flex justify-between mt-0.5 pl-4">
-                                                    <span className="text-[11px] text-green-700 italic">↳ Protective wrapping included</span>
-                                                </div>
-                                            )}
-                                            {item.requiresPhoto && (
-                                                <div className="flex justify-between mt-0.5 pl-4">
-                                                    <span className="text-[11px] text-purple-600 italic">↳ Price subject to photo verification</span>
-                                                </div>
-                                            )}
-                                        </li>
-                                    )
-                                })}
-                            {Object.keys(inventory || {}).length > 8 && (
-                                <li
-                                    className="text-xs text-red-600 font-medium pt-2 cursor-pointer hover:underline"
-                                    onClick={() => setShowAllItems(v => !v)}
-                                >
-                                    {showAllItems
-                                        ? '▲ Show less'
-                                        : `+ ${Object.keys(inventory).length - 8} more items (expand)`
-                                    }
-                                </li>
-                            )}
-                        </ul>
+                                        )
+                                    })}
+                                </div>
+                            )
+                        })()}
                     </div>
 
                     {/* Move Notes / Special Instructions */}

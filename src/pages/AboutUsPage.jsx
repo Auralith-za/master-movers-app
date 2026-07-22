@@ -43,7 +43,7 @@ export default function AboutUsPage() {
         {
             tag: "Security",
             title: 'Fully Insured & Protected',
-            description: 'Your peace of mind is our top priority. Comprehensive transit insurance is included with every move, and our highly trained specialists handle your items with the utmost care and respect.',
+            description: 'Your peace of mind is our top priority. Goods in transit cover is included with every move, and our highly trained specialists handle your items with the utmost care and respect.',
             icon: Shield,
             iconTitle: 'Total Protection',
             iconText: 'Zero-stress moving with full coverage.'

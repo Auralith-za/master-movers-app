@@ -44,10 +44,11 @@ export const useMoveStore = create(
                     moveDetails: { 
                         ...state.moveDetails, 
                         packagingOption: option,
-                        // Always reset box quantities when switching packaging option
+                        // Always reset box quantities AND confirmation when switching packaging option
                         // This prevents stale persisted values from showing phantom costs
                         st7Boxes: 0,
-                        linenBoxes: 0
+                        linenBoxes: 0,
+                        boxesConfirmed: false
                     }
                 })),
 
@@ -88,24 +89,63 @@ export const useMoveStore = create(
 
             // Step 3: Inventory
             inventory: {},
-            addItem: (id, variation = null) =>
+            addItem: (id, variation = null, room = null) =>
                 set((state) => {
-                    const idKey = variation ? `${id}_${variation}` : id
+                    let idKey = variation ? `${id}_${variation}` : id
+                    if (room) {
+                        idKey = `${idKey}__room:${room}`
+                    }
                     const newInventory = { ...state.inventory, [idKey]: (state.inventory[idKey] || 0) + 1 }
                     return {
                         inventory: newInventory,
                         undoHistory: [...state.undoHistory, state.inventory]
                     }
                 }),
-            removeItem: (id, variation = null) =>
+            removeItem: (id, variation = null, room = null) =>
                 set((state) => {
-                    const idKey = variation ? `${id}_${variation}` : id
+                    let idKey = variation ? `${id}_${variation}` : id
+                    if (room) {
+                        idKey = `${idKey}__room:${room}`
+                    }
+                    if (!state.inventory[idKey]) {
+                        // Fallback match
+                        const match = Object.keys(state.inventory).find(k => {
+                            const parsed = parseInventoryKey(k)
+                            return parsed.itemId === id && (variation ? parsed.variation === variation : true) && (room ? parsed.room === room : true)
+                        })
+                        if (match) idKey = match
+                    }
                     if (!state.inventory[idKey]) return state
                     const newInventory = { ...state.inventory }
                     if (newInventory[idKey] <= 1) {
                         delete newInventory[idKey]
                     } else {
                         newInventory[idKey] -= 1
+                    }
+                    return {
+                        inventory: newInventory,
+                        undoHistory: [...state.undoHistory, state.inventory]
+                    }
+                }),
+            setItemQuantity: (id, variation = null, qty = 0, room = null) =>
+                set((state) => {
+                    let idKey = variation ? `${id}_${variation}` : id
+                    if (room) {
+                        idKey = `${idKey}__room:${room}`
+                    }
+                    if (qty > 0 && !state.inventory[idKey]) {
+                        const match = Object.keys(state.inventory).find(k => {
+                            const parsed = parseInventoryKey(k)
+                            return parsed.itemId === id && (variation ? parsed.variation === variation : true) && (room ? parsed.room === room : true)
+                        })
+                        if (match) idKey = match
+                    }
+                    const newInventory = { ...state.inventory }
+                    const count = Math.max(0, parseInt(qty) || 0)
+                    if (count <= 0) {
+                        delete newInventory[idKey]
+                    } else {
+                        newInventory[idKey] = count
                     }
                     return {
                         inventory: newInventory,
@@ -288,62 +328,158 @@ export const useMoveStore = create(
     )
 )
 
+export const parseInventoryKey = (idKey) => {
+    if (!idKey) return { itemId: '', variation: null, room: null }
+    let key = idKey
+    let room = null
+    if (key.includes('__room:')) {
+        const parts = key.split('__room:')
+        key = parts[0]
+        room = parts[1] || null
+    }
+    let variation = null
+    if (key.includes('_')) {
+        const parts = key.split('_')
+        key = parts[0]
+        variation = parts.slice(1).join('_') || null
+    }
+    return { itemId: key, variation, room }
+}
+
 export const getPlasticSleevesCount = (item, idKey) => {
     if (!item) return 0;
-    const itemId = (item.id || '').toLowerCase()
+    const { itemId: rawItemId } = parseInventoryKey(idKey)
+    const itemId = (rawItemId || item.id || '').toLowerCase()
     const name = (item.name || '').toLowerCase()
-    const variation = (idKey || '').includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
-        
-        const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
-        const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 
-                                      itemId.includes('mattress') || name.includes('mattress') || 
-                                      itemId.includes('futon') || name.includes('futon')
-        
-        if (isBedOrMattressOrBase) {
-            return isKing ? 4 : 2
-        }
-        
-        const isCouch = (itemId.includes('couch') || name.includes('couch') || 
-                        itemId.includes('sofa') || name.includes('sofa') || 
-                        itemId.includes('suite') || name.includes('suite') ||
-                        itemId.includes('seater') || name.includes('seater')) && 
-                        !itemId.includes('table') && !name.includes('table')
-                        
-        if (isCouch) {
-            const isLShape = itemId.includes('l-shape') || name.includes('l shape') || name.includes('l-shape')
-            if (isLShape) return 3
-            
-            const is4Seater = itemId.includes('4-seater') || name.includes('4-seater') || 
-                              itemId.includes('4 seater') || name.includes('4 seater') ||
-                              variation.includes('4-seater') || variation.includes('4 seater')
-            const is3Seater = itemId.includes('3-seater') || name.includes('3-seater') || 
-                              itemId.includes('3 seater') || name.includes('3 seater') ||
-                              itemId.includes('three-seater') || name.includes('three') ||
-                              variation.includes('3-seater') || variation.includes('3 seater')
-            return (is4Seater || is3Seater) ? 2 : 1
-        }
-        
-        const isReclinerOrPoofOrLounger = (itemId.includes('recliner') || name.includes('recliner') ||
-                                          itemId.includes('lounger') || name.includes('lounger') ||
-                                          itemId.includes('chaise') || name.includes('chaise') ||
-                                          itemId.includes('armchair') || name.includes('armchair') ||
-                                          itemId.includes('daybed') || name.includes('daybed')) &&
-                                          !itemId.includes('pool') && !name.includes('pool')
-                                          
-        if (isReclinerOrPoofOrLounger) {
-            return 1
-        }
-        
-        if (item.autoPackagingType === 'Plastic Covers') {
-            return 1
-        }
-        
-        if (idKey.endsWith('_Plastic Sleeve') || idKey.includes('_Plastic Sleeve_')) {
-            return 1
-        }
-        
+    const { variation: parsedVar } = parseInventoryKey(idKey)
+    const variation = (parsedVar || '').toLowerCase()
+
+    // ─── Exact per-item sleeve counts (verified 2026-07-14) ──────────────────
+    // Keys match item IDs in mockItems.js exactly.
+    const SLEEVE_MAP = {
+        // Queen
+        'queen-bed-base':               1,
+        'queen-bed-mattress':           1,
+        'queen-mattress-bed-and-base':  2,
+        // King
+        'king-size-bed-base':           2,
+        'king-size-bed-mattress':       2,
+        'king-bed-base':                2,
+        'king-bed-mattress':            2,
+        'king-mattress-bed-and-base':   4,
+        'king-headboard':               0,
+        'sleigh-king-bed':              2,
+        'king-sleigh-bed':              2,
+        'sleigh-king':                  2,
+        'king-sleigh':                  2,
+        // Double
+        'double-bed-base':              1,
+        'double-bed-mattress':          1,
+        'double-bed-base-and-mattress': 2,
+        'double-bed-headboard':         0,
+        'd-bed-headboard':              0,
+        'double-bed-metal-spring':      0,
+        // Single / Three Quarter
+        'three-quarter-bed':            2,
+        'single-bed-base':              1,
+        'single-bed-mattress':          1,
+        'single-bed-base-and-mattress': 2,
+        'single-bed-headboard':         0,
+        'single-bed-steel-frame':       0,
+        // Sleigh beds
+        'sleigh-king-bed':              2,
+        'sleigh-queen-bed':             1,
+        'sleigh-double-bed':            1,
+        // Desks — no sleeves
+        'large-desk':                   0,
+        'l-shape-desk':                 0,
+        'small-desk':                   0,
+        'normal-desk':                  0,
+        'executive-desk':               0,
+        'desk-bedroom':                 0,
+        // Office chairs — no sleeves
+        'office-chairs':                0,
+        'office-chair-bedroom':         0,
+        // Pedestals — no sleeves
+        'pedestal':                     0,
+        'pedestals':                    0,
+        'glass-pedestal':               0,
+        'pedestals-bedroom':            0,
+        // Boxes — no sleeves
+        'boxes-lounge':                 0,
+        'boxes-dining':                 0,
+        'boxes-bedrooms':               0,
+        'boxes-office':                 0,
+        'boxes-appliances':             0,
+        'boxes-general':                0,
+        'boxes-outdoor':                0,
+        'boxes-or-cartons':             0,
+        'boxes-special':                0,
+        // Lamps — no sleeves
+        'bedside-lamp':                 0,
+        'desk-lamp':                    0,
+        // Carpet — no sleeves
+        'carpet':                       0,
+        'carpet-or-rug':                0,
+    }
+
+    // ─── Manual Toggle Override ──────────────────────────────────────────────
+    if (idKey.endsWith('_Plastic Sleeve') || idKey.includes('_Plastic Sleeve_')) {
+        return 1
+    }
+
+    if (Object.prototype.hasOwnProperty.call(SLEEVE_MAP, itemId)) {
+        return SLEEVE_MAP[itemId]
+    }
+
+    // ─── King beds / base / mattress / sleigh logic ───────────────────────────
+    if (itemId.includes('king') || name.includes('king')) {
+        if (itemId.includes('headboard') || name.includes('headboard')) return 0;
+        if (itemId.includes('base and mattress') || name.includes('base & mattress') || name.includes('base-and-mattress')) return 4;
+        if (itemId.includes('base') || name.includes('base') || itemId.includes('mattress') || name.includes('mattress') || itemId.includes('sleigh') || name.includes('sleigh')) return 2;
+    }
+
+    // ─── Couch / sofa / suite logic ──────────────────────────────────────────
+    const isCouch = (itemId.includes('couch') || name.includes('couch') ||
+                    itemId.includes('sofa') || name.includes('sofa') ||
+                    itemId.includes('suite') || name.includes('suite') ||
+                    itemId.includes('seater') || name.includes('seater')) &&
+                    !itemId.includes('table') && !name.includes('table')
+
+    if (isCouch) {
+        const isLShape = itemId.includes('l-shape') || name.includes('l shape') || name.includes('l-shape')
+        if (isLShape) return 3
+
+        const is4Seater = itemId.includes('4-seater') || name.includes('4-seater') ||
+                          itemId.includes('4 seater') || name.includes('4 seater') ||
+                          variation.includes('4-seater') || variation.includes('4 seater')
+        const is3Seater = itemId.includes('3-seater') || name.includes('3-seater') ||
+                          itemId.includes('3 seater') || name.includes('3 seater') ||
+                          itemId.includes('three-seater') || name.includes('three') ||
+                          variation.includes('3-seater') || variation.includes('3 seater')
+        return (is4Seater || is3Seater) ? 2 : 1
+    }
+
+    // ─── Recliner / lounger / armchair / daybed ───────────────────────────────
+    const isReclinerOrPoofOrLounger = (itemId.includes('recliner') || name.includes('recliner') ||
+                                      itemId.includes('lounger') || name.includes('lounger') ||
+                                      itemId.includes('chaise') || name.includes('chaise') ||
+                                      itemId.includes('armchair') || name.includes('armchair') ||
+                                      itemId.includes('daybed') || name.includes('daybed')) &&
+                                      !itemId.includes('pool') && !name.includes('pool')
+
+    if (isReclinerOrPoofOrLounger) {
+        return 1
+    }
+
+    // ─── Fallback: autoPackagingType or variation tag ─────────────────────────
+    if (item.autoPackagingType === 'Plastic Covers') {
+        return 1
+    }
+
     return 0
 }
+
 
 export const getWrappingFlag = (item, variation) => {
     if (!item) return false;
@@ -363,8 +499,7 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let boxQty = 0
     Object.entries(inventory).forEach(([idKey, qty]) => {
-        const [itemId] = idKey.split('_')
-        const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_') : null
+        const { itemId, variation } = parseInventoryKey(idKey)
         const item = items.find(i => i.id === itemId)
         if (item) {
             // All inventory items add to volume (including self-supplied boxes)
@@ -405,9 +540,10 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     // Add any extra volume (e.g. from manual custom items in admin)
     totalVolume += extraVolumeCuFt
 
-    // Add volume for ordered boxes
-    const orderedSt7Volume = (moveDetails.st7Boxes || 0) * 4
-    const orderedLinenVolume = (moveDetails.linenBoxes || 0) * 7
+    // Add volume for ordered boxes — only when user has confirmed the quantities
+    const boxesConfirmed = moveDetails.boxesConfirmed !== false
+    const orderedSt7Volume = boxesConfirmed ? (moveDetails.st7Boxes || 0) * 4.25 : 0
+    const orderedLinenVolume = boxesConfirmed ? (moveDetails.linenBoxes || 0) * 8 : 0
     totalVolume += orderedSt7Volume + orderedLinenVolume
 
     const totalVolumeCuFt = totalVolume
@@ -634,9 +770,15 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc, prefix) => {
         const hasElevator = !!loc?.elevator
+        const fl = loc?.floorLevel
+        
         if (hasElevator) {
-            accessFees += 300
-            detailedAccess.push(`${prefix} Elevator: R300`)
+            const flNum = parseInt(fl) || 0
+            // Elevator fee only applies from 3rd floor and upwards
+            if (flNum >= 3) {
+                accessFees += 750
+                detailedAccess.push(`${prefix} Elevator (3rd floor+): R750`)
+            }
         } else {
             // Enforce staircase surcharges (no lift logged)
             const fl = loc?.floorLevel
@@ -651,9 +793,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
                 if (flNum === 2) {
                     accessFees += 450
                     detailedAccess.push(`${prefix} Long Carry Floors (2nd floor): R450`)
-                } else if (flNum === 3 || flNum === 4) {
+                } else if (flNum === 3) {
+                    accessFees += 450
+                    detailedAccess.push(`${prefix} Long Carry Floors (3rd floor): R450`)
+                } else if (flNum === 4) {
                     accessFees += 750
-                    detailedAccess.push(`${prefix} Long Carry Floors (3rd-4th floor): R750`)
+                    detailedAccess.push(`${prefix} Long Carry Floors (4th floor): R750`)
                 } else if (flNum >= 5) {
                     accessFees += 950
                     detailedAccess.push(`${prefix} Long Carry Floors (5th+ floor): R950`)
@@ -662,12 +807,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         }
 
         if (loc?.specialConditions?.hoisting) {
-            accessFees += 750
-            detailedAccess.push(`${prefix} Hoisting: R750`)
+            accessFees += 850
+            detailedAccess.push(`${prefix} Hoisting: R850`)
         }
 
-        // Shuttle: Track if needed
-        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle) {
+        // Shuttle: Track if needed — shuttle checkbox or panhandle
+        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle || loc?.specialConditions?.panhandle) {
             hasShuttle = true
         }
 
@@ -677,11 +822,11 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance) || 0
-            // Shuttle applied if greater than 60m
-            if (dist > 60) {
+            // Shuttle applied if 90m or greater
+            if (dist >= 90) {
                 hasShuttle = true
             }
-            if (dist >= 50 && dist <= 60) {
+            if (dist >= 50 && dist < 90) {
                 if (appliedLongCarryCost < 750) {
                     appliedLongCarryCost = 750
                 }
@@ -718,8 +863,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
 
     let packagingCost = 0
     const hasStep2Packaging = moveDetails.packagingOption && moveDetails.packagingOption !== 'none';
-    const totalSt7 = (moveDetails.st7Boxes || 0)
-    const totalLinen = (moveDetails.linenBoxes || 0)
+    const totalSt7 = boxesConfirmed ? (moveDetails.st7Boxes || 0) : 0
+    const totalLinen = boxesConfirmed ? (moveDetails.linenBoxes || 0) : 0
     const totalBoxesOrdered = totalSt7 + totalLinen
     
     if ((hasStep2Packaging && totalBoxesOrdered > 0) || boxQty > 0) {
@@ -749,9 +894,11 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         })
     }
 
-    // Move Protection (added to transport cost instead of separate line)
-    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
-    transportCost += moveProtectionCost
+    // Move Protection (added to transport cost instead of separate line) — LOCAL MOVES ONLY
+    const moveProtectionCost = isNationalMove ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
+    if (!isNationalMove) {
+        transportCost += moveProtectionCost
+    }
     const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
@@ -764,9 +911,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     let baseCost = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
     // Apply mid-month discount (10%) only to the base move cost
+    // Mid-month = days 5 through 24 (inclusive) — timezone-safe using split on 'T'
     let exclVatDiscount = 0
     if (moveDetails.moveDate) {
-        const day = new Date(moveDetails.moveDate).getDate()
+        // Parse date string directly to avoid UTC timezone shifts: '2026-07-15' → day=15
+        const dateParts = String(moveDetails.moveDate).split('T')[0].split('-')
+        const day = parseInt(dateParts[2], 10)
         if (day >= 5 && day <= 24) exclVatDiscount = baseCost * 0.10
     }
 
@@ -777,8 +927,17 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         baseAfterDiscount = PRICING_CONSTANTS.minOrder
     }
 
+    // Storage with Master Movers: R1.50 per cubic foot, minimum R650/month (applied when client selects a depot)
+    const STORAGE_DEPOTS_VALID = ['JHB', 'DBN', 'CPT']
+    const storageDestination = moveDetails.storageDestination || null
+    const hasStorage = STORAGE_DEPOTS_VALID.includes(storageDestination)
+    const storageCostPerCuFt = 1.50
+    const rawStorageCost = Math.round(totalVolumeCuFt * storageCostPerCuFt * 100) / 100
+    const minStorageFee = PRICING_CONSTANTS.minStorageFee || 650
+    const storageCost = hasStorage ? Math.max(minStorageFee, rawStorageCost) : 0
+
     // Add packaging add-ons AFTER minimum enforcement so they are never lost
-    let exclVatSubTotal = baseAfterDiscount + autoPackagingCost + specialWrappingCost
+    let exclVatSubTotal = baseAfterDiscount + autoPackagingCost + specialWrappingCost + storageCost
     let exclVatAfterDiscount = exclVatSubTotal
 
     // Now add 15% VAT to get the final incl-VAT total
@@ -820,7 +979,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         volumeForVehicle: totalVolumeCuFt,
         isNationalMove,
         needsQuoteRequest,
-        packagingCost: packagingCost + autoPackagingCost,
+        packagingCost: packagingCost,
+        autoPackagingCost: autoPackagingCost,
         standardInsurance,
         requiresCrateFlag,
         requiresPhotoFlag,
@@ -845,6 +1005,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             longCarryCost: longCarryCost,
             standardInsurance: standardInsurance,
             moveProtectionCost: moveProtectionCost,
+            storageCost: storageCost,
+            storageDestination: storageDestination,
             documentationFee: documentationFee,
             distance: totalDistance,
             transportRate: transportRate,

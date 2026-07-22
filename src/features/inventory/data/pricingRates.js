@@ -32,20 +32,24 @@ export const NATIONAL_RATES = {
 
     // JHB ↔ DBN
     'JHB-DBN': { ratePerCuFt: 15,  minCharge: 4750  },
-    'DBN-JHB': { ratePerCuFt: 15,  minCharge: 5000  },  // ✅ corrected from 4750
+    'DBN-JHB': { ratePerCuFt: 9,   minCharge: 5500  },  // ✅ corrected to R9/cuft per spreadsheet 20-05-2026
 
     // CPT ↔ DBN
     'CPT-DBN': { ratePerCuFt: 15,  minCharge: 8250  },
-    'DBN-CPT': { ratePerCuFt: 15,  minCharge: 6500  },  // ✅ corrected from 8250
+    'DBN-CPT': { ratePerCuFt: 25,  minCharge: 8250  },  // ✅ corrected to R25/cuft, min R8250 per spreadsheet
 
-    // Eastern Cape / Garden Route — R15/cuft (CPT rate), min R14,000
-    // All GR routes use the Cape Town rate per cuft as instructed.
-    'JHB-GR':  { ratePerCuFt: 15,  minCharge: 14000 },
-    'CPT-GR':  { ratePerCuFt: 15,  minCharge: 14000 },
-    'DBN-GR':  { ratePerCuFt: 15,  minCharge: 14000 },
-    'GR-JHB':  { ratePerCuFt: 15,  minCharge: 14000 },
-    'GR-CPT':  { ratePerCuFt: 15,  minCharge: 14000 },
-    'GR-DBN':  { ratePerCuFt: 15,  minCharge: 14000 },
+    // Eastern Cape / Garden Route
+    // JHB→GR and DBN→GR: R29/cuft (outbound from JHB/DBN depot)
+    // CPT→GR: R15/cuft (CT rate outbound)
+    // GR→JHB and GR→DBN: R29/cuft (return from GR)
+    // GR→CPT: R15/cuft
+    // All verified against Local Costing: GR spreadsheet (20-05-2026)
+    'JHB-GR':  { ratePerCuFt: 29,  minCharge: 14500 },
+    'CPT-GR':  { ratePerCuFt: 15,  minCharge: 14500 },
+    'DBN-GR':  { ratePerCuFt: 29,  minCharge: 14500 },
+    'GR-JHB':  { ratePerCuFt: 29,  minCharge: 14500 },
+    'GR-CPT':  { ratePerCuFt: 15,  minCharge: 14500 },
+    'GR-DBN':  { ratePerCuFt: 29,  minCharge: 14500 },
 };
 
 /**
@@ -108,11 +112,12 @@ export const LOCAL_VEHICLE_RATES = {
  * Additional Surcharge Costs — verified from spreadsheet.
  */
 export const ADDITIONAL_COSTS = {
-    // Shuttle required when items must travel 50m or more from the truck to the door
-    shuttle: { flatRate: 2500, thresholdMeters: 50 },
+    // Shuttle required when items must travel more than 90m from the truck to the door
+    // Also triggered by the 'Shuttle Required' checkbox in special conditions
+    shuttle: { flatRate: 2500, thresholdMeters: 90 },
 
-    // Long carry surcharge: 30m–50m carry distance (no shuttle required)
-    longCarry: { flatRate: 450, thresholdMeters: 30 },
+    // Long carry surcharge: 50m–90m carry distance (no shuttle required)
+    longCarry: { flatRate: 750, thresholdMeters: 50 },
 
     // Additional crew required for heavy/awkward items (flat fee per 2-person crew)
     heavyItemCrew: { perPerson: 550, count: 2 },
@@ -152,6 +157,7 @@ export const PACKAGING_RATES = {
  */
 export const PRICING_CONSTANTS = {
     minOrder:          2600,   // Local move minimum charge (ex-VAT)
+    minStorageFee:     650,    // Monthly storage fee minimum charge (ex-VAT)
     minKmRadius:       100,
     documentationFee:  175,    // Documentation fee (ex-VAT), always included
     weekendSurcharge:  440,    // Saturday/Sunday surcharge (ex-VAT)

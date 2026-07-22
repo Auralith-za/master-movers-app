@@ -18,7 +18,7 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
         
         const orderedSt7Boxes = moveDetails?.st7Boxes || 0
         const orderedLinenBoxes = moveDetails?.linenBoxes || 0
-        return baseVolume + (orderedSt7Boxes * 4) + (orderedLinenBoxes * 7)
+        return baseVolume + (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8)
     }, [items, inventory, moveDetails?.st7Boxes, moveDetails?.linenBoxes])
 
     const boxQty = useMemo(() => {

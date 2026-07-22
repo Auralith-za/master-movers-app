@@ -9,7 +9,7 @@
  * internally to mirror the exact logic the production system uses.
  */
 import React, { useMemo } from 'react'
-import { useMoveStore, calculateQuote } from '../features/inventory/store/moveStore'
+import { useMoveStore, calculateQuote, getPlasticSleevesCount } from '../features/inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems'
 import { getCityCode, detectCityCode, LOCAL_VEHICLE_RATES, NATIONAL_RATES, CITY_CODES, PRICING_CONSTANTS, PACKAGING_RATES } from '../features/inventory/data/pricingRates'
 import { DEPOT_LOCATIONS } from '../services/googleMaps'
@@ -148,7 +148,7 @@ export default function TestCalcBreakdown() {
     // Add ordered boxes from moveDetails
     const orderedSt7Boxes = moveDetails.st7Boxes || 0;
     const orderedLinenBoxes = moveDetails.linenBoxes || 0;
-    totalVolume += (orderedSt7Boxes * 4) + (orderedLinenBoxes * 7);
+    totalVolume += (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8);
     boxQty += orderedSt7Boxes + orderedLinenBoxes;
 
     // Vehicle selection (mirroring moveStore logic)
@@ -175,53 +175,7 @@ export default function TestCalcBreakdown() {
     const natVolumeCost = nationalRate ? Math.max(totalVolume * nationalRate.ratePerCuFt, nationalRate.minCharge) : 0
     const natMinApplied = nationalRate && (totalVolume * nationalRate.ratePerCuFt) < nationalRate.minCharge
 
-    const getPlasticSleevesCount = (item, idKey) => {
-        const itemId = item.id.toLowerCase()
-        const name = item.name.toLowerCase()
-        const variation = idKey.includes('_') ? idKey.split('_').slice(1).join('_').toLowerCase() : ''
-        
-        const isKing = itemId.includes('king') || name.includes('king') || variation.includes('king')
-        const isBedOrMattressOrBase = itemId.includes('bed') || name.includes('bed') || 
-                                      itemId.includes('mattress') || name.includes('mattress') || 
-                                      itemId.includes('base') || name.includes('base') ||
-                                      itemId.includes('futon') || name.includes('futon')
-        
-        if (isBedOrMattressOrBase) {
-            return isKing ? 4 : 2
-        }
-        
-        const isCouch = itemId.includes('couch') || name.includes('couch') || 
-                        itemId.includes('sofa') || name.includes('sofa') || 
-                        itemId.includes('suite') || name.includes('suite')
-                        
-        if (isCouch) {
-            const is4Seater = itemId.includes('4-seater') || name.includes('4-seater') || 
-                              itemId.includes('4 seater') || name.includes('4 seater') ||
-                              variation.includes('4-seater') || variation.includes('4 seater')
-            return is4Seater ? 2 : 1
-        }
-        
-        const isReclinerOrPoofOrLounger = itemId.includes('recliner') || name.includes('recliner') ||
-                                          itemId.includes('poof') || name.includes('poof') ||
-                                          itemId.includes('pouf') || name.includes('pouf') ||
-                                          itemId.includes('lounger') || name.includes('lounger') ||
-                                          itemId.includes('ottoman') || name.includes('ottoman') ||
-                                          itemId.includes('chaise') || name.includes('chaise') ||
-                                          itemId.includes('armchair') || name.includes('armchair') ||
-                                          itemId.includes('daybed') || name.includes('daybed')
-                                          
-        // Removed auto-sleeving for recliners, ottomans, and loungers so they can be manually ticked
-        
-        if (item.autoPackagingType === 'Plastic Covers') {
-            return 1
-        }
-        
-        if (idKey.endsWith('_Plastic Sleeve') || idKey.includes('_Plastic Sleeve_')) {
-            return 1
-        }
-        
-        return 0
-    }
+
 
     // Build per-item wrapping/packaging breakdown
     const wrappingLines = []
@@ -236,6 +190,7 @@ export default function TestCalcBreakdown() {
                 name: item.name,
                 type: 'Plastic Sleeves',
                 qty,
+                sleeves,
                 rate: sleeves * 55,
                 total: qty * sleeves * 55
             })
@@ -330,8 +285,7 @@ export default function TestCalcBreakdown() {
                 )}
 
                 {/* SECTION 3: INVENTORY & VOLUME */}
-                {Object.keys(inventory || {}).length > 0 && (
-                    <Section title="3. Inventory & Volume" icon={Package} color="slate">
+                <Section title="3. Inventory & Volume" icon={Package} color="slate">
                         <Row label="Total Items" value={Object.values(inventory).reduce((a, b) => a + b, 0)} />
                         <Row label="Total Volume" value={`${totalVolume} cuft`} highlight />
                         {!isNational && assignedVehicle && (
@@ -347,11 +301,10 @@ export default function TestCalcBreakdown() {
                                 <Row label="Min Charge" value={R(nationalRate.minCharge)} />
                             </>
                         )}
-                    </Section>
-                )}
+                </Section>
 
                 {/* SECTION 4: CALCULATION ENGINE */}
-                {Object.keys(inventory || {}).length > 0 && hasData && (
+                {hasData && (
                     <Section title="4. Calculation Engine" icon={Calculator} color={result?.needsQuoteRequest ? 'red' : (isNational ? 'amber' : 'slate')}>
                         {result?.needsQuoteRequest && (
                             <div className="mb-2 p-2 bg-red-950/50 border border-red-800 text-red-200 text-[10px] rounded-lg text-left">
@@ -433,7 +386,7 @@ export default function TestCalcBreakdown() {
                                     <Row
                                         key={i}
                                         label={`  └ ${l.name} (${l.type})`}
-                                        value={`${l.qty} × ${R(l.rate)} = ${R(l.total)}`}
+                                        value={l.sleeves ? `${l.qty} item(s) × ${l.sleeves} sleeves @ R55 = ${R(l.total)}` : `${l.qty} × ${R(l.rate)} = ${R(l.total)}`}
                                         mono
                                     />
                                 ))}
@@ -462,7 +415,9 @@ export default function TestCalcBreakdown() {
                             (result.breakdown?.access || 0) +
                             (result.breakdown?.crew || 0) +
                             (result.breakdown?.extraDistance || 0) +
+                            (result.breakdown?.shuttleCost || 0) +
                             (result.packagingCost || 0) +
+                            (result.autoPackagingCost || 0) +
                             175 // doc fee
                         )} warn />
                     </Section>
@@ -476,7 +431,9 @@ export default function TestCalcBreakdown() {
                             (result.breakdown?.access || 0) +
                             (result.breakdown?.crew || 0) +
                             (result.breakdown?.extraDistance || 0) +
+                            (result.breakdown?.shuttleCost || 0) +
                             (result.packagingCost || 0) +
+                            (result.autoPackagingCost || 0) +
                             175
                         )} mono />
                         {result.discount > 0 && (

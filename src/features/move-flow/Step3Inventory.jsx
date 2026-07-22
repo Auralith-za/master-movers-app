@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useMoveStore, calculateQuote } from '../inventory/store/moveStore'
+import { useMoveStore, calculateQuote, parseInventoryKey } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS, CATEGORIES } from '../inventory/data/mockItems'
 import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'
@@ -11,6 +11,7 @@ import { Search, Trash2, Truck, RotateCcw, Phone, Loader2, Sparkles } from 'luci
 import { Input } from '../../components/ui/Input'
 import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
 import { LeadCaptureModal } from './Step1Details'
+import { trackCallbackRequest } from '../../lib/gtag'
 
 const categoryEmojis = {
     "Special Handling Items": "🎹",
@@ -39,12 +40,13 @@ export default function Step3Inventory() {
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
-    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, clearInventory, setInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
+    const { inventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, setItemQuantity, clearInventory, setInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState(orderedCategories[0])
 
     // Modal states
     const [variationModalItem, setVariationModalItem] = useState(null)
+    const [roomModalItem, setRoomModalItem] = useState(null)
     const [crateModalItem, setCrateModalItem] = useState(null) // For optional crate popup
     const [warningModal, setWarningModal] = useState({ show: false, title: '', message: '', onConfirm: null })
     const [showLeadModal, setShowLeadModal] = useState(false)
@@ -76,34 +78,38 @@ export default function Step3Inventory() {
         setLastVehicleName(currentVehicleName)
     }, [currentVehicleName, lastVehicleName])
 
-    const getQuantity = (itemId) => {
-        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
+    const getQuantity = (itemId, room = activeCategory) => {
         return Object.entries(inventory)
-            .filter(([idKey]) => idKey === resolvedId || idKey.startsWith(`${resolvedId}_`))
+            .filter(([idKey]) => {
+                const parsed = parseInventoryKey(idKey)
+                if (parsed.itemId !== itemId) return false
+                const itemRoom = parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category
+                return itemRoom === room
+            })
             .reduce((sum, [_, qty]) => sum + qty, 0);
     }
 
-    const handleAddItem = (itemId, existingVariation = null) => {
+    const handleAddItem = (itemId, existingVariation = null, targetRoom = activeCategory) => {
         const item = INVENTORY_ITEMS.find(i => i.id === itemId);
         if (!item) return;
 
-        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
-        const currentQty = getQuantity(itemId);
+        const roomToAssign = targetRoom || item.category;
+        const currentQty = getQuantity(itemId, roomToAssign);
 
         if (item.variationOptions && item.variationOptions.length > 0) {
-            setVariationModalItem(item);
+            setVariationModalItem({ ...item, targetRoom: roomToAssign });
             return;
         }
 
         if (currentQty === 0) {
             // Items with both wrapping + crate get the crate choice modal
             if (item.requiresCrate && item.autoPackagingType) {
-                setCrateModalItem(item);
+                setCrateModalItem({ ...item, targetRoom: roomToAssign });
                 return;
             }
             // Crate-only items just show the crate callback modal directly
             if (item.requiresCrate && !item.autoPackagingType) {
-                setCrateModalItem(item);
+                setCrateModalItem({ ...item, targetRoom: roomToAssign });
                 return;
             }
             if (item.requiresPhoto) {
@@ -112,7 +118,7 @@ export default function Step3Inventory() {
                     title: 'Photo Verification Needed',
                     message: 'This item requires a photo for accurate quoting. Please add it to your inventory and remember to send us a photo!',
                     onConfirm: () => {
-                        addItem(resolvedId, existingVariation);
+                        addItem(itemId, existingVariation, roomToAssign);
                         setWarningModal({ show: false });
                     }
                 });
@@ -120,27 +126,23 @@ export default function Step3Inventory() {
             }
         }
 
-        addItem(resolvedId, existingVariation);
+        addItem(itemId, existingVariation, roomToAssign);
     }
 
-    const handleRemoveItem = (itemId, existingVariation = null) => {
-        const resolvedId = itemId.startsWith('boxes-') ? 'boxes' : itemId;
-        const idKey = existingVariation ? `${resolvedId}_${existingVariation}` : resolvedId;
-        
-        if (inventory[idKey]) {
-            removeItem(resolvedId, existingVariation);
-        } else {
-            // Fallback for removing other variations
-            const idKeys = Object.keys(inventory).filter(k => k === resolvedId || k.startsWith(`${resolvedId}_`));
-            if (idKeys.length > 0) {
-                const parts = idKeys[0].split('_');
-                removeItem(parts[0], parts.slice(1).join('_') || null);
-            }
-        }
+    const handleRemoveItem = (itemId, existingVariation = null, targetRoom = activeCategory) => {
+        const item = INVENTORY_ITEMS.find(i => i.id === itemId);
+        const roomToAssign = targetRoom || item?.category;
+        removeItem(itemId, existingVariation, roomToAssign);
+    }
+
+    const handleSetQuantity = (itemId, qty, existingVariation = null, targetRoom = activeCategory) => {
+        const item = INVENTORY_ITEMS.find(i => i.id === itemId);
+        const roomToAssign = targetRoom || item?.category;
+        setItemQuantity(itemId, existingVariation, qty, roomToAssign);
     }
 
     const handleToggleModifier = (itemId, modifier) => {
-        const idKeys = Object.keys(inventory).filter(k => k === itemId || k.startsWith(`${itemId}_`));
+        const idKeys = Object.keys(inventory).filter(k => parseInventoryKey(k).itemId === itemId);
         if (idKeys.length === 0) return;
         
         const currentKey = idKeys[0];
@@ -162,12 +164,19 @@ export default function Step3Inventory() {
     const [showVolumeModal, setShowVolumeModal] = useState(false)
     const VOLUME_THRESHOLD_FT3 = 10594 // 300m3
 
-    const filteredItems = INVENTORY_ITEMS.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase())
-        // If there's a search term, ignore the active category and search the entire catalog
-        const matchesCategory = (activeCategory && !searchTerm) ? item.category === activeCategory : true
-        return matchesSearch && matchesCategory
-    })
+    const filteredItems = React.useMemo(() => {
+        if (searchTerm.trim()) {
+            return INVENTORY_ITEMS.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+        }
+        const catalogItems = INVENTORY_ITEMS.filter(item => item.category === activeCategory)
+        const customRoomItemIds = Object.keys(inventory)
+            .map(idKey => parseInventoryKey(idKey))
+            .filter(parsed => parsed.room === activeCategory)
+            .map(parsed => parsed.itemId)
+        
+        const extraItems = INVENTORY_ITEMS.filter(item => customRoomItemIds.includes(item.id) && item.category !== activeCategory)
+        return [...catalogItems, ...extraItems]
+    }, [searchTerm, activeCategory, inventory])
 
     const handleProceed = () => {
         if (totalVolume === 0) {
@@ -227,7 +236,62 @@ export default function Step3Inventory() {
                 </div>
             )}
 
-            {/* Variations Modal */}
+            {/* Room Selector Modal */}
+            {roomModalItem && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-red-100"
+                    >
+                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                            <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                                🏠
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 leading-tight">Add to Which Room?</h3>
+                                <p className="text-xs font-semibold text-red-600">{roomModalItem.name}</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">Select the room destination for this item:</p>
+
+                        <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
+                            {orderedCategories.map(cat => {
+                                const isCurrent = (roomModalItem.targetRoom || activeCategory) === cat;
+                                return (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        className={`w-full py-3 px-4 rounded-xl text-xs md:text-sm font-bold flex items-center justify-between transition-all border-2 ${
+                                            isCurrent
+                                                ? 'bg-red-600 border-red-600 text-white shadow-md'
+                                                : 'bg-white border-slate-100 text-slate-700 hover:border-red-200 hover:bg-red-50/50'
+                                        }`}
+                                        onClick={() => {
+                                            const selectedRoom = cat;
+                                            handleAddItem(roomModalItem.id, roomModalItem.variation || null, selectedRoom);
+                                            setRoomModalItem(null);
+                                        }}
+                                    >
+                                        <span>{cat}</span>
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isCurrent ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                            {isCurrent ? 'Selected ✓' : 'Add Here →'}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <Button
+                            variant="ghost"
+                            className="w-full mt-4 text-slate-400 outline-none hover:text-slate-600"
+                            onClick={() => setRoomModalItem(null)}
+                        >
+                            Cancel
+                        </Button>
+                    </motion.div>
+                </div>
+            )}
             {variationModalItem && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
                     <motion.div
@@ -417,19 +481,29 @@ export default function Step3Inventory() {
                         {/* Items Grid - 2 columns on mobile */}
                         <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-6 mt-2">
                             {filteredItems.map(item => {
-                                // Determine the current variation for this item (if any)
-                                const idKeys = Object.keys(inventory).filter(k => k === item.id || k.startsWith(`${item.id}_`));
+                                const targetRoom = activeCategory
+                                const idKeys = Object.keys(inventory).filter(k => {
+                                    const parsed = parseInventoryKey(k)
+                                    if (parsed.itemId !== item.id) return false
+                                    const itemRoom = parsed.room || item.category
+                                    return itemRoom === targetRoom
+                                })
                                 const firstKey = idKeys[0] || '';
-                                const variation = firstKey.includes('_') ? firstKey.split('_').slice(1).join('_') : null;
+                                const parsedKey = parseInventoryKey(firstKey)
+                                const variation = parsedKey.variation
+
                                 return (
                                     <InventoryItemCard
                                         key={item.id}
                                         item={item}
-                                        quantity={getQuantity(item.id)}
+                                        quantity={getQuantity(item.id, targetRoom)}
                                         variation={variation}
-                                        onAdd={handleAddItem}
-                                        onRemove={handleRemoveItem}
+                                        targetRoom={searchTerm ? targetRoom : null}
+                                        onAdd={(id, varOpt) => handleAddItem(id, varOpt, targetRoom)}
+                                        onRemove={(id, varOpt) => handleRemoveItem(id, varOpt, targetRoom)}
+                                        onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt, targetRoom)}
                                         onToggleModifier={handleToggleModifier}
+                                        onChangeRoom={(itemToChange) => setRoomModalItem({ ...itemToChange, targetRoom: targetRoom, variation })}
                                     />
                                 );
                             })}
@@ -467,6 +541,8 @@ export default function Step3Inventory() {
                                         setIsSubmittingLead(true)
                                         try {
                                             await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                            // 🔴 Google Ads: Lead / Callback conversion
+                                            trackCallbackRequest({ step: 'Step 3 — Inventory' })
                                             emailService.sendCallbackEmail({
                                                 name: moveDetails.contactName,
                                                 email: moveDetails.contactEmail,

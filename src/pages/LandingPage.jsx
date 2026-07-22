@@ -124,7 +124,7 @@ export default function LandingPage() {
                             {
                                 icon: Shield,
                                 title: 'Fully Insured',
-                                desc: 'Comprehensive transit insurance included with every move for your peace of mind.'
+                                desc: 'Goods in transit cover included with every move for your peace of mind.'
                             },
                             {
                                 icon: Clock,

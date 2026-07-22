@@ -9,6 +9,7 @@ import { LeadCaptureModal } from './Step1Details'
 import { emailService } from '../../services/emailService'
 import clsx from 'clsx'
 import { PACKAGING_RATES } from '../inventory/data/pricingRates'
+import { trackCallbackRequest } from '../../lib/gtag'
 
 const PROPERTY_TYPES = [
     { id: 'house', label: 'House', icon: Home },
@@ -44,6 +45,7 @@ export default function Step2Access() {
     const [showLeadModal, setShowLeadModal] = React.useState(false)
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [addedBoxes, setAddedBoxes] = React.useState(false)
+    const [isSavingBoxes, setIsSavingBoxes] = React.useState(false)
 
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
@@ -51,11 +53,16 @@ export default function Step2Access() {
 
     const handleSpecialCondition = (location, condition) => {
         const currentConditions = accessDetails?.[location]?.specialConditions || {}
+        const newValue = !currentConditions[condition]
+        const updated = {
+            ...currentConditions,
+            [condition]: newValue
+        }
+        if (condition === 'panhandle' && newValue) {
+            updated.shuttle = true
+        }
         setAccessDetails(location, {
-            specialConditions: {
-                ...currentConditions,
-                [condition]: !currentConditions[condition]
-            }
+            specialConditions: updated
         })
     }
 
@@ -255,14 +262,14 @@ export default function Step2Access() {
                             <div className="flex items-center gap-3">
                                 <Input 
                                     type="number" 
-                                    placeholder="e.g. 45"
+                                    placeholder="e.g. 65"
                                     value={data.longCarryDistance || ''}
                                     onChange={(e) => handleUpdate(locationType, 'longCarryDistance', e.target.value)}
                                     className="bg-white h-10"
                                 />
                                 <span className="text-xs font-bold text-slate-400 uppercase">meters</span>
                             </div>
-                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: 50–60m incurs a flat rate of R750. Distances over 60m will be charged a shuttle vehicle fee.</p>
+                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: 50–89m incurs a flat rate of R750. Distances of 90m or more will incur an additional shuttle vehicle fee of R2,500.</p>
                         </div>
                     )}
 
@@ -347,17 +354,24 @@ export default function Step2Access() {
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <button 
-                                                onClick={() => setMoveDetails({ st7Boxes: Math.max(0, (moveDetails.st7Boxes || 0) - 1) })}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                                onClick={() => setMoveDetails({ st7Boxes: Math.max(0, (moveDetails.st7Boxes || 0) - 1), boxesConfirmed: true })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm flex-shrink-0"
                                             >
                                                 <Minus size={20} />
                                             </button>
-                                            <div className="flex-1 bg-white border border-slate-200 rounded-xl h-12 flex items-center justify-center font-black text-xl text-slate-900 shadow-sm">
-                                                {moveDetails.st7Boxes || 0}
-                                            </div>
+                                            <input 
+                                                type="number"
+                                                min="0"
+                                                value={moveDetails.st7Boxes || 0}
+                                                onChange={(e) => {
+                                                    const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                    setMoveDetails({ st7Boxes: val, boxesConfirmed: true })
+                                                }}
+                                                className="flex-1 bg-white border border-slate-200 rounded-xl h-12 text-center font-black text-xl text-slate-900 shadow-sm focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+                                            />
                                             <button 
-                                                onClick={() => setMoveDetails({ st7Boxes: (moveDetails.st7Boxes || 0) + 1 })}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                                onClick={() => setMoveDetails({ st7Boxes: (moveDetails.st7Boxes || 0) + 1, boxesConfirmed: true })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm flex-shrink-0"
                                             >
                                                 <Plus size={20} />
                                             </button>
@@ -371,17 +385,24 @@ export default function Step2Access() {
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <button 
-                                                onClick={() => setMoveDetails({ linenBoxes: Math.max(0, (moveDetails.linenBoxes || 0) - 1) })}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                                onClick={() => setMoveDetails({ linenBoxes: Math.max(0, (moveDetails.linenBoxes || 0) - 1), boxesConfirmed: true })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm flex-shrink-0"
                                             >
                                                 <Minus size={20} />
                                             </button>
-                                            <div className="flex-1 bg-white border border-slate-200 rounded-xl h-12 flex items-center justify-center font-black text-xl text-slate-900 shadow-sm">
-                                                {moveDetails.linenBoxes || 0}
-                                            </div>
+                                            <input 
+                                                type="number"
+                                                min="0"
+                                                value={moveDetails.linenBoxes || 0}
+                                                onChange={(e) => {
+                                                    const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                    setMoveDetails({ linenBoxes: val, boxesConfirmed: true })
+                                                }}
+                                                className="flex-1 bg-white border border-slate-200 rounded-xl h-12 text-center font-black text-xl text-slate-900 shadow-sm focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+                                            />
                                             <button 
-                                                onClick={() => setMoveDetails({ linenBoxes: (moveDetails.linenBoxes || 0) + 1 })}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm"
+                                                onClick={() => setMoveDetails({ linenBoxes: (moveDetails.linenBoxes || 0) + 1, boxesConfirmed: true })}
+                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:border-red-600 hover:text-red-600 transition-all shadow-sm flex-shrink-0"
                                             >
                                                 <Plus size={20} />
                                             </button>
@@ -394,22 +415,6 @@ export default function Step2Access() {
                                         <p className="text-[10px] font-bold uppercase tracking-tight">Delivery Fee of R{PACKAGING_RATES.sendMeBoxesOnly.deliveryFee.toFixed(2)} will be included in the total.</p>
                                     </div>
                                 )}
-                                <div className="mt-6">
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault()
-                                            setAddedBoxes(true)
-                                            setTimeout(() => setAddedBoxes(false), 2000)
-                                        }}
-                                        className={clsx(
-                                            "w-full py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2",
-                                            addedBoxes ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" : "bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
-                                        )}
-                                    >
-                                        <span className="font-black uppercase tracking-widest text-sm">{addedBoxes ? "✓ Added To Quote" : "Confirm Box Quantities"}</span>
-                                    </button>
-                                </div>
                             </div>
                         )}
                     </div>
@@ -480,6 +485,8 @@ export default function Step2Access() {
                                 setIsSubmittingLead(true)
                                 try {
                                     await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    // 🔴 Google Ads: Lead / Callback conversion
+                                    trackCallbackRequest({ step: 'Step 2 — Site Access' })
                                     emailService.sendCallbackEmail({
                                         name: moveDetails.contactName,
                                         email: moveDetails.contactEmail,

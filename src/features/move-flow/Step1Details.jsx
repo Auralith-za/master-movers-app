@@ -6,8 +6,9 @@ import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse } from 'lucide-react'
 import { getCityCode, detectCityCode } from '../inventory/data/pricingRates'
+import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
@@ -127,7 +128,7 @@ export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initial
 
 export default function Step1Details() {
     const navigate = useNavigate()
-    const { moveDetails, setMoveDetails, submitQuote } = useMoveStore()
+    const { moveDetails, setMoveDetails, submitQuote, lastSavedQuote } = useMoveStore()
     const location = useLocation()
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
@@ -136,6 +137,69 @@ export default function Step1Details() {
     const [isValidating, setIsValidating] = React.useState(false)
     const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
     const [dropoffHelpSent, setDropoffHelpSent] = React.useState(false)
+
+    // ─── Storage destination constants ──────────────────────────────────────
+    const STORAGE_DEPOTS = [
+        {
+            code: 'JHB',
+            city: 'Johannesburg',
+            region: 'Gauteng',
+            address: 'Master Movers Storage — Johannesburg (Gauteng)',
+            badge: 'JHB',
+            color: 'red',
+        },
+        {
+            code: 'DBN',
+            city: 'Durban',
+            region: 'KwaZulu-Natal',
+            address: 'Master Movers Storage — Durban (KwaZulu-Natal)',
+            badge: 'DBN',
+            color: 'slate',
+        },
+        {
+            code: 'CPT',
+            city: 'Cape Town',
+            region: 'Western Cape',
+            address: 'Master Movers Storage — Cape Town (Western Cape)',
+            badge: 'CPT',
+            color: 'slate',
+        },
+    ]
+    const isStorageMode = !!moveDetails.storageDestination
+
+    const handleSelectStorageDepot = (depot) => {
+        setMoveDetails({
+            storageDestination: depot.code,
+            dropoffAddress: depot.address,
+            dropoffAddressVerified: true,
+            dropoffManualActive: false,
+            dropoffPlaceId: null,
+            dropoffLatLng: null,
+            dropoffCity: depot.city,
+            dropoffAddressComponents: null,
+            // Storage moves don't need a driving distance
+            distanceKm: 0,
+            tripBreakdown: null,
+            totalBillableDistance: 0,
+        })
+        setAddressError(null)
+    }
+
+    const handleClearStorage = () => {
+        setMoveDetails({
+            storageDestination: null,
+            dropoffAddress: '',
+            dropoffAddressVerified: false,
+            dropoffManualActive: false,
+            dropoffPlaceId: null,
+            dropoffLatLng: null,
+            dropoffCity: null,
+            dropoffAddressComponents: null,
+            distanceKm: 0,
+            tripBreakdown: null,
+            totalBillableDistance: 0,
+        })
+    }
 
     const handleLocationHelp = async (field) => {
         const isPickup = field === 'pickup'
@@ -340,7 +404,7 @@ export default function Step1Details() {
         e.preventDefault()
 
         if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
-            setAddressError("Both pickup and dropoff addresses are required.")
+            setAddressError("Both pickup and delivery/storage addresses are required.")
             return
         }
         if (isValidating) {
@@ -368,8 +432,8 @@ export default function Step1Details() {
         const dropoffIsOutline = isOutlineComponent(moveDetails.dropoffAddressComponents)
         const isOutline = pickupIsOutline || dropoffIsOutline
 
-        // For local moves, ensure Google Maps resolved a real distance (unless manual entry is selected)
-        if (!isManual && !isNational && !isOutline && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
+        // For local moves, ensure Google Maps resolved a real distance (unless manual entry or storage is selected)
+        if (!isManual && !isNational && !isOutline && !moveDetails.storageDestination && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
             setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
             return
         }
@@ -379,11 +443,33 @@ export default function Step1Details() {
             return
         }
 
+        // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion
+        // while pricing is hidden behind a "get in touch" message.
+        trackStep1Complete()
         navigate(`${basePath}/access`)
     }
 
     return (
         <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Start New Quote Banner to prevent overwriting */}
+            {lastSavedQuote && (
+                <div className="mb-8 bg-blue-50 border-l-4 border-blue-500 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <p className="text-blue-900 font-black uppercase tracking-tight text-lg">Continuing Existing Quote</p>
+                        <p className="text-blue-700 text-sm mt-1">
+                            You are continuing a quote. To start fresh, click the button.
+                        </p>
+                    </div>
+                    <Button 
+                        type="button" 
+                        onClick={() => useMoveStore.getState().reset()} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold whitespace-nowrap shadow-md"
+                    >
+                        Start Fresh Quote
+                    </Button>
+                </div>
+            )}
+
             {/* Massive Promo Banner at the Top */}
             <div className="mb-8 bg-red-600 text-white rounded-2xl p-8 shadow-2xl relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
@@ -569,67 +655,150 @@ export default function Step1Details() {
 
                             {/* Dropoff Group */}
                             <div className="space-y-4">
-                                {moveDetails.dropoffManualActive ? (
-                                    <div className="space-y-1.5">
-                                        <Input
-                                            label="Dropoff Suburb / Area"
-                                            name="dropoffAddress"
-                                            placeholder="Please enter suburb name"
-                                            value={moveDetails.dropoffAddress || ''}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setMoveDetails({ dropoffManualActive: false, dropoffAddress: '', cant_find_address: false });
-                                                setDropoffHelpSent(false);
-                                            }}
-                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
-                                        >
-                                            ← Search address on map
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <AddressAutocomplete
-                                        label="Dropoff Address"
-                                        name="dropoffAddress"
-                                        placeholder="Please fill in as: Street Number, Street Name, Suburb"
-                                        value={moveDetails.dropoffAddress || ''}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                )}
-                                {!dropoffHelpSent ? (
-                                    !moveDetails.dropoffManualActive && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleLocationHelp('dropoff')}
-                                            className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
-                                        >
-                                            I cannot find my address
-                                        </button>
-                                    )
-                                ) : (
-                                    <div className="mt-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 shadow-lg shadow-emerald-100/50 animate-in fade-in slide-in-from-top-3 duration-500">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30 animate-in zoom-in duration-300">
-                                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-black text-emerald-800 uppercase tracking-wide">Request Received</p>
-                                                <p className="text-xs text-emerald-600 mt-1 leading-relaxed">One of our sales consultants will contact you shortly to assist with your location details.</p>
-                                            </div>
+                                {/* Toggle: Deliver to address vs Store with Master Movers */}
+                                <div className="flex items-center gap-2 mb-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleClearStorage}
+                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
+                                            !isStorageMode
+                                                ? 'bg-slate-900 text-white border-slate-900'
+                                                : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
+                                        }`}
+                                    >
+                                        Deliver to Address
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            // If no depot selected yet, show picker (clear any existing address)
+                                            handleClearStorage()
+                                            setMoveDetails({ storageDestination: 'PICK' })
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 transition-all flex items-center gap-1.5 ${
+                                            isStorageMode
+                                                ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-600/20'
+                                                : 'bg-white text-slate-400 border-slate-200 hover:border-red-400 hover:text-red-600'
+                                        }`}
+                                    >
+                                        <Warehouse size={11} /> Store with Master Movers
+                                    </button>
+                                </div>
+
+                                {isStorageMode ? (
+                                    /* ── Storage Depot Picker ── */
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Storage Location</p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {STORAGE_DEPOTS.map((depot) => {
+                                                const isSelected = moveDetails.storageDestination === depot.code
+                                                return (
+                                                    <button
+                                                        key={depot.code}
+                                                        type="button"
+                                                        onClick={() => handleSelectStorageDepot(depot)}
+                                                        className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                                                            isSelected
+                                                                ? 'bg-slate-900 border-slate-900 shadow-xl shadow-slate-900/20 text-white'
+                                                                : 'bg-white border-slate-100 hover:border-slate-300 text-slate-700 hover:shadow-md'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                                                            isSelected ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'
+                                                        }`}>
+                                                            {depot.badge}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                                                                {depot.city}
+                                                            </p>
+                                                            <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
+                                                                {depot.region} · Master Movers Storage
+                                                            </p>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                                                                <CheckCircle size={14} className="text-white" />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                )
+                                            })}
                                         </div>
+                                        {moveDetails.storageDestination && moveDetails.storageDestination !== 'PICK' && (
+                                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+                                                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">📦 Storage Rate</p>
+                                                <p className="text-xs text-amber-600">R1.50 per cubic foot per month (minimum R650/month) — calculated from your inventory volume and added to your quote.</p>
+                                                <p className="text-xs font-bold text-amber-800 uppercase tracking-tight">Note: Delivery out of storage is not included.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* ── Standard address input ── */
+                                    <div className="space-y-4">
+                                        {moveDetails.dropoffManualActive ? (
+                                            <div className="space-y-1.5">
+                                                <Input
+                                                    label="Dropoff Suburb / Area"
+                                                    name="dropoffAddress"
+                                                    placeholder="Please enter suburb name"
+                                                    value={moveDetails.dropoffAddress || ''}
+                                                    onChange={handleChange}
+                                                    required
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setMoveDetails({ dropoffManualActive: false, dropoffAddress: '', cant_find_address: false });
+                                                        setDropoffHelpSent(false);
+                                                    }}
+                                                    className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                                >
+                                                    ← Search address on map
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <AddressAutocomplete
+                                                label="Dropoff Address"
+                                                name="dropoffAddress"
+                                                placeholder="Please fill in as: Street Number, Street Name, Suburb"
+                                                value={moveDetails.dropoffAddress || ''}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        )}
+                                        {!dropoffHelpSent ? (
+                                            !moveDetails.dropoffManualActive && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleLocationHelp('dropoff')}
+                                                    className="text-xs text-red-600 hover:text-red-700 font-bold underline cursor-pointer mt-1 focus:outline-none text-left block"
+                                                >
+                                                    I cannot find my address
+                                                </button>
+                                            )
+                                        ) : (
+                                            <div className="mt-3 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 shadow-lg shadow-emerald-100/50 animate-in fade-in slide-in-from-top-3 duration-500">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30 animate-in zoom-in duration-300">
+                                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-emerald-800 uppercase tracking-wide">Request Received</p>
+                                                        <p className="text-xs text-emerald-600 mt-1 leading-relaxed">One of our sales consultants will contact you shortly to assist with your location details.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <Input
+                                            label="Unit Number & Complex Name (Optional)"
+                                            name="dropoffUnitComplex"
+                                            placeholder="e.g. Unit 12, Ocean View"
+                                            value={moveDetails.dropoffUnitComplex || ''}
+                                            onChange={handleChange}
+                                        />
                                     </div>
                                 )}
-                                <Input
-                                    label="Unit Number & Complex Name (Optional)"
-                                    name="dropoffUnitComplex"
-                                    placeholder="e.g. Unit 12, Ocean View"
-                                    value={moveDetails.dropoffUnitComplex || ''}
-                                    onChange={handleChange}
-                                />
                             </div>
                         </div>
 
@@ -719,6 +888,8 @@ export default function Step1Details() {
                                 setIsSubmittingLead(true)
                                 try {
                                     const result = await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    // 🔴 Google Ads: Lead / Callback conversion
+                                    trackCallbackRequest({ step: 'Step 1 — Details' })
                                     // Send urgent callback alert to all admins
                                     emailService.sendCallbackEmail({
                                         name: moveDetails.contactName,
@@ -826,7 +997,8 @@ export default function Step1Details() {
                                                     customer_comments: '[OUTLAYING AREA] User requested a custom quote for an outlaying area.',
                                                     forceNew: true
                                                 })
-                                                
+                                                // 🔴 Google Ads: Lead conversion (Outline Area callback)
+                                                trackCallbackRequest({ step: 'Step 1 — Outlaying Area' })
                                                 await emailService.sendOutlineAreaEmail({
                                                     name: moveDetails.contactName,
                                                     email: moveDetails.contactEmail,

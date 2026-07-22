@@ -170,9 +170,30 @@ serve(async (req) => {
 
         const resendApiKey = Deno.env.get('RESEND_API_KEY')
         const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'
-        const adminEmails = adminEmailSecret.split(',').map(e => e.trim()).filter(Boolean)
+        let adminEmails = adminEmailSecret.split(',').map(e => e.trim()).filter(Boolean)
+        
+        // Remove old incorrect @mastermovers.co.za emails
+        adminEmails = adminEmails.filter(email => !email.toLowerCase().endsWith('@mastermovers.co.za'))
+
         if (!adminEmails.includes('melonie@nova-gg.com')) {
             adminEmails.push('melonie@nova-gg.com')
+        }
+
+        const additionalEmails = [
+            'sales@mastermoversjhb.co.za',
+            'sales1@mastermoversjhb.co.za',
+            'carla@mastermoversjhb.co.za',
+            'sales3@mastermoversjhb.co.za',
+            'office@mastermoverscpt.co.za',
+            'info@mastermoverscpt.co.za',
+            'sales@mastermoversdbn.co.za',
+            'office@mastermoversdbn.co.za'
+        ];
+
+        for (const email of additionalEmails) {
+            if (!adminEmails.includes(email)) {
+                adminEmails.push(email);
+            }
         }
         const sender = Deno.env.get('EMAIL_SENDER') || 'Master Movers <onboarding@resend.dev>'
         const originUrl = 'https://mastermovers.co.za'

@@ -62,6 +62,20 @@ export default function MoveWizard() {
         return !!(moveDetails?.contactEmail || moveDetails?.contactPhone)
     }, [moveDetails?.contactEmail, moveDetails?.contactPhone])
 
+    // ─── Auto-Reset if returning to an already completed quote ──────────────
+    useEffect(() => {
+        if (lastSavedQuote && ['booked', 'paid', 'completed'].includes(lastSavedQuote.status)) {
+            const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
+                location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
+            
+            // If they are on step 1, auto-clear it
+            if (location.pathname === currentBase || location.pathname === currentBase + '/') {
+                console.log('Previous quote was completed. Auto-resetting for a fresh quote.');
+                useMoveStore.getState().reset();
+            }
+        }
+    }, [lastSavedQuote, location.pathname])
+
     // ─── 1. Debounced Auto-Save to Database ─────────────────────────────────
     useEffect(() => {
         if (!moveDetails?.contactEmail && !moveDetails?.contactPhone && !moveDetails?.contactName) return

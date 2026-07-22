@@ -175,12 +175,21 @@ const REAL_RENDERS = {
 }
 
 export const getInventoryImage = (item) => {
+    if (!item) return "https://img.icons8.com/3d-fluency/100/box.png";
+    const id = (item.id || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+
+    if (id.includes('fridge-double') || id.includes('fridge double') || name.includes('double door fridge') || name.includes('double-door')) {
+        return '/inventory/fridge-d-door.png';
+    }
+    if (id.includes('fridge-d-door') || id.includes('single upright') || name.includes('single upright fridge')) {
+        return '/inventory/fridge-double-upright.png';
+    }
+
     // 0. Custom cropped database images (Priority)
     if (item.image && item.image.startsWith('/inventory/')) {
         return item.image;
     }
-
-    const id = item.id.toLowerCase();
     
     // 0. EXACT MATCH IN REAL_RENDERS
     if (REAL_RENDERS[id]) return REAL_RENDERS[id];
@@ -245,9 +254,9 @@ export const getInventoryImage = (item) => {
     if (id.includes('mirror (large)') || (id.includes('mirror') && id.includes('large'))) return REAL_RENDERS['large-mirror-bedroom'];
     if (id.includes('dumb valet')) return REAL_RENDERS['dumb-valet'];
 
-    // Appliances specifico
-    if (id.includes('fridge double') || id.includes('fridge double upright') || id.includes('fridge-double-upright') || id.includes('fridge d door') || id.includes('fridge-d-door')) return REAL_RENDERS['fridge-double-spec'];
-    if (id.includes('fridge s door') || id.includes('fridge-large-s-door')) return REAL_RENDERS['fridge-s-door-spec'];
+    // Appliances specific
+    if (id.includes('fridge double') || id.includes('fridge double upright') || id.includes('fridge-double-upright') || id.includes('double door fridge')) return REAL_RENDERS['fridge-double-spec'];
+    if (id.includes('fridge s door') || id.includes('fridge-large-s-door') || id.includes('fridge d door') || id.includes('fridge-d-door') || id.includes('single upright fridge')) return REAL_RENDERS['fridge-s-door-spec'];
     if (id.includes('small fridge') || id.includes('small-fridge')) return REAL_RENDERS['small-fridge-spec'];
     if (id.includes('barfridge') || id.includes('bar fridge')) return REAL_RENDERS['bar-fridge-spec'];
     if (id.includes('deep-freeze') || id.includes('deep freeze')) return REAL_RENDERS['deep-freeze-spec'];
@@ -383,7 +392,7 @@ export const getInventoryImage = (item) => {
     return localPath;
 }
 
-export default function InventoryItemCard({ item, quantity = 0, variation, onAdd, onRemove, onToggleModifier }) {
+export default function InventoryItemCard({ item, quantity = 0, variation, targetRoom, onAdd, onRemove, onSetQuantity, onToggleModifier, onChangeRoom }) {
     const realisticImage = getInventoryImage(item);
     
     const hasWrapping = item.autoPackagingType && item.autoPackagingType !== 'crate'
@@ -467,6 +476,27 @@ export default function InventoryItemCard({ item, quantity = 0, variation, onAdd
 
             <div className="p-3 md:p-5 flex flex-col flex-1 gap-2 md:gap-4">
                 <div className="flex-1">
+                    {targetRoom && (
+                        <div className="mb-2">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onChangeRoom) onChangeRoom(item);
+                                }}
+                                className="w-full flex items-center justify-between gap-1.5 text-[10px] md:text-[11px] font-bold text-slate-700 bg-slate-50 hover:bg-red-50/80 border border-slate-200 hover:border-red-200 px-2.5 py-1.5 rounded-xl transition-all group/roombtn cursor-pointer"
+                            >
+                                <span className="truncate flex items-center gap-1 min-w-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 flex-shrink-0" />
+                                    <span className="text-slate-400 font-medium text-[9px] uppercase tracking-wider">Room:</span>
+                                    <span className="text-slate-900 group-hover/roombtn:text-red-600 font-extrabold truncate">{targetRoom}</span>
+                                </span>
+                                <span className="text-[9px] font-black text-red-600 bg-white group-hover/roombtn:bg-red-600 group-hover/roombtn:text-white px-2 py-0.5 rounded-md border border-slate-200 group-hover/roombtn:border-red-600 transition-colors flex-shrink-0 uppercase">
+                                    Change ▾
+                                </span>
+                            </button>
+                        </div>
+                    )}
                     <h4 className="text-xs md:text-base font-bold text-slate-800 leading-tight mb-1 md:mb-2 group-hover:text-red-600 transition-colors line-clamp-2">
                         {item.name}
                     </h4>
@@ -532,7 +562,27 @@ export default function InventoryItemCard({ item, quantity = 0, variation, onAdd
                             <Minus size={14} className="md:w-[18px] md:h-[18px]" />
                         </button>
                         {quantity > 0 && (
-                            <span className="text-sm md:text-lg font-black text-slate-900 w-6 md:w-8 text-center">{quantity}</span>
+                            <input 
+                                type="number"
+                                min="0"
+                                value={quantity}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                    e.stopPropagation();
+                                    const val = Math.max(0, parseInt(e.target.value) || 0);
+                                    if (onSetQuantity) {
+                                        onSetQuantity(item.id, val, variation);
+                                    } else {
+                                        const diff = val - quantity;
+                                        if (diff > 0) {
+                                            for (let i = 0; i < diff; i++) onAdd(item.id, variation);
+                                        } else if (diff < 0) {
+                                            for (let i = 0; i < Math.abs(diff); i++) onRemove(item.id, variation);
+                                        }
+                                    }
+                                }}
+                                className="w-10 md:w-12 text-xs md:text-sm font-black text-slate-900 text-center bg-slate-100 border border-slate-200 rounded-lg py-1 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
+                            />
                         )}
                     </div>
 
