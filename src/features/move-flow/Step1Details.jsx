@@ -7,7 +7,7 @@ import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse } from 'lucide-react'
-import { getCityCode, detectCityCode } from '../inventory/data/pricingRates'
+import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
@@ -728,7 +728,7 @@ export default function Step1Details() {
                                         {moveDetails.storageDestination && moveDetails.storageDestination !== 'PICK' && (
                                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
                                                 <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">📦 Storage Rate</p>
-                                                <p className="text-xs text-amber-600">R1.50 per cubic foot per month (minimum R650/month) — calculated from your inventory volume and added to your quote.</p>
+                                                <p className="text-xs text-amber-600">R1.50 per cubic foot per month (minimum R{PRICING_CONSTANTS.minStorageFee || 450}/month) — calculated from your inventory volume and added to your quote.</p>
                                                 <p className="text-xs font-bold text-amber-800 uppercase tracking-tight">Note: Delivery out of storage is not included.</p>
                                             </div>
                                         )}

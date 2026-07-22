@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PACKAGING_RATES } from '../features/inventory/data/pricingRates';
+import { PACKAGING_RATES, PRICING_CONSTANTS } from '../features/inventory/data/pricingRates';
 import { getSimpleQuoteNumber } from '../utils/quoteHelpers';
 
 /**
@@ -208,7 +208,7 @@ export const generateProfessionalQuote = (data) => {
                 }
 
                 const storageFeeCalc = Number(bd.storageCost || data.storage_cost || data.storageCost || 0) ||
-                                       ((data.dropoffAddress?.toLowerCase().includes('storage') || data.storage_destination || bd.storageDestination) ? Math.max(650, Math.round(displayVolume * 1.50 * 100)/100) : 0);
+                                       ((data.dropoffAddress?.toLowerCase().includes('storage') || data.storage_destination || bd.storageDestination) ? Math.max(PRICING_CONSTANTS.minStorageFee || 450, Math.round(displayVolume * 1.50 * 100)/100) : 0);
                 if (storageFeeCalc > 0) {
                     costs.push([`Master Movers Storage (Monthly Fee)`, `R ${Number(storageFeeCalc).toFixed(2)}`]);
                 }

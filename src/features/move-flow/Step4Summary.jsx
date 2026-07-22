@@ -845,7 +845,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                                        <span>{breakdown.storageDestination} Depot · {totalVolume?.toFixed(2)} ft³ × R1.50/cuft/mo{breakdown.storageCost === 650 && (totalVolume * 1.5 < 650) ? ' (Min. R650/mo)' : ''}</span>
+                                        <span>{breakdown.storageDestination} Depot · {totalVolume?.toFixed(2)} ft³ × R1.50/cuft/mo{breakdown.storageCost === (PRICING_CONSTANTS.minStorageFee || 450) && (totalVolume * 1.5 < (PRICING_CONSTANTS.minStorageFee || 450)) ? ` (Min. R${PRICING_CONSTANTS.minStorageFee || 450}/mo)` : ''}</span>
                                         <span className="text-slate-500">R {breakdown.storageCost.toFixed(2)}</span>
                                     </div>
                                     <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Note: Delivery out of storage is not included</p>

@@ -157,7 +157,7 @@ export const PACKAGING_RATES = {
  */
 export const PRICING_CONSTANTS = {
     minOrder:          2600,   // Local move minimum charge (ex-VAT)
-    minStorageFee:     650,    // Monthly storage fee minimum charge (ex-VAT)
+    minStorageFee:     450,    // Monthly storage fee minimum charge (ex-VAT)
     minKmRadius:       100,
     documentationFee:  175,    // Documentation fee (ex-VAT), always included
     weekendSurcharge:  440,    // Saturday/Sunday surcharge (ex-VAT)

@@ -927,13 +927,13 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         baseAfterDiscount = PRICING_CONSTANTS.minOrder
     }
 
-    // Storage with Master Movers: R1.50 per cubic foot, minimum R650/month (applied when client selects a depot)
+    // Storage with Master Movers: R1.50 per cubic foot, minimum R450/month (applied when client selects a depot)
     const STORAGE_DEPOTS_VALID = ['JHB', 'DBN', 'CPT']
     const storageDestination = moveDetails.storageDestination || null
     const hasStorage = STORAGE_DEPOTS_VALID.includes(storageDestination)
     const storageCostPerCuFt = 1.50
     const rawStorageCost = Math.round(totalVolumeCuFt * storageCostPerCuFt * 100) / 100
-    const minStorageFee = PRICING_CONSTANTS.minStorageFee || 650
+    const minStorageFee = PRICING_CONSTANTS.minStorageFee || 450
     const storageCost = hasStorage ? Math.max(minStorageFee, rawStorageCost) : 0
 
     // Add packaging add-ons AFTER minimum enforcement so they are never lost
