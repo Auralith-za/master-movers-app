@@ -395,23 +395,18 @@ export const getInventoryImage = (item) => {
 export default function InventoryItemCard({ item, quantity = 0, variation, targetRoom, onAdd, onRemove, onSetQuantity, onToggleModifier, onChangeRoom }) {
     const realisticImage = getInventoryImage(item);
     
-    const hasWrapping = item.autoPackagingType && item.autoPackagingType !== 'crate'
-    // AUTO-WRAP rules:
-    // • Items with variation options: ONLY Glass or Marble = auto-wrap. Standard/Wood = show tick.
-    // • Items WITHOUT variation options that have autoPackagingType='Wrapping': show tick (not auto)
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
     const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
-    // Only truly auto-wrap when a Glass/Marble variation is explicitly selected
-    const isAutoWrapped = isGlassOrMarble
-    // Show the optional wrapping tick when: not auto-wrapped, and either has a non-Glass/Marble variation OR has no variation at all
-    const showWrappingTick = !isAutoWrapped
-
-    // AUTO-SLEEVE rules centralized from moveStore
-    const idKey = variation ? `${item.id}_${variation}` : item.id
-    const isAutoSleeve = getPlasticSleevesCount(item, idKey) > 0
     
-    const isManuallyWrapped = variation?.includes('Wrapped') || false
-    const isManuallySleeved = variation?.includes('Plastic Sleeve') || false
+    // AUTO-WRAP: Glass/Marble OR items with autoPackagingType === 'Wrapping' (unless Standard Wood selected)
+    const isAutoWrapped = isGlassOrMarble || (item.autoPackagingType === 'Wrapping' && !isStandardOrWood)
+    const isManuallyWrapped = !isAutoWrapped && Boolean(variation?.includes('Wrapped'))
+
+    // AUTO-SLEEVE: Check native sleeve count (strip manual toggle modifiers from key first)
+    const cleanVariation = variation ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '') : null
+    const baseIdKey = cleanVariation ? `${item.id}_${cleanVariation}` : item.id
+    const isAutoSleeve = !isAutoWrapped && getPlasticSleevesCount(item, baseIdKey) > 0
+    const isManuallySleeved = !isAutoSleeve && Boolean(variation?.includes('Plastic Sleeve'))
     
     const needsPackaging = isAutoWrapped || isAutoSleeve || isManuallyWrapped || isManuallySleeved
     const packagingCostPerUnit = needsPackaging ? (item.volume * 35) : 0

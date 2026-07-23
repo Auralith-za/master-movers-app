@@ -484,7 +484,9 @@ export const getPlasticSleevesCount = (item, idKey) => {
 export const getWrappingFlag = (item, variation) => {
     if (!item) return false;
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
-    return isGlassOrMarble || variation?.includes('Wrapped')
+    const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
+    const appliesAutoWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
+    return isGlassOrMarble || appliesAutoWrapping || Boolean(variation?.includes('Wrapped'))
 }
 
 export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null, isAdminEdit = false) => {
