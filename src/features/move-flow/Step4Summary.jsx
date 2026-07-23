@@ -14,6 +14,7 @@ import { event, trackLeadConversion, trackQuoteSubmit } from '../../lib/gtag'
 import clsx from 'clsx'
 import { LeadCaptureModal } from './Step1Details'
 import { supabase } from '../../lib/supabaseClient'
+import { formatClientName, cleanClientName } from '../../utils/quoteHelpers'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -227,7 +228,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         emailService.sendQuoteEmail({
             type: 'quote_proposal',
             quoteId: targetQuote.id,
-            clientName: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+            clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
             clientEmail: moveDetails.contactEmail,
             clientPhone: moveDetails.contactPhone,
             moveDate: moveDetails.moveDate,
@@ -267,7 +268,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 if (submissionType !== 'admin') {
                     emailService.sendPendingQuoteAlert({
                         quoteId: savedQuote.id,
-                        clientName: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
                         clientEmail: moveDetails.contactEmail,
                         clientPhone: moveDetails.contactPhone,
                         moveDate: moveDetails.moveDate,
@@ -325,7 +326,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             const savedQuote = result.data?.[0] || lastSavedQuote
             if (result.success && savedQuote) {
                 await emailService.sendCallbackEmail({
-                    name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                    name: formatClientName(moveDetails.contactName, moveDetails.surname),
                     email: moveDetails.contactEmail,
                     phone: moveDetails.contactPhone,
                     step: 'Step 4 - Custom Quote Redirect (>80km or Outline)',
@@ -405,7 +406,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 sendProposalEmail(savedQuote)
                 // Send urgent admin callback alert (no PDF, instant)
                 emailService.sendCallbackEmail({
-                    name: moveDetails.contactName,
+                    name: formatClientName(moveDetails.contactName, moveDetails.surname),
                     email: moveDetails.contactEmail,
                     phone: moveDetails.contactPhone,
                     step: 'Step 4 — Quote Summary',
@@ -465,7 +466,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
             generateProfessionalQuote({
                 quoteId: lastSavedQuote?.id || `MM-${Math.floor(Math.random() * 10000)}`,
-                clientName: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim(),
+                clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
                 clientEmail: moveDetails.contactEmail,
                 clientPhone: moveDetails.contactPhone,
                 pickupAddress: moveDetails.pickupAddress,
@@ -1006,7 +1007,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                         total_price: discountedTotal,
                                                         pickup_address: moveDetails.pickupAddress,
                                                         dropoff_address: moveDetails.dropoffAddress,
-                                                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim() || 'Anonymous',
+                                                        client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
                                                         client_email: moveDetails.contactEmail
                                                     }}
                                                 />
@@ -1024,7 +1025,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                     quote={{
                                                         id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
                                                         total_price: discountedTotal,
-                                                        client_name: `${moveDetails.contactName || ''} ${moveDetails.surname || ''}`.trim() || 'Anonymous',
+                                                        client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
                                                         client_email: moveDetails.contactEmail,
                                                         client_phone: moveDetails.contactPhone
                                                     }}
@@ -1208,9 +1209,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         setIsSubmitting(true)
                         try {
                             // Update store
-                            const contactName = `${formData.name} ${formData.surname}`
+                            const fullName = formatClientName(formData.name, formData.surname)
                             setMoveDetails({
-                                contactName: contactName,
+                                contactName: formData.name,
+                                surname: formData.surname,
                                 contactEmail: formData.email,
                                 contactPhone: formData.phone
                             })
@@ -1218,7 +1220,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             await submitQuote({ 
                                 status: 'lead', 
                                 request_call_back: true,
-                                client_name: contactName,
+                                client_name: fullName,
                                 client_email: formData.email,
                                 client_phone: formData.phone,
                                 forceNew: true

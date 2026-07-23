@@ -5,6 +5,16 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper to clean duplicate consecutive words in client names (e.g. "Marné Van Aarde Van Aarde" -> "Marné Van Aarde")
+function cleanClientName(name?: string): string {
+    if (!name) return ''
+    let cleaned = name.trim()
+    while (/\b(.+?)\s+\1\b/i.test(cleaned)) {
+        cleaned = cleaned.replace(/\b(.+?)\s+\1\b/gi, '$1').trim()
+    }
+    return cleaned
+}
+
 // Branded CSS/HTML Wrapper
 function getBrandedTemplate(title: string, innerHtml: string): string {
     return `
@@ -167,6 +177,13 @@ serve(async (req) => {
 
     try {
         const { type, to, quoteData, contactData, pdfBase64, pdfFilename, paymentLink } = await req.json()
+
+        if (quoteData && quoteData.client_name) {
+            quoteData.client_name = cleanClientName(quoteData.client_name)
+        }
+        if (contactData && contactData.name) {
+            contactData.name = cleanClientName(contactData.name)
+        }
 
         const resendApiKey = Deno.env.get('RESEND_API_KEY')
         const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'

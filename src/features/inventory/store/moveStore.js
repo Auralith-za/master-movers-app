@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../../../lib/supabaseClient'
+import { formatClientName, cleanClientName } from '../../../utils/quoteHelpers'
 import { INVENTORY_ITEMS } from '../data/mockItems'
 import { 
     CITY_CODES, 
@@ -224,9 +225,10 @@ export const useMoveStore = create(
                     ? `[LOCATION SEARCH FAILED] User could not find their address. Please contact them. ${commentsBase}`
                     : commentsBase
 
-                const defaultFullName = `${state.moveDetails.contactName || ''} ${state.moveDetails.surname || ''}`.trim() || 'Anonymous'
+                const defaultFullName = formatClientName(state.moveDetails.contactName, state.moveDetails.surname) || 'Anonymous'
+                const rawName = dbOverrides.client_name || overrides.contactName || defaultFullName
                 const quotePayload = {
-                    client_name: dbOverrides.client_name || overrides.contactName || defaultFullName,
+                    client_name: cleanClientName(rawName),
                     client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
                     client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
                     pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',

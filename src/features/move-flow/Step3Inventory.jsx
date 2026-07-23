@@ -12,6 +12,7 @@ import { Input } from '../../components/ui/Input'
 import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
 import { LeadCaptureModal } from './Step1Details'
 import { trackCallbackRequest } from '../../lib/gtag'
+import { formatClientName } from '../../utils/quoteHelpers'
 
 const categoryEmojis = {
     "Special Handling Items": "🎹",
@@ -606,15 +607,17 @@ export default function Step3Inventory() {
                 onSubmit={async (formData) => {
                     setIsSubmittingLead(true)
                     try {
+                        const fullName = formatClientName(formData.name, formData.surname)
                         setMoveDetails({
-                            contactName: `${formData.name} ${formData.surname}`,
+                            contactName: formData.name,
+                            surname: formData.surname,
                             contactEmail: formData.email,
                             contactPhone: formData.phone
                         })
                         await submitQuote({ 
                             status: 'lead', 
                             request_call_back: true,
-                            contactName: `${formData.name} ${formData.surname}`,
+                            client_name: fullName,
                             contactEmail: formData.email,
                             contactPhone: formData.phone,
                             forceNew: true

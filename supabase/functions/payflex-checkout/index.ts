@@ -47,9 +47,10 @@ serve(async (req) => {
         const successUrl = redirectUrl || `${originUrl}/payment/success?m_payment_id=${quoteId}&gateway=payflex`
         const failUrl = cancelUrl || `${originUrl}/payment/cancel?m_payment_id=${quoteId}&gateway=payflex`
 
-        // 4. Split customer name
-        const clientName = customer?.name || 'Valued Client'
-        const parts = clientName.trim().split(/\s+/)
+        // 4. Clean & Split customer name
+        const rawName = customer?.name || 'Valued Client'
+        const clientName = rawName.replace(/\b(.+?)\s+\1\b/gi, '$1').trim()
+        const parts = clientName.split(/\s+/)
         const firstName = parts[0] || 'Client'
         const lastName = parts.slice(1).join(' ') || 'Customer'
 

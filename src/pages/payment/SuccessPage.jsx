@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { event, trackPurchaseConversion } from '../../lib/gtag'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
+import { formatClientName } from '../../utils/quoteHelpers'
 
 export default function SuccessPage() {
     const [searchParams] = useSearchParams()
@@ -47,7 +48,7 @@ export default function SuccessPage() {
     useEffect(() => {
         if (moveDetails?.contactName) {
             setCapturedDetails({
-                name: `${moveDetails.contactName} ${moveDetails.surname || ''}`.trim(),
+                name: formatClientName(moveDetails.contactName, moveDetails.surname),
                 email: moveDetails.contactEmail,
                 phone: moveDetails.contactPhone
             })

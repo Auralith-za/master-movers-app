@@ -9,6 +9,7 @@ import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse } from 'lucide-react'
 import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
+import { formatClientName } from '../../utils/quoteHelpers'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
@@ -938,8 +939,10 @@ export default function Step1Details() {
                         setIsSubmittingLead(true)
                         try {
                             // Save to store
+                            const fullName = formatClientName(formData.name, formData.surname)
                             setMoveDetails({
-                                contactName: `${formData.name} ${formData.surname}`,
+                                contactName: formData.name,
+                                surname: formData.surname,
                                 contactEmail: formData.email,
                                 contactPhone: formData.phone
                             })
@@ -947,7 +950,7 @@ export default function Step1Details() {
                             await submitQuote({ 
                                 status: 'lead', 
                                 request_call_back: true,
-                                contactName: `${formData.name} ${formData.surname}`,
+                                client_name: fullName,
                                 contactEmail: formData.email,
                                 contactPhone: formData.phone,
                                 forceNew: true
