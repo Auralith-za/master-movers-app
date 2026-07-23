@@ -172,8 +172,11 @@ serve(async (req) => {
         const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'
         let adminEmails = adminEmailSecret.split(',').map(e => e.trim()).filter(Boolean)
         
-        // Remove old incorrect @mastermovers.co.za emails
-        adminEmails = adminEmails.filter(email => !email.toLowerCase().endsWith('@mastermovers.co.za'))
+        // Remove old incorrect @mastermovers.co.za emails, Jose, and all iCloud email addresses
+        adminEmails = adminEmails.filter(email => {
+            const lower = email.toLowerCase()
+            return !lower.endsWith('@mastermovers.co.za') && !lower.includes('icloud') && !lower.includes('jose')
+        })
 
         if (!adminEmails.includes('melonie@nova-gg.com')) {
             adminEmails.push('melonie@nova-gg.com')
@@ -195,6 +198,12 @@ serve(async (req) => {
                 adminEmails.push(email);
             }
         }
+
+        // Ensure Jose / iCloud emails are strictly excluded from admin email list
+        adminEmails = adminEmails.filter(email => {
+            const lower = email.toLowerCase()
+            return !lower.includes('icloud') && !lower.includes('jose')
+        })
         const sender = Deno.env.get('EMAIL_SENDER') || 'Master Movers <onboarding@resend.dev>'
         const originUrl = 'https://mastermovers.co.za'
 
@@ -627,6 +636,27 @@ serve(async (req) => {
                 content: pdfBase64,
                 filename: pdfFilename,
             })
+        }
+
+        // Explicitly exclude Jose and any iCloud email addresses from recipients list
+        const isJoseOrIcloud = (email: string) => {
+            if (typeof email !== 'string') return true
+            const lower = email.toLowerCase().trim()
+            return lower.includes('icloud') || lower.includes('jose')
+        }
+
+        if (Array.isArray(recipients)) {
+            recipients = recipients.filter(email => !isJoseOrIcloud(email))
+        } else if (typeof recipients === 'string') {
+            recipients = isJoseOrIcloud(recipients) ? [] : [recipients]
+        }
+
+        if (!recipients || recipients.length === 0) {
+            console.warn("No valid recipients remaining after filtering out Jose/iCloud emails. Skipping send.")
+            return new Response(
+                JSON.stringify({ success: true, message: "No recipients to send to after filtering." }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            )
         }
 
         // Call Resend
