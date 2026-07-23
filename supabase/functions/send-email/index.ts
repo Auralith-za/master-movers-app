@@ -150,7 +150,7 @@ function getBrandedTemplate(title: string, innerHtml: string): string {
                 <div class="footer">
                     <p><strong>Master Movers NextGen Logistics</strong></p>
                     <p>17 Indianapolis Blvd, Germiston | Unit 1 Bosal Park, Epping, Cape Town</p>
-                    <p>Call: <a href="tel:+27114937569">+27 11 493 7569</a> | Email: <a href="mailto:info@mastermovers.co.za">info@mastermovers.co.za</a></p>
+                    <p>Call: <a href="tel:+27114937569">+27 11 493 7569</a> | Email: <a href="mailto:sales1@mastermoversjhb.co.za">sales1@mastermoversjhb.co.za</a></p>
                     <p style="font-size: 10px; margin-top: 15px; opacity: 0.6;">&copy; ${new Date().getFullYear()} Master Movers. All rights reserved.</p>
                 </div>
             </div>

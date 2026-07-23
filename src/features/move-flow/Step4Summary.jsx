@@ -1183,7 +1183,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             Call us at any time: <a href="tel:+27114937569" className="text-red-600 hover:underline">+27 11 493 7569</a>
                         </p>
                         <p className="text-sm font-black text-slate-900 group mt-2">
-                            <a href="mailto:info@mastermovers.co.za" className="text-sm font-medium hover:text-red-600 underline underline-offset-4">info@mastermovers.co.za</a>
+                            <a href="mailto:sales1@mastermoversjhb.co.za" className="text-sm font-medium hover:text-red-600 underline underline-offset-4">sales1@mastermoversjhb.co.za</a>
                         </p>
                     </div>
 

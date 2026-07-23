@@ -304,7 +304,7 @@ export const generateProfessionalQuote = (data) => {
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(148, 163, 184); // Slate 400
                 doc.text('MasterMovers NextGen - Professional Moving & Logistics Solutions', 105, 283, { align: 'center' });
-                doc.text(`MasterMovers.co.za | +27 11 493 7569 | info@mastermovers.co.za  ·  Page ${i} of ${totalPages}`, 105, 287, { align: 'center' });
+                doc.text(`MasterMovers.co.za | +27 11 493 7569 | sales1@mastermoversjhb.co.za  ·  Page ${i} of ${totalPages}`, 105, 287, { align: 'center' });
             }
 
             if (shouldSave) {
