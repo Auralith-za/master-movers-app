@@ -141,19 +141,31 @@ export default function Step3Inventory() {
         setItemQuantity(itemId, existingVariation, qty, roomToAssign);
     }
 
-    const handleToggleModifier = (itemId, modifier) => {
-        const idKeys = Object.keys(inventory).filter(k => parseInventoryKey(k).itemId === itemId);
+    const handleToggleModifier = (itemId, modifier, targetRoom, currentVariation) => {
+        const idKeys = Object.keys(inventory).filter(k => {
+            const parsed = parseInventoryKey(k);
+            return parsed.itemId === itemId && 
+                   (parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category) === targetRoom &&
+                   parsed.variation === currentVariation;
+        });
         if (idKeys.length === 0) return;
         
         const currentKey = idKeys[0];
         const currentQty = inventory[currentKey];
         
-        let newKey = currentKey;
-        if (newKey.includes(`_${modifier}`)) {
-            newKey = newKey.replace(`_${modifier}`, '');
+        const parsed = parseInventoryKey(currentKey);
+        let newVariation = parsed.variation || '';
+        
+        if (newVariation.includes(modifier)) {
+            newVariation = newVariation.split('_').filter(v => v !== modifier).join('_');
+            if (newVariation === '') newVariation = null;
         } else {
-            newKey = `${newKey}_${modifier}`;
+            newVariation = newVariation ? `${newVariation}_${modifier}` : modifier;
         }
+        
+        let newKey = itemId;
+        if (newVariation) newKey += `_${newVariation}`;
+        if (parsed.room) newKey += `__room:${parsed.room}`;
         
         const newInventory = { ...inventory };
         delete newInventory[currentKey];
@@ -481,30 +493,30 @@ export default function Step3Inventory() {
                         {/* Items Grid - 2 columns on mobile */}
                         <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-6 mt-2">
                             {filteredItems.map(item => {
-                                const targetRoom = activeCategory
-                                const idKeys = Object.keys(inventory).filter(k => {
-                                    const parsed = parseInventoryKey(k)
-                                    if (parsed.itemId !== item.id) return false
-                                    const itemRoom = parsed.room || item.category
-                                    return itemRoom === targetRoom
-                                })
-                                const firstKey = idKeys[0] || '';
-                                const parsedKey = parseInventoryKey(firstKey)
-                                const variation = parsedKey.variation
+        const targetRoom = activeCategory
+        const idKeys = Object.keys(inventory).filter(k => {
+            const parsed = parseInventoryKey(k)
+            if (parsed.itemId !== item.id) return false
+            const itemRoom = parsed.room || item.category
+            return itemRoom === targetRoom
+        })
+        const firstKey = idKeys[0] || '';
+        const parsedKey = parseInventoryKey(firstKey)
+        const variation = parsedKey.variation
 
-                                return (
-                                    <InventoryItemCard
-                                        key={item.id}
-                                        item={item}
-                                        quantity={getQuantity(item.id, targetRoom)}
-                                        variation={variation}
-                                        targetRoom={searchTerm ? targetRoom : null}
-                                        onAdd={(id, varOpt) => handleAddItem(id, varOpt, targetRoom)}
-                                        onRemove={(id, varOpt) => handleRemoveItem(id, varOpt, targetRoom)}
-                                        onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt, targetRoom)}
-                                        onToggleModifier={handleToggleModifier}
-                                        onChangeRoom={(itemToChange) => setRoomModalItem({ ...itemToChange, targetRoom: targetRoom, variation })}
-                                    />
+        return (
+            <InventoryItemCard
+                key={item.id}
+                item={item}
+                quantity={getQuantity(item.id, targetRoom)}
+                variation={variation}
+                targetRoom={searchTerm ? targetRoom : null}
+                onAdd={(id, varOpt) => handleAddItem(id, varOpt, targetRoom)}
+                onRemove={(id, varOpt) => handleRemoveItem(id, varOpt, targetRoom)}
+                onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt, targetRoom)}
+                onToggleModifier={(id, modifier) => handleToggleModifier(id, modifier, targetRoom, variation)}
+                onChangeRoom={(itemToChange) => setRoomModalItem({ ...itemToChange, targetRoom: targetRoom, variation })}
+            />
                                 );
                             })}
                             {filteredItems.length === 0 && (
