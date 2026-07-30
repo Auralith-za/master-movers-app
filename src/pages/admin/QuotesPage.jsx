@@ -61,13 +61,24 @@ export default function QuotesPage() {
         if (!searchTerm.trim()) return true
 
         const q = searchTerm.toLowerCase().trim()
+        const clientName = (quote.client_name || quote.items_json?.contactName || quote.items_json?.client_name || '').toLowerCase()
+        const clientEmail = (quote.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email || '').toLowerCase()
+        const clientPhone = (quote.client_phone || quote.items_json?.contactPhone || quote.items_json?.client_phone || '').toLowerCase()
+        const quoteId = (quote.id || '').toString().toLowerCase()
+        const pickup = (quote.pickup_address || quote.items_json?.pickupAddress || '').toLowerCase()
+        const dropoff = (quote.dropoff_address || quote.items_json?.dropoffAddress || '').toLowerCase()
+        const moveDate = (quote.move_date || quote.items_json?.moveDate || '').toLowerCase()
+        const status = (quote.status || '').toLowerCase()
+
         return (
-            (quote.client_name || '').toLowerCase().includes(q) ||
-            (quote.client_email || '').toLowerCase().includes(q) ||
-            (quote.client_phone || '').toLowerCase().includes(q) ||
-            (quote.id || '').toString().toLowerCase().includes(q) ||
-            (quote.pickup_address || '').toLowerCase().includes(q) ||
-            (quote.dropoff_address || '').toLowerCase().includes(q)
+            clientName.includes(q) ||
+            clientEmail.includes(q) ||
+            clientPhone.includes(q) ||
+            quoteId.includes(q) ||
+            pickup.includes(q) ||
+            dropoff.includes(q) ||
+            moveDate.includes(q) ||
+            status.includes(q)
         )
     })
 
