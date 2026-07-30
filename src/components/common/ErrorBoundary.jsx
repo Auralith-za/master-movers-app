@@ -16,6 +16,7 @@ export class ErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
+            const errorMsg = this.state.error?.toString() || 'Unknown error'
             return (
                 <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
                     <div className="max-w-md bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
@@ -23,7 +24,12 @@ export class ErrorBoundary extends React.Component {
                             ⚠️
                         </div>
                         <h2 className="text-xl font-black text-slate-900 mb-2">Application Error</h2>
-                        <p className="text-sm text-slate-500 mb-6">An unexpected error occurred. Please refresh or return to home.</p>
+                        <p className="text-sm text-slate-500 mb-4">An unexpected error occurred in this view.</p>
+                        
+                        <div className="bg-red-50 text-red-700 text-xs font-mono p-3 rounded-lg border border-red-200 mb-6 text-left overflow-x-auto max-h-32">
+                            {errorMsg}
+                        </div>
+
                         <div className="flex gap-3">
                             <button
                                 onClick={() => window.location.reload()}
