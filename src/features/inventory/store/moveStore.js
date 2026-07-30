@@ -953,34 +953,34 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const isMidMonthDate = (moveDay !== null && !isNaN(moveDay) && moveDay >= 5 && moveDay <= 24);
     const isMonthEnd = !isMidMonthDate;
 
-    // Check if raw move transport/volume cost was at or below minimum threshold
-    const rawTransportVolumeCost = isNationalMove
+    // Check if raw unpadded move transport/volume cost was at or below minimum threshold
+    const unpaddedMoveCost = isNationalMove
         ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25))
-        : ((totalDistance * transportRate) + (totalVolumeCuFt * volumeRate));
+        : ((totalDistance * transportRate) + moveProtectionCost + (totalVolumeCuFt * volumeRate));
 
-    let isMinQuote = isNationalMove
-        ? (rawTransportVolumeCost <= routeMinCharge)
-        : (rawTransportVolumeCost <= routeMinCharge || baseCost <= routeMinCharge);
+    let isMinQuote = (unpaddedMoveCost <= routeMinCharge);
 
-    // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote
-    // Applies ONLY to base move cost (transport + volume), not box supplies, shuttle or extra fees
-    const moveBaseCost = transportCost + volumeCost
-    let exclVatDiscount = 0
+    // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote.
+    // Minimum quotes get ZERO discount!
+    const moveBaseCost = transportCost + volumeCost;
+    let exclVatDiscount = 0;
+
     if (!isMonthEnd && !isMinQuote) {
-        exclVatDiscount = moveBaseCost * 0.10
+        exclVatDiscount = moveBaseCost * 0.10;
+        // Clamp discount so that moveBaseCost after discount NEVER drops below routeMinCharge
+        if ((moveBaseCost - exclVatDiscount) < routeMinCharge) {
+            exclVatDiscount = Math.max(0, moveBaseCost - routeMinCharge);
+            if (exclVatDiscount === 0) {
+                isMinQuote = true;
+            }
+        }
+    } else {
+        // Strict enforcement: ZERO discount on minimum quotes
+        exclVatDiscount = 0;
+        isMinQuote = true;
     }
 
-    let baseAfterDiscount = baseCost - exclVatDiscount
-
-    // Enforce minimum charge on the base for BOTH local and national moves
-    if (baseAfterDiscount < routeMinCharge) {
-        // Clamp discount so base after discount does not drop below route minimum
-        exclVatDiscount = Math.max(0, baseCost - routeMinCharge)
-        baseAfterDiscount = routeMinCharge
-        isMinQuote = true
-    } else if (baseAfterDiscount <= routeMinCharge) {
-        isMinQuote = true
-    }
+    let baseAfterDiscount = baseCost - exclVatDiscount;
 
     // Storage with Master Movers: R1.50 per cubic foot, minimum R450/month (applied when client selects a depot)
     const STORAGE_DEPOTS_VALID = ['JHB', 'DBN', 'CPT']
