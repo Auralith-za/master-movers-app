@@ -109,10 +109,16 @@ export const useMoveStore = create(
                         idKey = `${idKey}__room:${room}`
                     }
                     if (!state.inventory[idKey]) {
-                        // Fallback match
+                        // Fallback match: match by itemId and variation (or match any key starting with itemId)
                         const match = Object.keys(state.inventory).find(k => {
                             const parsed = parseInventoryKey(k)
-                            return parsed.itemId === id && (variation ? parsed.variation === variation : true) && (room ? parsed.room === room : true)
+                            if (parsed.itemId !== id) return false
+                            if (variation && parsed.variation !== variation) return false
+                            if (room && parsed.room && parsed.room !== room) return false
+                            return true
+                        }) || Object.keys(state.inventory).find(k => {
+                            const parsed = parseInventoryKey(k)
+                            return parsed.itemId === id
                         })
                         if (match) idKey = match
                     }
@@ -510,19 +516,19 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
             totalVolume += item.volume * qty
 
             
-            let sleeves = getPlasticSleevesCount(item, idKey)
-            
-            // Wrapping only applies when:
-            //  - Item has autoPackagingType = 'Wrapping' AND no variation selected (no material choice)
-            //  - OR the selected variation is specifically Glass or Marble
-            // Standard Wood/Other = no wrapping cost.
             let appliesWrapping = getWrappingFlag(item, variation)
+            let sleeves = getPlasticSleevesCount(item, idKey)
+
+            // Enforce mutual exclusivity: wrapping and plastic sleeves cannot both be selected/calculated for the same item
+            if (appliesWrapping) {
+                sleeves = 0
+            }
 
             // Apply overrides if any
             if (specialWrappingOverrides && specialWrappingOverrides[idKey]) {
                 const override = specialWrappingOverrides[idKey]
-                if (override.sleeves !== undefined) sleeves = override.sleeves
                 if (override.wrap !== undefined) appliesWrapping = override.wrap
+                if (override.sleeves !== undefined) sleeves = appliesWrapping ? 0 : override.sleeves
             }
 
             if (sleeves > 0) {
@@ -914,14 +920,20 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     // Packaging add-ons are kept separate so they always apply ON TOP of the minimum charge
     let baseCost = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
-    // Apply mid-month discount (10%) only to the base move cost
-    // Mid-month = days 5 through 24 (inclusive) — timezone-safe using split on 'T'
-    let exclVatDiscount = 0
+    // Check month-end date (days 1-4 and 25-31) and minimum quote policy
+    let isMonthEnd = false
     if (moveDetails.moveDate) {
-        // Parse date string directly to avoid UTC timezone shifts: '2026-07-15' → day=15
         const dateParts = String(moveDetails.moveDate).split('T')[0].split('-')
         const day = parseInt(dateParts[2], 10)
-        if (day >= 5 && day <= 24) exclVatDiscount = baseCost * 0.10
+        if (day < 5 || day > 24) isMonthEnd = true
+    }
+
+    const isMinQuote = (!isNationalMove && baseCost <= PRICING_CONSTANTS.minOrder)
+
+    // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote
+    let exclVatDiscount = 0
+    if (!isMonthEnd && !isMinQuote) {
+        exclVatDiscount = baseCost * 0.10
     }
 
     let baseAfterDiscount = baseCost - exclVatDiscount
@@ -974,6 +986,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         total: (needsQuoteRequest && !isAdminEdit) ? 0 : total,
         subTotal: (needsQuoteRequest && !isAdminEdit) ? 0 : exclVatAfterDiscount,  // Ex-VAT total after discount & minimums applied
         discount: (needsQuoteRequest && !isAdminEdit) ? 0 : exclVatDiscount,        // Ex-VAT discount amount
+        isMonthEnd,
+        isMinQuote,
         vat: (needsQuoteRequest && !isAdminEdit) ? 0 : vat,                              // VAT amount (15% of ex-VAT subtotal)
         payflexSurcharge: (needsQuoteRequest && !isAdminEdit) ? 0 : payflexSurcharge,
         paymentMethod: moveDetails.paymentMethod || 'eft',

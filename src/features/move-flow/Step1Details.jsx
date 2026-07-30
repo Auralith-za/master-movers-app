@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2 } from 'lucide-react'
 import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
@@ -584,13 +584,44 @@ export default function Step1Details() {
 
                     {/* Section: Locations */}
                     <div className="space-y-6">
-                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                            <MapPin className="text-red-600" size={32} />
-                            Where are you moving?
-                        </h3>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                                <MapPin className="text-red-600" size={32} />
+                                Where are you moving?
+                            </h3>
+                            {/* Dedicated Location Mode Tab Switcher */}
+                            <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
+                                <button
+                                    type="button"
+                                    onClick={() => setMoveDetails({ locationMode: 'single' })}
+                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                        (moveDetails.locationMode || 'single') === 'single'
+                                            ? 'bg-white text-slate-900 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-900'
+                                    }`}
+                                >
+                                    Single Location
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMoveDetails({ locationMode: 'multiple' })}
+                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        moveDetails.locationMode === 'multiple'
+                                            ? 'bg-red-600 text-white shadow-md'
+                                            : 'text-slate-500 hover:text-slate-900'
+                                    }`}
+                                >
+                                    <Sparkles size={13} /> Multiple Collections & Drops
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Pickup Group */}
                             <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Primary Pickup Location</span>
+                                </div>
                                 {moveDetails.pickupManualActive ? (
                                     <div className="space-y-1.5">
                                         <Input
@@ -652,10 +683,71 @@ export default function Step1Details() {
                                     value={moveDetails.pickupUnitComplex || ''}
                                     onChange={handleChange}
                                 />
+
+                                {/* Multiple Collections Section */}
+                                {(moveDetails.locationMode === 'multiple' || (moveDetails.extraCollections && moveDetails.extraCollections.length > 0)) && (
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="text-xs font-black text-red-600 uppercase tracking-wider">Additional Collection Addresses</h4>
+                                        {(moveDetails.extraCollections || []).map((coll, idx) => (
+                                            <div key={coll.id || idx} className="p-4 bg-red-50/50 border border-red-100 rounded-2xl space-y-3 relative group">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">Collection #{idx + 2}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const list = [...(moveDetails.extraCollections || [])]
+                                                            list.splice(idx, 1)
+                                                            setMoveDetails({ extraCollections: list })
+                                                        }}
+                                                        className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                                <AddressAutocomplete
+                                                    label={`Additional Collection Address #${idx + 2}`}
+                                                    name={`extra_coll_${idx}`}
+                                                    placeholder="Street Number, Street Name, Suburb"
+                                                    value={coll.address || ''}
+                                                    onChange={({ target: { value } }) => {
+                                                        const list = [...(moveDetails.extraCollections || [])]
+                                                        list[idx] = { ...list[idx], address: value }
+                                                        setMoveDetails({ extraCollections: list })
+                                                    }}
+                                                />
+                                                <Input
+                                                    label="Unit & Complex Name (Optional)"
+                                                    placeholder="e.g. Unit 12, Parkgate"
+                                                    value={coll.unitComplex || ''}
+                                                    onChange={({ target: { value } }) => {
+                                                        const list = [...(moveDetails.extraCollections || [])]
+                                                        list[idx] = { ...list[idx], unitComplex: value }
+                                                        setMoveDetails({ extraCollections: list })
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const list = moveDetails.extraCollections || []
+                                                setMoveDetails({
+                                                    extraCollections: [...list, { id: 'coll_' + Date.now(), address: '', unitComplex: '' }]
+                                                })
+                                            }}
+                                            className="w-full py-3 rounded-xl border-2 border-dashed border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            <Plus size={14} /> Add Another Collection Address
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Dropoff Group */}
                             <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Primary Drop-off Location</span>
+                                </div>
                                 {/* Toggle: Deliver to address vs Store with Master Movers */}
                                 <div className="flex items-center gap-2 mb-1">
                                     <button
@@ -672,7 +764,6 @@ export default function Step1Details() {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            // If no depot selected yet, show picker (clear any existing address)
                                             handleClearStorage()
                                             setMoveDetails({ storageDestination: 'PICK' })
                                         }}
@@ -798,6 +889,64 @@ export default function Step1Details() {
                                             value={moveDetails.dropoffUnitComplex || ''}
                                             onChange={handleChange}
                                         />
+                                    </div>
+                                )}
+
+                                {/* Multiple Drop-offs Section */}
+                                {(moveDetails.locationMode === 'multiple' || (moveDetails.extraDrops && moveDetails.extraDrops.length > 0)) && (
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Additional Drop-off Addresses</h4>
+                                        {(moveDetails.extraDrops || []).map((drop, idx) => (
+                                            <div key={drop.id || idx} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative group">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Drop-off #{idx + 2}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const list = [...(moveDetails.extraDrops || [])]
+                                                            list.splice(idx, 1)
+                                                            setMoveDetails({ extraDrops: list })
+                                                        }}
+                                                        className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                                <AddressAutocomplete
+                                                    label={`Additional Drop-off Address #${idx + 2}`}
+                                                    name={`extra_drop_${idx}`}
+                                                    placeholder="Street Number, Street Name, Suburb"
+                                                    value={drop.address || ''}
+                                                    onChange={({ target: { value } }) => {
+                                                        const list = [...(moveDetails.extraDrops || [])]
+                                                        list[idx] = { ...list[idx], address: value }
+                                                        setMoveDetails({ extraDrops: list })
+                                                    }}
+                                                />
+                                                <Input
+                                                    label="Unit & Complex Name (Optional)"
+                                                    placeholder="e.g. Unit 5, Marina View"
+                                                    value={drop.unitComplex || ''}
+                                                    onChange={({ target: { value } }) => {
+                                                        const list = [...(moveDetails.extraDrops || [])]
+                                                        list[idx] = { ...list[idx], unitComplex: value }
+                                                        setMoveDetails({ extraDrops: list })
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const list = moveDetails.extraDrops || []
+                                                setMoveDetails({
+                                                    extraDrops: [...list, { id: 'drop_' + Date.now(), address: '', unitComplex: '' }]
+                                                })
+                                            }}
+                                            className="w-full py-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            <Plus size={14} /> Add Another Drop-off Address
+                                        </button>
                                     </div>
                                 )}
                             </div>

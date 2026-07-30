@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
  *  onRemove()      — called when the coupon is removed
  *  appliedCoupon   — the currently applied coupon object (or null)
  */
-export default function CouponInput({ onApply, onRemove, appliedCoupon }) {
+export default function CouponInput({ onApply, onRemove, appliedCoupon, isDisabled = false, disabledReason = '' }) {
     const [code, setCode] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -81,6 +81,15 @@ export default function CouponInput({ onApply, onRemove, appliedCoupon }) {
                 >
                     <XCircle size={18} />
                 </button>
+            </div>
+        )
+    }
+
+    if (isDisabled) {
+        return (
+            <div className="bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 text-xs font-bold flex items-center gap-2">
+                <Tag size={15} className="text-slate-400 shrink-0" />
+                <span>{disabledReason || 'Discounts cannot be applied during month-end periods or on minimum-rate quotes.'}</span>
             </div>
         )
     }

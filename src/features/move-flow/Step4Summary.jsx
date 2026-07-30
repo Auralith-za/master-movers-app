@@ -144,8 +144,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
 
-    // Apply coupon discount on top of calculated total
-    const couponDiscount = appliedCoupon ? (
+    const isMonthEnd = Boolean(quoteResult.isMonthEnd)
+    const isMinQuote = Boolean(quoteResult.isMinQuote)
+
+    // Apply coupon discount on top of calculated total (blocked during month-end or minimum rate quotes)
+    const canApplyCoupon = !isMonthEnd && !isMinQuote
+    const couponDiscount = (appliedCoupon && canApplyCoupon) ? (
         appliedCoupon.discount_type === 'fixed' ? appliedCoupon.discount_amount : (total * appliedCoupon.discount_percent) / 100
     ) : 0
     const discountedTotal = Math.max(0, total - couponDiscount)
@@ -871,6 +875,11 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 appliedCoupon={appliedCoupon}
                                 onApply={(coupon) => setAppliedCoupon(coupon)}
                                 onRemove={() => setAppliedCoupon(null)}
+                                isDisabled={!canApplyCoupon}
+                                disabledReason={
+                                    isMonthEnd ? 'Discounts are disabled during month-end periods (days 1-4 & 25-31).' :
+                                    isMinQuote ? 'Discounts cannot be applied to minimum-rate quotes.' : ''
+                                }
                             />
                         </div>
 
@@ -1063,23 +1072,100 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <MapPin size={18} className="text-red-600" /> Move Route
                             </h3>
                         </div>
-                        <div className="space-y-4 pl-4 border-l-2 border-gray-100 relative">
+                        <div className="space-y-4 pl-4 border-l-2 border-slate-200 relative">
+                            {/* Primary Pickup */}
                             <div className="relative">
                                 <div className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-red-600 border-2 border-white ring-1 ring-gray-200" />
-                                <p className="text-xs text-slate-500 uppercase">Pickup</p>
-                                <p className="font-medium text-slate-900">{moveDetails.pickupAddress || 'Not set'}</p>
-                                <div className="text-sm text-slate-500 mt-1">
-                                    {accessDetails.origin?.type || 'House'} • Stairs: {accessDetails.origin?.stairs ? 'Yes' : 'No'}
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Pickup</p>
+                                <p className="font-bold text-slate-900 text-sm">{moveDetails.pickupAddress || 'Not set'}</p>
+                                {moveDetails.pickupUnitComplex && (
+                                    <p className="text-xs text-slate-500 font-medium">Unit/Complex: {moveDetails.pickupUnitComplex}</p>
+                                )}
+                                <div className="text-xs text-slate-600 mt-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    {(() => {
+                                        const a = accessDetails.origin || {}
+                                        const parts = [(a.type || 'House').toUpperCase()]
+                                        if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
+                                        if (a.elevator) parts.push('Elevator: Yes')
+                                        if (a.stairs) parts.push('Stairs: Yes')
+                                        if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                        if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                        if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                        if (a.notes) parts.push(`Notes: ${a.notes}`)
+                                        return parts.join(' • ')
+                                    })()}
                                 </div>
                             </div>
-                            <div className="relative pt-6">
-                                <div className="absolute -left-[21px] top-7 w-3 h-3 rounded-full bg-slate-900 border-2 border-white ring-1 ring-gray-200" />
-                                <p className="text-xs text-slate-500 uppercase">Dropoff</p>
-                                <p className="font-medium text-slate-900">{moveDetails.dropoffAddress || 'Not set'}</p>
-                                <div className="text-sm text-slate-500 mt-1">
-                                    {accessDetails.destination?.type || 'House'} • Stairs: {accessDetails.destination?.stairs ? 'Yes' : 'No'}
+
+                            {/* Additional Collections */}
+                            {(moveDetails.extraCollections || []).map((coll, idx) => (
+                                <div key={coll.id || idx} className="relative pt-4">
+                                    <div className="absolute -left-[21px] top-5 w-3 h-3 rounded-full bg-red-400 border-2 border-white ring-1 ring-gray-200" />
+                                    <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Additional Collection #{idx + 2}</p>
+                                    <p className="font-bold text-slate-900 text-sm">{coll.address || 'Not set'}</p>
+                                    {coll.unitComplex && <p className="text-xs text-slate-500 font-medium">Unit/Complex: {coll.unitComplex}</p>}
+                                    <div className="text-xs text-slate-600 mt-1 font-medium bg-red-50/50 p-2 rounded-lg border border-red-100">
+                                        {(() => {
+                                            const a = accessDetails[`extra_coll_${idx}`] || {}
+                                            const parts = [(a.type || 'House').toUpperCase()]
+                                            if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
+                                            if (a.elevator) parts.push('Elevator: Yes')
+                                            if (a.stairs) parts.push('Stairs: Yes')
+                                            if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                            if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                            if (a.notes) parts.push(`Notes: ${a.notes}`)
+                                            return parts.join(' • ')
+                                        })()}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Primary Dropoff */}
+                            <div className="relative pt-4">
+                                <div className="absolute -left-[21px] top-5 w-3 h-3 rounded-full bg-slate-900 border-2 border-white ring-1 ring-gray-200" />
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Dropoff</p>
+                                <p className="font-bold text-slate-900 text-sm">{moveDetails.dropoffAddress || (moveDetails.storageDestination ? `Master Movers Storage (${moveDetails.storageDestination})` : 'Not set')}</p>
+                                {moveDetails.dropoffUnitComplex && (
+                                    <p className="text-xs text-slate-500 font-medium">Unit/Complex: {moveDetails.dropoffUnitComplex}</p>
+                                )}
+                                <div className="text-xs text-slate-600 mt-1 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    {(() => {
+                                        const a = accessDetails.destination || {}
+                                        const parts = [(a.type || 'House').toUpperCase()]
+                                        if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
+                                        if (a.elevator) parts.push('Elevator: Yes')
+                                        if (a.stairs) parts.push('Stairs: Yes')
+                                        if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                        if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                        if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                        if (a.notes) parts.push(`Notes: ${a.notes}`)
+                                        return parts.join(' • ')
+                                    })()}
                                 </div>
                             </div>
+
+                            {/* Additional Drop-offs */}
+                            {(moveDetails.extraDrops || []).map((drop, idx) => (
+                                <div key={drop.id || idx} className="relative pt-4">
+                                    <div className="absolute -left-[21px] top-5 w-3 h-3 rounded-full bg-slate-600 border-2 border-white ring-1 ring-gray-200" />
+                                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Additional Drop-off #{idx + 2}</p>
+                                    <p className="font-bold text-slate-900 text-sm">{drop.address || 'Not set'}</p>
+                                    {drop.unitComplex && <p className="text-xs text-slate-500 font-medium">Unit/Complex: {drop.unitComplex}</p>}
+                                    <div className="text-xs text-slate-600 mt-1 font-medium bg-slate-100 p-2 rounded-lg border border-slate-200">
+                                        {(() => {
+                                            const a = accessDetails[`extra_drop_${idx}`] || {}
+                                            const parts = [(a.type || 'House').toUpperCase()]
+                                            if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
+                                            if (a.elevator) parts.push('Elevator: Yes')
+                                            if (a.stairs) parts.push('Stairs: Yes')
+                                            if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                            if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                            if (a.notes) parts.push(`Notes: ${a.notes}`)
+                                            return parts.join(' • ')
+                                        })()}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 

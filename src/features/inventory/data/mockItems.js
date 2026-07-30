@@ -79,7 +79,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/large-statues.png",
     "requiresPhoto": false,
     "requiresCrate": true,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "isHeavy": true,
     "variationOptions": null
 },
@@ -91,7 +91,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/small-statues.png",
     "requiresPhoto": false,
     "requiresCrate": true,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "isHeavy": true,
     "variationOptions": null
 },
@@ -184,7 +184,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/glass-top-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -295,7 +295,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/coffee-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -310,7 +310,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/coffee-table-large.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -347,7 +347,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/halfmoon-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -380,7 +380,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/hall-stand.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -435,7 +435,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/tv-stand.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -450,7 +450,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/tv-cabinet.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -472,7 +472,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/4-seater-dining-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -487,7 +487,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/6-seat-table-+-base.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -502,7 +502,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/6-seat-table-top-only.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -517,7 +517,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/8-seater-dining-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -532,7 +532,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/10-seater-dining-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -547,7 +547,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/dining-room-chair.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -602,7 +602,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/sideboard.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -624,7 +624,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/welsh-dresser.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -646,7 +646,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/display-cabinet.png",
     "requiresPhoto": false,
     "requiresCrate": true,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -767,7 +767,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/d-bed-headboard.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -833,7 +833,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/chest-of-drawers.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -844,7 +844,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/dressing-table_stool.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -855,7 +855,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/cheval-mirror.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -866,7 +866,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/mirror-large.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -888,7 +888,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/fridge-d-door.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -899,7 +899,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/fridge-double-upright.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -910,7 +910,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/small-fridge.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -921,7 +921,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/barfridge.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -943,7 +943,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/washing-machine.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -954,7 +954,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/tumble-dryer.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -965,7 +965,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/dishwasher.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -976,7 +976,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/microwave-oven.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -1187,7 +1187,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/pictures_mirrors.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {
@@ -1275,7 +1275,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/4-seater-patio-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -1290,7 +1290,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/6-seater-patio-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -1305,7 +1305,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/8-seater-patio-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -1320,7 +1320,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/10-seater-patio-table.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": [
         "Glass",
         "Marble",
@@ -1841,7 +1841,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/white-board.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": null,
     "variationOptions": null
 },
 {

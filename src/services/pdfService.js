@@ -192,8 +192,7 @@ export const generateProfessionalQuote = (data) => {
                     costs.push(['Plastic Sleeves', `R ${Number(bd.plasticSleeveCost).toFixed(2)}`]);
                 }
                 if (bd.wrappingCost > 0) {
-                    const volText = bd.wrappingVolume > 0 ? ` (${Number(bd.wrappingVolume).toFixed(2)} ft³ x R5.90)` : '';
-                    costs.push([`Specialized Wrapping${volText}`, `R ${Number(bd.wrappingCost).toFixed(2)}`]);
+                    costs.push(['Specialized Furniture Wrapping', `R ${Number(bd.wrappingCost).toFixed(2)}`]);
                 }
                 if (bd.specialWrapping > 0) costs.push(['Special Item Wrapping / Sleeves', `R ${Number(bd.specialWrapping).toFixed(2)}`]);
                 

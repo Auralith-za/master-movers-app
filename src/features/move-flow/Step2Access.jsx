@@ -67,7 +67,7 @@ export default function Step2Access() {
         })
     }
 
-    const renderLocationForm = (locationType) => {
+    const renderLocationForm = (locationType, customLabel = null) => {
         const data = accessDetails?.[locationType] || {
             type: 'house',
             floorLevel: 0,
@@ -77,8 +77,8 @@ export default function Step2Access() {
             parkingType: 'driveway',
             notes: ''
         }
-        const label = locationType === 'origin' ? 'Pickup Location' : 'Dropoff Location'
-        const colorClass = locationType === 'origin' ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-slate-900'
+        const label = customLabel || (locationType === 'origin' ? 'Pickup Location' : 'Dropoff Location')
+        const colorClass = locationType === 'origin' || locationType.startsWith('extra_coll') ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-slate-900'
 
         const showFloorFields = data.type === 'flat' || data.type === 'office'
         const isHouse = data.type === 'house'
@@ -302,7 +302,13 @@ export default function Step2Access() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {renderLocationForm('origin')}
+                        {(moveDetails.extraCollections || []).map((coll, idx) => 
+                            renderLocationForm(`extra_coll_${idx}`, `Collection #${idx + 2} (${coll.address ? coll.address.split(',')[0] : 'Address'})`)
+                        )}
                         {renderLocationForm('destination')}
+                        {(moveDetails.extraDrops || []).map((drop, idx) => 
+                            renderLocationForm(`extra_drop_${idx}`, `Drop-off #${idx + 2} (${drop.address ? drop.address.split(',')[0] : 'Address'})`)
+                        )}
                     </div>
 
                     {/* Packaging Services Section */}

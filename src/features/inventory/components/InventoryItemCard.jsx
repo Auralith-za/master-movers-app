@@ -401,14 +401,15 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
     // AUTO-WRAP: Glass/Marble OR items with autoPackagingType === 'Wrapping' (unless Standard Wood selected)
     const isAutoWrapped = isGlassOrMarble || (item.autoPackagingType === 'Wrapping' && !isStandardOrWood)
     const isManuallyWrapped = !isAutoWrapped && Boolean(variation?.includes('Wrapped'))
+    const isWrapped = isAutoWrapped || isManuallyWrapped
 
-    // AUTO-SLEEVE: Check native sleeve count (strip manual toggle modifiers from key first)
+    // AUTO-SLEEVE: Plastic sleeves apply automatically ONLY to couches, mattresses, and bases (and mutually exclusive with wrapping)
     const cleanVariation = variation ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '') : null
     const baseIdKey = cleanVariation ? `${item.id}_${cleanVariation}` : item.id
-    const isAutoSleeve = !isAutoWrapped && getPlasticSleevesCount(item, baseIdKey) > 0
-    const isManuallySleeved = !isAutoSleeve && Boolean(variation?.includes('Plastic Sleeve'))
+    const isAutoSleeve = !isWrapped && getPlasticSleevesCount(item, baseIdKey) > 0
+    const isManuallySleeved = false
     
-    const needsPackaging = isAutoWrapped || isAutoSleeve || isManuallyWrapped || isManuallySleeved
+    const needsPackaging = isWrapped || isAutoSleeve
     const packagingCostPerUnit = needsPackaging ? (item.volume * 35) : 0
 
     return (
@@ -512,21 +513,6 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
                 </div>
 
                 <div className="flex flex-col gap-1 mt-1">
-                    {!isAutoSleeve && quantity > 0 && onToggleModifier && (
-                        <div className="flex items-center gap-2">
-                            <input 
-                                type="checkbox" 
-                                id={`ps-${item.id}`}
-                                checked={isManuallySleeved}
-                                onChange={(e) => { e.stopPropagation(); onToggleModifier(item.id, 'Plastic Sleeve'); }}
-                                className="w-3.5 h-3.5 text-red-600 rounded border-gray-300"
-                            />
-                            <label htmlFor={`ps-${item.id}`} className="text-[10px] md:text-xs text-slate-500 font-bold cursor-pointer uppercase tracking-tight">
-                                Add Plastic Sleeve (R55)
-                            </label>
-                        </div>
-                    )}
-
                     {!isAutoWrapped && quantity > 0 && onToggleModifier && (
                         <div className="flex items-center gap-2">
                             <input 

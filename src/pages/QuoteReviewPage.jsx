@@ -169,6 +169,60 @@ export default function QuoteReviewPage() {
                             </div>
                         </div>
 
+                        {/* Access & Additional Stops Card */}
+                        {quote.access_details && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-4">
+                                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                                    <MapPin size={20} className="text-red-500" /> Access & Site Details
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    <div className="p-4 bg-slate-50 rounded-xl space-y-1">
+                                        <p className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Pickup Access</p>
+                                        <p className="text-slate-700 font-bold">
+                                            {quote.access_details.origin?.type?.toUpperCase() || 'HOUSE'} • Floor {quote.access_details.origin?.floorLevel || 0}
+                                        </p>
+                                        <p className="text-slate-500">
+                                            Elevator: {quote.access_details.origin?.elevator ? 'Yes' : 'No'} • Stairs: {quote.access_details.origin?.stairs ? 'Yes' : 'No'}
+                                        </p>
+                                        {quote.access_details.origin?.longCarryMeters > 0 && (
+                                            <p className="text-slate-600 font-semibold">Long Carry: {quote.access_details.origin.longCarryMeters}m</p>
+                                        )}
+                                        {quote.access_details.origin?.notes && (
+                                            <p className="text-slate-500 italic mt-1">"{quote.access_details.origin.notes}"</p>
+                                        )}
+                                    </div>
+
+                                    <div className="p-4 bg-slate-50 rounded-xl space-y-1">
+                                        <p className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Dropoff Access</p>
+                                        <p className="text-slate-700 font-bold">
+                                            {quote.access_details.destination?.type?.toUpperCase() || 'HOUSE'} • Floor {quote.access_details.destination?.floorLevel || 0}
+                                        </p>
+                                        <p className="text-slate-500">
+                                            Elevator: {quote.access_details.destination?.elevator ? 'Yes' : 'No'} • Stairs: {quote.access_details.destination?.stairs ? 'Yes' : 'No'}
+                                        </p>
+                                        {quote.access_details.destination?.longCarryMeters > 0 && (
+                                            <p className="text-slate-600 font-semibold">Long Carry: {quote.access_details.destination.longCarryMeters}m</p>
+                                        )}
+                                        {quote.access_details.destination?.notes && (
+                                            <p className="text-slate-500 italic mt-1">"{quote.access_details.destination.notes}"</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Customer Notes Card */}
+                        {(quote.general_notes || quote.notes) && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
+                                <h2 className="text-lg font-black text-slate-900 mb-3 flex items-center gap-2">
+                                    💬 Special Notes & Instructions
+                                </h2>
+                                <div className="p-4 bg-amber-50/60 border border-amber-200/60 rounded-xl text-xs text-amber-900 font-medium leading-relaxed">
+                                    "{quote.general_notes || quote.notes}"
+                                </div>
+                            </div>
+                        )}
+
                         {/* Move Services Card */}
                         {(quote.packaging_option !== 'none' || quote.insurance_enabled) && (
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">

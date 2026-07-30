@@ -322,7 +322,7 @@ export default function Step3Inventory() {
                                     variant="outline"
                                     className="w-full justify-start text-left font-medium hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                                     onClick={() => {
-                                        addItem(variationModalItem.id, opt);
+                                        addItem(variationModalItem.id, opt, variationModalItem.targetRoom);
                                         setVariationModalItem(null);
                                     }}
                                 >
@@ -361,7 +361,7 @@ export default function Step3Inventory() {
                             <button
                                 className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold transition-colors flex items-center justify-center gap-2"
                                 onClick={() => {
-                                    addItem(crateModalItem.id);
+                                    addItem(crateModalItem.id, crateModalItem.variation || null, crateModalItem.targetRoom);
                                     // Trigger callback request for crate quote
                                     alert('Thanks! A sales representative will contact you to quote the crating for this item. Meanwhile, the item has been added to your inventory.');
                                     setCrateModalItem(null);
@@ -372,7 +372,7 @@ export default function Step3Inventory() {
                             <button
                                 className="w-full py-4 rounded-2xl border-2 border-gray-200 text-slate-700 font-semibold hover:border-gray-300 hover:bg-gray-50 transition-colors"
                                 onClick={() => {
-                                    addItem(crateModalItem.id);
+                                    addItem(crateModalItem.id, crateModalItem.variation || null, crateModalItem.targetRoom);
                                     setCrateModalItem(null);
                                 }}
                             >
