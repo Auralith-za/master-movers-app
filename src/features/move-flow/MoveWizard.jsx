@@ -198,6 +198,7 @@ export default function MoveWizard() {
         location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote'
 
     const isAdmin = basePath === '/admin/quotes/new'
+    const isTest = basePath === '/quote-test'
 
     const STEPS = useMemo(() => [
         { id: 'details', label: 'Details', path: basePath },
@@ -255,8 +256,6 @@ export default function MoveWizard() {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [location.pathname])
-
-    const isTest = basePath === '/quote-test'
 
     const renderCurrentStepComponent = () => {
         const path = location.pathname.toLowerCase().replace(/\/$/, '')
