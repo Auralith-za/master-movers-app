@@ -101,7 +101,10 @@ function App() {
           <Route index element={<MoveWizard />} />
           <Route path="*" element={<MoveWizard />} />
         </Route>
-        <Route path="/Quote/*" element={<WebsiteLayout />} />
+        <Route path="/Quote/*" element={<WebsiteLayout />}>
+          <Route index element={<MoveWizard />} />
+          <Route path="*" element={<MoveWizard />} />
+        </Route>
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>

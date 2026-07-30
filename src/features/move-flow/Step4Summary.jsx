@@ -246,6 +246,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }
 
     const handleProceed = async () => {
+        // If contact details are missing, capture them first via modal
+        if (submissionType !== 'admin' && (!moveDetails.contactName || !moveDetails.contactEmail)) {
+            setShowLeadModal(true)
+            return
+        }
+
         if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
             alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
             return

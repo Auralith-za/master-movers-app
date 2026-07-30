@@ -214,35 +214,19 @@ export default function MoveWizard() {
     const isStepCompleted = (stepId) => {
         if (stepId === 'details' || stepId === 'access' || stepId === 'inventory') return true
 
-        const step1Ok = !!(
-            moveDetails?.pickupAddress &&
-            moveDetails?.dropoffAddress &&
-            moveDetails?.moveDate &&
-            moveDetails?.contactName &&
-            moveDetails?.surname &&
-            moveDetails?.contactPhone &&
-            moveDetails?.contactEmail &&
-            moveDetails?.contactEmail.includes('@') &&
-            moveDetails?.contactEmail.includes('.')
-        )
-
         const hasInventory = Object.keys(inventory || {}).length > 0
-        if (stepId === 'summary') return step1Ok && hasInventory
+        if (stepId === 'summary') return hasInventory
 
         return true
     }
 
-    // Auto-redirect invalid step paths safely
+    // Auto-redirect invalid step paths safely (redirect to inventory if no items added)
     useEffect(() => {
         const currentStep = STEPS[currentStepIndex]
         if (currentStep && currentStep.id === 'summary' && !isStepCompleted('summary')) {
-            if (!Object.keys(inventory || {}).length) {
-                navigate(`${basePath}/inventory`, { replace: true })
-            } else {
-                navigate(basePath, { replace: true })
-            }
+            navigate(`${basePath}/inventory`, { replace: true })
         }
-    }, [location.pathname, moveDetails, inventory, currentStepIndex, basePath, navigate])
+    }, [location.pathname, inventory, currentStepIndex, basePath, navigate])
 
     // Scroll to top on step change
     useEffect(() => {
