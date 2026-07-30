@@ -920,13 +920,31 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     // Packaging add-ons are kept separate so they always apply ON TOP of the minimum charge
     let baseCost = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
-    // Check month-end date (days 1-4 and 25-31) and minimum quote policy
-    let isMonthEnd = false
-    if (moveDetails.moveDate) {
-        const dateParts = String(moveDetails.moveDate).split('T')[0].split('-')
-        const day = parseInt(dateParts[2], 10)
-        if (day < 5 || day > 24) isMonthEnd = true
-    }
+    // Robust day-of-month extractor supporting YYYY-MM-DD, DD/MM/YYYY, YYYY/MM/DD, DD-MM-YYYY, and Date instances
+    const getDayOfMonth = (dateVal) => {
+        if (!dateVal) return null;
+        const str = String(dateVal).split('T')[0].trim();
+
+        if (str.includes('/')) {
+            const parts = str.split('/');
+            if (parts[0].length === 4) return parseInt(parts[2], 10); // YYYY/MM/DD
+            return parseInt(parts[0], 10);                             // DD/MM/YYYY
+        }
+
+        if (str.includes('-')) {
+            const parts = str.split('-');
+            if (parts[0].length === 4) return parseInt(parts[2], 10); // YYYY-MM-DD
+            return parseInt(parts[0], 10);                             // DD-MM-YYYY
+        }
+
+        const d = new Date(dateVal);
+        return !isNaN(d.getTime()) ? d.getDate() : null;
+    };
+
+    const moveDay = getDayOfMonth(moveDetails.moveDate);
+    // Mid-month special (10% discount) applies ONLY if move date is selected AND day of month is between 5 and 24 inclusive
+    const isMidMonthDate = (moveDay !== null && !isNaN(moveDay) && moveDay >= 5 && moveDay <= 24);
+    const isMonthEnd = !isMidMonthDate;
 
     // Initial check: if base cost is at or below minimum order threshold (R2,600 ex-VAT), it's a minimum quote
     let isMinQuote = (!isNationalMove && baseCost <= PRICING_CONSTANTS.minOrder)
