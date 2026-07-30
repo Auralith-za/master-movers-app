@@ -497,7 +497,10 @@ export const getWrappingFlag = (item, variation) => {
     return isGlassOrMarble || appliesAutoWrapping || Boolean(variation?.includes('Wrapped'))
 }
 
-export const calculateQuote = (inventory, moveDetails, accessDetails, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null, isAdminEdit = false) => {
+export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails = {}, items = INVENTORY_ITEMS, manualServiceCharges = {}, extraVolumeCuFt = 0, specialWrappingOverrides = null, isAdminEdit = false) => {
+    moveDetails = moveDetails || {}
+    accessDetails = accessDetails || {}
+    inventory = inventory || {}
     const { isSharedLoad: sharedLoadPreference = null } = moveDetails;
     let totalVolume = 0
     let plasticSleeveCost = 0

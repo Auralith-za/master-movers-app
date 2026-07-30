@@ -314,15 +314,24 @@ export const generateProfessionalQuote = (data) => {
                 });
             }
 
-            // Auto-reconcile manually applied discounts
+            // Auto-reconcile component lines with exact subtotal
+            const hasActualDiscount = (data.discount > 0) || (bd?.discount > 0) || Boolean(data.appliedCoupon) || (Number(data.discount_amount) > 0);
             const sumOfCosts = costs.reduce((acc, row) => {
                 const valStr = String(row[1]).replace(/[^\d.-]/g, '');
                 return acc + (parseFloat(valStr) || 0);
             }, 0);
 
             const diff = serviceFees - sumOfCosts;
-            if (diff < -0.01) {
+            if (diff < -0.01 && hasActualDiscount) {
                 costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
+            } else if (Math.abs(diff) > 0.01 && !hasActualDiscount) {
+                // If there's a breakdown discrepancy without an actual discount, adjust the Transport Services line so items equal subtotal
+                const transportIdx = costs.findIndex(c => c[0] === 'Transport Services');
+                if (transportIdx !== -1) {
+                    const currentTrans = parseFloat(String(costs[transportIdx][1]).replace(/[^\d.-]/g, '')) || 0;
+                    const adjustedTrans = Math.max(0, currentTrans + diff);
+                    costs[transportIdx][1] = `R ${adjustedTrans.toFixed(2)}`;
+                }
             }
 
             costs.push(

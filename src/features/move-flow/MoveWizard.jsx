@@ -249,6 +249,8 @@ export default function MoveWizard() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [location.pathname])
 
+    const isTest = basePath === '/quote-test'
+
     const renderCurrentStepComponent = () => {
         const path = location.pathname.toLowerCase().replace(/\/$/, '')
         if (path.endsWith('/access')) {
