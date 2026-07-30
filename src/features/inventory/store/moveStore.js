@@ -928,7 +928,8 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
         if (day < 5 || day > 24) isMonthEnd = true
     }
 
-    const isMinQuote = (!isNationalMove && baseCost <= PRICING_CONSTANTS.minOrder)
+    // Initial check: if base cost is at or below minimum order threshold (R2,600 ex-VAT), it's a minimum quote
+    let isMinQuote = (!isNationalMove && baseCost <= PRICING_CONSTANTS.minOrder)
 
     // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote
     let exclVatDiscount = 0
@@ -941,6 +942,12 @@ export const calculateQuote = (inventory, moveDetails, accessDetails, items = IN
     // Enforce minimum charge on the base (packaging costs always apply on top)
     if (!isNationalMove && baseAfterDiscount < PRICING_CONSTANTS.minOrder) {
         baseAfterDiscount = PRICING_CONSTANTS.minOrder
+    }
+
+    // Final verification: if base after discount is at minimum rate, zero out discount and flag as min quote
+    if (!isNationalMove && baseAfterDiscount <= PRICING_CONSTANTS.minOrder) {
+        isMinQuote = true
+        exclVatDiscount = 0
     }
 
     // Storage with Master Movers: R1.50 per cubic foot, minimum R450/month (applied when client selects a depot)
