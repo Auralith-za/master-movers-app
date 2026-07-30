@@ -211,22 +211,45 @@ export default function MoveWizard() {
         ? STEPS.findIndex(s => s.path.toLowerCase() === normalizedPath)
         : 0
 
+    const isStep1Ok = useMemo(() => {
+        if (isAdmin || isTest) return true
+
+        const hasPickup = !!moveDetails?.pickupAddress
+        const hasDropoff = !!(moveDetails?.dropoffAddress || moveDetails?.storageDestination)
+        const hasDate = !!moveDetails?.moveDate
+        const hasName = !!(moveDetails?.contactName && (moveDetails?.surname || moveDetails?.contactName.trim().includes(' ')))
+        const hasPhone = !!moveDetails?.contactPhone
+        const hasEmail = !!(moveDetails?.contactEmail && moveDetails.contactEmail.includes('@') && moveDetails.contactEmail.includes('.'))
+
+        return hasPickup && hasDropoff && hasDate && hasName && hasPhone && hasEmail
+    }, [moveDetails, isAdmin, isTest])
+
+    const hasInventory = Object.keys(inventory || {}).length > 0
+
     const isStepCompleted = (stepId) => {
-        if (stepId === 'details' || stepId === 'access' || stepId === 'inventory') return true
-
-        const hasInventory = Object.keys(inventory || {}).length > 0
-        if (stepId === 'summary') return hasInventory
-
+        if (stepId === 'details') return true
+        if (stepId === 'access' || stepId === 'inventory') return isStep1Ok
+        if (stepId === 'summary') return isStep1Ok && hasInventory
         return true
     }
 
-    // Auto-redirect invalid step paths safely (redirect to inventory if no items added)
+    // Auto-redirect invalid step paths safely
     useEffect(() => {
         const currentStep = STEPS[currentStepIndex]
-        if (currentStep && currentStep.id === 'summary' && !isStepCompleted('summary')) {
-            navigate(`${basePath}/inventory`, { replace: true })
+        if (!currentStep) return
+
+        // Step 2, 3, 4 require Step 1 completion
+        if (currentStep.id !== 'details' && !isStep1Ok) {
+            navigate(basePath, { replace: true })
+            return
         }
-    }, [location.pathname, inventory, currentStepIndex, basePath, navigate])
+
+        // Step 4 also requires at least 1 item in inventory
+        if (currentStep.id === 'summary' && !hasInventory) {
+            navigate(`${basePath}/inventory`, { replace: true })
+            return
+        }
+    }, [location.pathname, currentStepIndex, basePath, navigate, isStep1Ok, hasInventory])
 
     // Scroll to top on step change
     useEffect(() => {
