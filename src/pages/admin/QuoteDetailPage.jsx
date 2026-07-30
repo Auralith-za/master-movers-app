@@ -320,12 +320,20 @@ export default function QuoteDetailPage() {
         const cubes = parseFloat(customProductForm.cubes) || 0
         const price = parseFloat(customProductForm.price) || 0
         if (!name) return
+        if (recalculatedData?.isMinQuote && price < 0) {
+            alert('Minimum Quotes Policy: Discounts cannot be applied to minimum-rate quotes.')
+            return
+        }
         const newProduct = { id: Date.now(), name, cubes, price }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
         setCustomProductForm({ name: '', cubes: '', price: '' })
     }
 
     const handleApplyCoupon = (coupon) => {
+        if (recalculatedData?.isMinQuote) {
+            alert('Minimum Quotes Policy: Discounts cannot be applied to minimum-rate quotes.')
+            return
+        }
         const basePrice = recalculatedData?.total || editForm.total_price || 0
         const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
         
@@ -593,7 +601,11 @@ export default function QuoteDetailPage() {
                 boxQty: recalculatedData?.boxQty,
                 totalVolume: recalculatedData?.totalVolume || quote.total_volume || 0,
                 st7Boxes: quote.st7_boxes || 0,
-                linenBoxes: quote.linen_boxes || 0
+                linenBoxes: quote.linen_boxes || 0,
+                accessDetails: quote.access_details || recalculatedData?.accessDetails || {},
+                generalNotes: quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || '',
+                customProducts: editForm.custom_products || quote.custom_products || [],
+                isMinQuote: recalculatedData?.isMinQuote || false
             })
         } catch (err) {
             console.error('PDF generation error:', err)

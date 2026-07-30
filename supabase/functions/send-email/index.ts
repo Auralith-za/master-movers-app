@@ -202,6 +202,7 @@ serve(async (req) => {
         const additionalEmails = [
             'sales@mastermoversjhb.co.za',
             'sales1@mastermoversjhb.co.za',
+            'office@mastermoversjhb.co.za',
             'carla@mastermoversjhb.co.za',
             'sales3@mastermoversjhb.co.za',
             'office@mastermoverscpt.co.za',

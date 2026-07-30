@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, Users, Package, AlertCircle, FileText, Download, Loader2 } from 'lucide-react'
+import { TrendingUp, Users, AlertCircle, FileText, Download, Search, X, Eye, ArrowRight, Calendar, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import Button from '../../components/ui/Button'
-import { useMoveStore } from '../../features/inventory/store/moveStore' // Just for access if needed
+import { useNavigate } from 'react-router-dom'
+import { generateProfessionalQuote } from '../../services/pdfService'
+import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 
 export default function DashboardPage() {
+    const navigate = useNavigate()
     const [isLoading, setIsLoading] = useState(true)
     const [quotes, setQuotes] = useState([])
+    const [searchQuery, setSearchQuery] = useState('')
+    const [statusFilter, setStatusFilter] = useState('all')
     const [stats, setStats] = useState({
         totalRevenue: 0,
         pendingRevenue: 0,
@@ -71,7 +76,6 @@ export default function DashboardPage() {
     }
 
     const handleExportExcel = () => {
-        // Simple CSV Export
         if (!quotes.length) return
 
         const headers = ['ID', 'Client Name', 'Date', 'From', 'To', 'Status', 'Total']
@@ -98,6 +102,75 @@ export default function DashboardPage() {
         document.body.removeChild(link)
     }
 
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'new': return 'bg-blue-50 text-blue-700 ring-blue-600/20'
+            case 'processing': return 'bg-purple-50 text-purple-700 ring-purple-600/20'
+            case 'pending_payment': return 'bg-amber-50 text-amber-700 ring-amber-600/20'
+            case 'booked':
+            case 'paid':
+            case 'booked_paid': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+            case 'on_hold': return 'bg-orange-50 text-orange-700 ring-orange-600/20'
+            case 'rejected': return 'bg-red-50 text-red-700 ring-red-600/10'
+            case 'lead': return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+            case 'payment_cancelled': return 'bg-red-100 text-red-800 ring-red-600/30'
+            default: return 'bg-slate-50 text-slate-700 ring-slate-600/20'
+        }
+    }
+
+    // Filter quotes for dashboard search engine
+    const filteredQuotes = quotes.filter(quote => {
+        const isPaid = quote.status === 'booked' || quote.status === 'paid' || quote.status === 'booked_paid' || quote.payment_status === 'paid'
+
+        let matchesStatus = true
+        if (statusFilter === 'paid') matchesStatus = isPaid
+        else if (statusFilter === 'pending') matchesStatus = !isPaid && quote.status !== 'rejected'
+        else if (statusFilter === 'rejected') matchesStatus = quote.status === 'rejected'
+        else if (statusFilter === 'lead') matchesStatus = quote.status === 'lead'
+
+        if (!matchesStatus) return false
+        if (!searchQuery.trim()) return true
+
+        const q = searchQuery.toLowerCase().trim()
+        return (
+            (quote.client_name || '').toLowerCase().includes(q) ||
+            (quote.client_email || '').toLowerCase().includes(q) ||
+            (quote.client_phone || '').toLowerCase().includes(q) ||
+            (quote.id || '').toString().toLowerCase().includes(q) ||
+            (quote.pickup_address || '').toLowerCase().includes(q) ||
+            (quote.dropoff_address || '').toLowerCase().includes(q) ||
+            (quote.move_date || '').toLowerCase().includes(q)
+        )
+    })
+
+    const handleDownloadPDF = async (e, quote) => {
+        e.stopPropagation()
+        try {
+            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            await generateProfessionalQuote({
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                inventory: inventoryForPdf,
+                total: quote.total_price || 0,
+                vat: (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: (quote.total_price || 0) / 1.15,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: quote.items_json?.breakdown || null,
+                accessDetails: quote.access_details || {},
+                generalNotes: quote.general_notes || quote.notes || quote.customer_comments || '',
+                customProducts: quote.custom_products || []
+            })
+        } catch (err) {
+            console.error('PDF error:', err)
+            alert('Failed to generate PDF')
+        }
+    }
+
     const StatCard = ({ icon: Icon, label, value, subValue, color, bg }) => (
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
@@ -116,12 +189,133 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">Executive Overview</h2>
-                    <p className="text-slate-500">Real-time business insights.</p>
+                    <p className="text-slate-500">Real-time business insights & client quote search.</p>
                 </div>
                 <Button variant="outline" onClick={handleExportExcel} disabled={isLoading}>
                     <Download className="mr-2 h-4 w-4" />
                     Export Report
                 </Button>
+            </div>
+
+            {/* Dashboard Global Search Engine Bar */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row items-center gap-3">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input 
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search quotes by client name, email, phone, ref #, or address..."
+                            className="w-full pl-12 pr-10 py-3 rounded-xl border border-slate-200 focus:border-red-600 focus:ring-2 focus:ring-red-600/10 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none transition-all"
+                        />
+                        {searchQuery && (
+                            <button 
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                            >
+                                <X size={18} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+                        {['all', 'pending', 'paid', 'lead', 'rejected'].map(status => (
+                            <button
+                                key={status}
+                                onClick={() => setStatusFilter(status)}
+                                className={`px-3 py-2 text-xs font-bold rounded-lg uppercase tracking-wider transition-all whitespace-nowrap ${
+                                    statusFilter === status
+                                        ? 'bg-slate-900 text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                {status}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Real-time Search Results Section */}
+                {(searchQuery.trim().length > 0 || statusFilter !== 'all') && (
+                    <div className="pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                Search Results ({filteredQuotes.length} quote{filteredQuotes.length !== 1 ? 's' : ''} found)
+                            </span>
+                            {(searchQuery || statusFilter !== 'all') && (
+                                <button 
+                                    onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
+                                    className="text-xs font-bold text-red-600 hover:underline"
+                                >
+                                    Reset Filters
+                                </button>
+                            )}
+                        </div>
+
+                        {filteredQuotes.length === 0 ? (
+                            <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm">
+                                No client quotes match "{searchQuery}".
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto rounded-xl border border-slate-100">
+                                {filteredQuotes.slice(0, 15).map((q) => (
+                                    <div 
+                                        key={q.id}
+                                        onClick={() => navigate(`/admin/quotes/${q.id}`)}
+                                        className="p-4 hover:bg-slate-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2.5 bg-slate-100 rounded-lg group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                                                <FileText size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-900 text-sm">{q.client_name || 'Unnamed Client'}</span>
+                                                    <span className="font-mono text-xs text-slate-400">#{q.id.toString().substring(0, 6)}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider ring-1 ring-inset ${getStatusColor(q.status)}`}>
+                                                        {q.status?.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                    {q.client_email && <span>📧 {q.client_email}</span>}
+                                                    {q.client_phone && <span>📞 {q.client_phone}</span>}
+                                                    {q.move_date && <span className="flex items-center gap-1"><Calendar size={12} /> {q.move_date}</span>}
+                                                </div>
+                                                <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                                                    <MapPin size={12} className="shrink-0 text-slate-400" />
+                                                    <span className="truncate max-w-xs">{q.pickup_address?.split(',')[0] || 'N/A'}</span>
+                                                    <span>→</span>
+                                                    <span className="truncate max-w-xs">{q.dropoff_address?.split(',')[0] || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
+                                            <div className="text-right">
+                                                <div className="font-bold text-slate-900 text-base">
+                                                    R {Number(q.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400">Incl VAT</div>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={(e) => handleDownloadPDF(e, q)}
+                                                    className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                                                    title="Download PDF"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
+                                                <div className="p-2 text-slate-400 group-hover:text-red-600 transition-colors">
+                                                    <ArrowRight size={18} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Stats Grid */}
@@ -178,7 +372,6 @@ export default function DashboardPage() {
                     </select>
                 </div>
                 <div className="h-64 flex items-end justify-between gap-2 px-4 border-b border-gray-100 pb-4">
-                    {/* Mock Graph Bars - In real app use Recharts */}
                     {[45, 60, 35, 78, 52, 85].map((h, i) => (
                         <div key={i} className="flex flex-col items-center gap-2 w-full group">
                             <div className="relative w-full max-w-[40px] bg-indigo-50 hover:bg-indigo-100 rounded-t-lg transition-all duration-500" style={{ height: `${h}%` }}>

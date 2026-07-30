@@ -11,6 +11,7 @@ export default function QuotesPage() {
     const [quotes, setQuotes] = useState([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
+    const [searchTerm, setSearchTerm] = useState('')
 
     useEffect(() => {
         fetchQuotes()
@@ -51,11 +52,23 @@ export default function QuotesPage() {
     const filteredQuotes = quotes.filter(quote => {
         const isPaid = quote.status === 'booked' || quote.status === 'paid' || quote.status === 'booked_paid' || quote.payment_status === 'paid'
 
-        if (filter === 'all') return true
-        if (filter === 'paid') return isPaid
-        if (filter === 'pending') return !isPaid && quote.status !== 'rejected'
-        if (filter === 'rejected') return quote.status === 'rejected'
-        return true
+        let matchesFilter = true
+        if (filter === 'paid') matchesFilter = isPaid
+        else if (filter === 'pending') matchesFilter = !isPaid && quote.status !== 'rejected'
+        else if (filter === 'rejected') matchesFilter = quote.status === 'rejected'
+
+        if (!matchesFilter) return false
+        if (!searchTerm.trim()) return true
+
+        const q = searchTerm.toLowerCase().trim()
+        return (
+            (quote.client_name || '').toLowerCase().includes(q) ||
+            (quote.client_email || '').toLowerCase().includes(q) ||
+            (quote.client_phone || '').toLowerCase().includes(q) ||
+            (quote.id || '').toString().toLowerCase().includes(q) ||
+            (quote.pickup_address || '').toLowerCase().includes(q) ||
+            (quote.dropoff_address || '').toLowerCase().includes(q)
+        )
     })
 
     const handleAutomatedEmail = async (quote) => {
@@ -165,7 +178,9 @@ export default function QuotesPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                             type="text"
-                            placeholder="Search client, email..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search name, email, ref #..."
                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                         />
                     </div>

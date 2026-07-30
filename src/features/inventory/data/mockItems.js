@@ -686,7 +686,7 @@ export const INVENTORY_ITEMS = [
     "id": "double-bed-base",
     "name": "DOUBLE BED BASE",
     "category": "Bedrooms",
-    "volume": 56,
+    "volume": 28,
     "image": "/inventory/double-bed-base.png",
     "requiresPhoto": false,
     "requiresCrate": false,

@@ -144,13 +144,13 @@ export const generateProfessionalQuote = (data) => {
                 currentY += 6;
             });
 
-            const notes = data.generalNotes || data.notes || data.moveDetails?.generalNotes || data.moveDetails?.notes || '';
+            const notes = data.generalNotes || data.notes || data.customer_comments || data.moveDetails?.generalNotes || data.moveDetails?.notes || data.quote?.general_notes || data.quote?.notes || data.quote?.customer_comments || '';
             if (notes) {
                 doc.setFont('helvetica', 'bold');
-                doc.text('Special Notes:', 20, currentY);
+                doc.text('Special Notes / Instructions:', 20, currentY);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`"${notes}"`, 48, currentY, { maxWidth: 142 });
-                const notesHeight = doc.getTextDimensions(`"${notes}"`, { maxWidth: 142 }).h || 5;
+                doc.text(`"${notes}"`, 68, currentY, { maxWidth: 122 });
+                const notesHeight = doc.getTextDimensions(`"${notes}"`, { maxWidth: 122 }).h || 5;
                 currentY += Math.max(6, notesHeight + 2);
             }
 
@@ -244,9 +244,8 @@ export const generateProfessionalQuote = (data) => {
             const numVat = Number(vat) || (numTotal - numTotal / 1.15);
             
             const serviceFees = numSubTotal || (numTotal / 1.15);
-            const discountAmount = 0; // discount is already baked in to subTotal
 
-            const { breakdown: bd, boxQty } = data;
+            const { breakdown: bd } = data;
             const costs = [];
 
             // Transport Services line
@@ -295,7 +294,22 @@ export const generateProfessionalQuote = (data) => {
                 }
             }
 
-            // Auto-reconcile manually edited totals and custom products
+            // Itemize custom products explicitly if provided
+            const customProductsList = data.customProducts || data.custom_products || data.quote?.custom_products || [];
+            if (Array.isArray(customProductsList) && customProductsList.length > 0) {
+                customProductsList.forEach(prod => {
+                    if (prod.name && prod.price !== undefined) {
+                        const pVal = Number(prod.price) || 0;
+                        if (pVal >= 0) {
+                            costs.push([prod.name, `R ${pVal.toFixed(2)}`]);
+                        } else {
+                            costs.push([prod.name, `-R ${Math.abs(pVal).toFixed(2)}`]);
+                        }
+                    }
+                });
+            }
+
+            // Auto-reconcile manually edited totals and minimum rate top-ups
             const sumOfCosts = costs.reduce((acc, row) => {
                 const valStr = String(row[1]).replace(/[^\d.-]/g, '');
                 return acc + (parseFloat(valStr) || 0);
@@ -304,7 +318,9 @@ export const generateProfessionalQuote = (data) => {
             const diff = serviceFees - sumOfCosts;
             if (Math.abs(diff) > 0.01) {
                 if (diff > 0) {
-                    costs.push(['Manual Adjustment / Custom Items', `R ${diff.toFixed(2)}`]);
+                    const isMinTopUp = data.isMinQuote || bd?.isMinQuote || (serviceFees >= PRICING_CONSTANTS.minOrder);
+                    const label = isMinTopUp ? 'Minimum Base Rate Charge Top-Up' : 'Manual Adjustment / Custom Services';
+                    costs.push([label, `R ${diff.toFixed(2)}`]);
                 } else {
                     costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
                 }

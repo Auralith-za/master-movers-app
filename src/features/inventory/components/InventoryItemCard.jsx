@@ -542,25 +542,46 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
                         >
                             <Minus size={14} className="md:w-[18px] md:h-[18px]" />
                         </button>
-                        {quantity > 0 && (
+                        {(quantity > 0 || isFocused) && (
                             <input 
                                 type="number"
                                 min="0"
-                                value={quantity}
+                                value={isFocused && inputValue !== null ? inputValue : quantity}
                                 onClick={(e) => e.stopPropagation()}
+                                onFocus={(e) => {
+                                    e.stopPropagation();
+                                    setIsFocused(true);
+                                    setInputValue(quantity.toString());
+                                    e.target.select();
+                                }}
                                 onChange={(e) => {
                                     e.stopPropagation();
-                                    const val = Math.max(0, parseInt(e.target.value) || 0);
-                                    if (onSetQuantity) {
-                                        onSetQuantity(item.id, val, variation);
-                                    } else {
-                                        const diff = val - quantity;
-                                        if (diff > 0) {
-                                            for (let i = 0; i < diff; i++) onAdd(item.id, variation);
-                                        } else if (diff < 0) {
-                                            for (let i = 0; i < Math.abs(diff); i++) onRemove(item.id, variation);
+                                    const valStr = e.target.value;
+                                    setInputValue(valStr);
+                                    if (valStr !== '') {
+                                        const parsed = Math.max(0, parseInt(valStr, 10) || 0);
+                                        if (onSetQuantity) {
+                                            onSetQuantity(item.id, parsed, variation);
+                                        } else {
+                                            const diff = parsed - quantity;
+                                            if (diff > 0) {
+                                                for (let i = 0; i < diff; i++) onAdd(item.id, variation);
+                                            } else if (diff < 0) {
+                                                for (let i = 0; i < Math.abs(diff); i++) onRemove(item.id, variation);
+                                            }
                                         }
                                     }
+                                }}
+                                onBlur={(e) => {
+                                    e.stopPropagation();
+                                    setIsFocused(false);
+                                    if (inputValue === '' || inputValue === null) {
+                                        if (onSetQuantity) onSetQuantity(item.id, 0, variation);
+                                    } else {
+                                        const parsed = Math.max(0, parseInt(inputValue, 10) || 0);
+                                        if (onSetQuantity) onSetQuantity(item.id, parsed, variation);
+                                    }
+                                    setInputValue(null);
                                 }}
                                 className="w-10 md:w-12 text-xs md:text-sm font-black text-slate-900 text-center bg-slate-100 border border-slate-200 rounded-lg py-1 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600"
                             />
