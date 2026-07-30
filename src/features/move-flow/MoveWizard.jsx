@@ -249,7 +249,19 @@ export default function MoveWizard() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [location.pathname])
 
-    const isTest = basePath === '/quote-test'
+    const renderCurrentStepComponent = () => {
+        const path = location.pathname.toLowerCase().replace(/\/$/, '')
+        if (path.endsWith('/access')) {
+            return <Step2Access />
+        }
+        if (path.endsWith('/inventory')) {
+            return <Step3Inventory />
+        }
+        if (path.endsWith('/summary')) {
+            return <Step4Summary submissionType={isTest ? 'test' : (isAdmin ? 'admin' : 'standard')} />
+        }
+        return <Step1Details />
+    }
 
     return (
         <div className="max-w-6xl mx-auto px-4 md:px-6 pb-20">
@@ -333,16 +345,7 @@ export default function MoveWizard() {
                                 exit={{ opacity: 0, x: -20 }}
                                 transition={{ duration: 0.2 }}
                             >
-                                <Routes>
-                                    <Route index element={<Step1Details />} />
-                                    <Route path="access" element={<Step2Access />} />
-                                    <Route path="Access" element={<Step2Access />} />
-                                    <Route path="inventory" element={<Step3Inventory />} />
-                                    <Route path="Inventory" element={<Step3Inventory />} />
-                                    <Route path="summary" element={<Step4Summary submissionType="test" />} />
-                                    <Route path="Summary" element={<Step4Summary submissionType="test" />} />
-                                    <Route path="*" element={<Step1Details />} />
-                                </Routes>
+                                {renderCurrentStepComponent()}
                             </motion.div>
                         </AnimatePresence>
                     </div>
@@ -362,16 +365,7 @@ export default function MoveWizard() {
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
                     >
-                        <Routes>
-                            <Route index element={<Step1Details />} />
-                            <Route path="access" element={<Step2Access />} />
-                            <Route path="Access" element={<Step2Access />} />
-                            <Route path="inventory" element={<Step3Inventory />} />
-                            <Route path="Inventory" element={<Step3Inventory />} />
-                            <Route path="summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : 'standard'} />} />
-                            <Route path="Summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : 'standard'} />} />
-                            <Route path="*" element={<Step1Details />} />
-                        </Routes>
+                        {renderCurrentStepComponent()}
                     </motion.div>
                 </AnimatePresence>
             )}
