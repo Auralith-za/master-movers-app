@@ -135,17 +135,14 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [isCalculating]);
 
     // Calculate Totals
-    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, standardInsurance, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove, needsQuoteRequest } = useMemo(() => {
+    const { totalVolume, total, vat, subTotal, discount, discountType, breakdown, packagingCost, standardInsurance, requiresCrateFlag, requiresPhotoFlag, needsConsultation, isNationalMove, needsQuoteRequest, isMonthEnd, isMinQuote } = useMemo(() => {
         try {
             return calculateQuote(inventory, moveDetails, accessDetails, INVENTORY_ITEMS, manualServiceCharges)
         } catch (e) {
             console.error("Calculation Error:", e)
-            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, standardInsurance: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, needsQuoteRequest: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
+            return { totalVolume: 0, total: 0, vat: 0, subTotal: 0, discount: 0, discountType: null, packagingCost: 0, standardInsurance: 0, requiresCrateFlag: false, requiresPhotoFlag: false, needsConsultation: false, isNationalMove: false, needsQuoteRequest: false, isMonthEnd: false, isMinQuote: false, breakdown: { base: 0, transport: 0, volume: 0, access: 0, distance: 0, autoPackagingCost: 0 } }
         }
     }, [inventory, moveDetails, accessDetails, manualServiceCharges])
-
-    const isMonthEnd = Boolean(quoteResult.isMonthEnd)
-    const isMinQuote = Boolean(quoteResult.isMinQuote)
 
     // Apply coupon discount on top of calculated total (blocked during month-end or minimum rate quotes)
     const canApplyCoupon = !isMonthEnd && !isMinQuote
