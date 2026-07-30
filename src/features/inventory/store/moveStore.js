@@ -911,8 +911,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         })
     }
 
-    // Move Protection is included within base pricing rates
-    const moveProtectionCost = 0
+    // Move Protection (minimum protection surcharge: R250 <= 500 cuft, R450 > 500 cuft) — LOCAL MOVES ONLY
+    const moveProtectionCost = isNationalMove ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
+    if (!isNationalMove) {
+        transportCost += moveProtectionCost
+    }
     const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
