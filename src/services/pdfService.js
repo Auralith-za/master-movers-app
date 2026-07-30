@@ -251,7 +251,7 @@ export const generateProfessionalQuote = (data) => {
             // Transport Services line
             const displayVolume = totalVolume || bd?.totalVolume || 0;
             if (displayVolume > 0 || serviceFees > 0) {
-                let transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0) + (bd?.moveProtectionCost || 0);
+                let transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0);
                 costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
             }
 
