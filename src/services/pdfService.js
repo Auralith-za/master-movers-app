@@ -72,7 +72,89 @@ export const generateProfessionalQuote = (data) => {
             doc.text(`From: ${pickupAddress || 'N/A'}`, 110, currentY + 6, { maxWidth: 80 });
             doc.text(`To: ${dropoffAddress || 'N/A'}`, 110, currentY + 18, { maxWidth: 80 });
 
-            currentY += 32;
+            currentY += 30;
+
+            // --- Site Access & Logistics Section ---
+            doc.setTextColor(...slate900);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SITE ACCESS & LOGISTICS DETAILS', 20, currentY);
+            doc.line(20, currentY + 2, 190, currentY + 2);
+
+            currentY += 8;
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(51, 65, 85);
+
+            const getAccessSummaryString = (acc) => {
+                if (!acc) return 'House (Ground Floor)';
+                const parts = [];
+                const type = (acc.type || 'house').toUpperCase();
+                parts.push(type);
+                if (acc.floorLevel > 0) parts.push(`Floor ${acc.floorLevel}`);
+                parts.push(`Elevator: ${acc.elevator ? 'Yes' : 'No'}`);
+                parts.push(`Stairs: ${acc.stairs ? 'Yes' : 'No'}`);
+                if (acc.longCarryMeters > 0) parts.push(`Long Carry: ${acc.longCarryMeters}m`);
+                if (acc.specialConditions) {
+                    if (acc.specialConditions.hoisting) parts.push('Hoisting Required');
+                    if (acc.specialConditions.shuttle) parts.push('Shuttle Required');
+                    if (acc.specialConditions.panhandle) parts.push('Panhandle');
+                }
+                if (acc.notes) parts.push(`Notes: "${acc.notes}"`);
+                return parts.join(' • ');
+            };
+
+            const accDetails = data.accessDetails || data.moveDetails?.accessDetails || {};
+            const pickupAccessStr = getAccessSummaryString(accDetails.origin);
+            const dropoffAccessStr = getAccessSummaryString(accDetails.destination);
+
+            doc.setFont('helvetica', 'bold');
+            doc.text('Pickup Access:', 20, currentY);
+            doc.setFont('helvetica', 'normal');
+            doc.text(pickupAccessStr, 48, currentY, { maxWidth: 142 });
+            const pickupHeight = doc.getTextDimensions(pickupAccessStr, { maxWidth: 142 }).h || 5;
+            currentY += Math.max(6, pickupHeight + 2);
+
+            doc.setFont('helvetica', 'bold');
+            doc.text('Dropoff Access:', 20, currentY);
+            doc.setFont('helvetica', 'normal');
+            doc.text(dropoffAccessStr, 48, currentY, { maxWidth: 142 });
+            const dropoffHeight = doc.getTextDimensions(dropoffAccessStr, { maxWidth: 142 }).h || 5;
+            currentY += Math.max(6, dropoffHeight + 2);
+
+            const extraColls = data.extraCollections || data.moveDetails?.extraCollections || [];
+            extraColls.forEach((coll, idx) => {
+                if (!coll.address) return;
+                const extraAccStr = getAccessSummaryString(accDetails[`extra_coll_${idx}`]);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Collection #${idx + 2}:`, 20, currentY);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`${coll.address} (${extraAccStr})`, 48, currentY, { maxWidth: 142 });
+                currentY += 6;
+            });
+
+            const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || [];
+            extraDrops.forEach((drop, idx) => {
+                if (!drop.address) return;
+                const extraAccStr = getAccessSummaryString(accDetails[`extra_drop_${idx}`]);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Drop-off #${idx + 2}:`, 20, currentY);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`${drop.address} (${extraAccStr})`, 48, currentY, { maxWidth: 142 });
+                currentY += 6;
+            });
+
+            const notes = data.generalNotes || data.notes || data.moveDetails?.generalNotes || data.moveDetails?.notes || '';
+            if (notes) {
+                doc.setFont('helvetica', 'bold');
+                doc.text('Special Notes:', 20, currentY);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`"${notes}"`, 48, currentY, { maxWidth: 142 });
+                const notesHeight = doc.getTextDimensions(`"${notes}"`, { maxWidth: 142 }).h || 5;
+                currentY += Math.max(6, notesHeight + 2);
+            }
+
+            currentY += 8;
 
             // --- Inventory Table ---
             doc.setTextColor(...slate900);

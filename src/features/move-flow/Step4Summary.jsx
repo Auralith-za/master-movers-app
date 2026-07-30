@@ -479,6 +479,11 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 vat: vat,
                 subTotal: subTotal,
                 inventoryItems: INVENTORY_ITEMS,
+                accessDetails: accessDetails,
+                moveDetails: moveDetails,
+                generalNotes: moveDetails.generalNotes || moveDetails.notes || '',
+                extraCollections: moveDetails.extraCollections || [],
+                extraDrops: moveDetails.extraDrops || [],
                 isSharedLoad: breakdown.isSharedLoad
             })
         } catch (err) {

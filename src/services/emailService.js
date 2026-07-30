@@ -7,7 +7,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'paid' }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid' }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -31,6 +31,11 @@ export const emailService = {
                 vat,
                 subTotal,
                 inventoryItems,
+                accessDetails,
+                moveDetails,
+                generalNotes,
+                extraCollections,
+                extraDrops,
                 isSharedLoad: breakdown?.isSharedLoad || false,
                 shouldSave: false
             })
