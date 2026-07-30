@@ -250,8 +250,13 @@ export const generateProfessionalQuote = (data) => {
 
             // Transport Services line
             const displayVolume = totalVolume || bd?.totalVolume || 0;
-            if (displayVolume > 0) {
-                const transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0) + (bd?.moveProtectionCost || 0);
+            if (displayVolume > 0 || serviceFees > 0) {
+                let transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0) + (bd?.moveProtectionCost || 0);
+                const isMinQuote = data.isMinQuote || bd?.isMinQuote || (serviceFees >= PRICING_CONSTANTS.minOrder && transportCost < PRICING_CONSTANTS.minOrder);
+                if (isMinQuote && !data.isNationalMove && !isSharedLoad) {
+                    // For local minimum quotes, transport line reflects the minimum base rate
+                    transportCost = Math.max(PRICING_CONSTANTS.minOrder, transportCost);
+                }
                 costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
             }
 
@@ -309,21 +314,15 @@ export const generateProfessionalQuote = (data) => {
                 });
             }
 
-            // Auto-reconcile manually edited totals and minimum rate top-ups
+            // Auto-reconcile manually applied discounts
             const sumOfCosts = costs.reduce((acc, row) => {
                 const valStr = String(row[1]).replace(/[^\d.-]/g, '');
                 return acc + (parseFloat(valStr) || 0);
             }, 0);
 
             const diff = serviceFees - sumOfCosts;
-            if (Math.abs(diff) > 0.01) {
-                if (diff > 0) {
-                    const isMinTopUp = data.isMinQuote || bd?.isMinQuote || (serviceFees >= PRICING_CONSTANTS.minOrder);
-                    const label = isMinTopUp ? 'Minimum Base Rate Charge Top-Up' : 'Manual Adjustment / Custom Services';
-                    costs.push([label, `R ${diff.toFixed(2)}`]);
-                } else {
-                    costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
-                }
+            if (diff < -0.01) {
+                costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
             }
 
             costs.push(
