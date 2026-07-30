@@ -371,13 +371,15 @@ export default function Step1Details() {
             moveDetails.dropoffAddress,
             cityCode,
             pickupRef,
-            dropoffRef
+            dropoffRef,
+            moveDetails.extraCollections || [],
+            moveDetails.extraDrops || []
         )
             .then(({ breakdown, totalDistance }) => {
                 setMoveDetails({
-                    distanceKm: breakdown.pickupToDropoff,     // Pickup→Dropoff only (for reference display)
-                    tripBreakdown: breakdown,                   // Full breakdown object
-                    totalBillableDistance: totalDistance        // Full circuit: Depot→Pickup→Dropoff→Depot
+                    distanceKm: breakdown.pickupToDropoff,     // Pickup→Dropoff leg total (for reference display)
+                    tripBreakdown: breakdown,                   // Full breakdown object with detailedLegs
+                    totalBillableDistance: totalDistance        // Full circuit sum of all legs
                 })
                 setAddressError(null)
             })
@@ -397,7 +399,9 @@ export default function Step1Details() {
         moveDetails.pickupLatLng, 
         moveDetails.dropoffLatLng,
         moveDetails.pickupPlaceId,
-        moveDetails.dropoffPlaceId
+        moveDetails.dropoffPlaceId,
+        JSON.stringify(moveDetails.extraCollections || []),
+        JSON.stringify(moveDetails.extraDrops || [])
     ])
 
 
@@ -996,27 +1000,38 @@ export default function Step1Details() {
                             </div>
                         )}
 
-                        {/* Distance Breakdown Panel — shown for local moves once Google Maps has calculated the route (ONLY IN TEST MODE) */}
-                        {window.location.pathname.includes('quote-test') && !isValidating && !addressError && moveDetails.tripBreakdown && moveDetails.totalBillableDistance > 0 && (
+                        {/* Distance Breakdown Panel — shown for moves once Google Maps has calculated the route */}
+                        {!isValidating && !addressError && moveDetails.tripBreakdown && moveDetails.totalBillableDistance > 0 && (
                             <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl animate-in fade-in slide-in-from-top-2">
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                     <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Route Distance Confirmed via Google Maps</p>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Depot → Pickup</p>
-                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.depotToPickup} <span className="text-xs font-bold text-slate-500">km</span></p>
-                                    </div>
-                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pickup → Dropoff</p>
-                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.pickupToDropoff} <span className="text-xs font-bold text-slate-500">km</span></p>
-                                    </div>
-                                    <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Dropoff → Depot</p>
-                                        <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.dropoffToDepot} <span className="text-xs font-bold text-slate-500">km</span></p>
-                                    </div>
-                                    <div className="bg-emerald-600 rounded-xl p-3 text-center">
+                                    {moveDetails.tripBreakdown.detailedLegs ? (
+                                        moveDetails.tripBreakdown.detailedLegs.map((leg, idx) => (
+                                            <div key={idx} className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{leg.label}</p>
+                                                <p className="text-lg font-black text-slate-900">{leg.km} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Depot → Pickup</p>
+                                                <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.depotToPickup} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                            </div>
+                                            <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pickup → Dropoff</p>
+                                                <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.pickupToDropoff} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                            </div>
+                                            <div className="bg-white rounded-xl p-3 border border-emerald-100 text-center">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Dropoff → Depot</p>
+                                                <p className="text-lg font-black text-slate-900">{moveDetails.tripBreakdown.dropoffToDepot} <span className="text-xs font-bold text-slate-500">km</span></p>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="bg-emerald-600 rounded-xl p-3 text-center col-span-2 md:col-span-1">
                                         <p className="text-[9px] font-black text-emerald-100 uppercase tracking-widest mb-1">Total Billable</p>
                                         <p className="text-lg font-black text-white">{moveDetails.totalBillableDistance} <span className="text-xs font-bold text-emerald-200">km</span></p>
                                     </div>

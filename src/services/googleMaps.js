@@ -144,9 +144,17 @@ function calculateFromCoords(pickupCoords, dropoffCoords, cityCode = 'JHB') {
  * @param {object|null} dropoffRef - { placeId, latLng } from Places autocomplete
  * @param {string} cityCode        - JHB | DBN | CPT
  */
-function calculateFromDistanceMatrix(pickupAddress, dropoffAddress, pickupRef, dropoffRef, cityCode) {
+const calculateFromDistanceMatrix = async (
+    pickupAddress,
+    dropoffAddress,
+    pickupRef,
+    dropoffRef,
+    cityCode,
+    extraCollections = [],
+    extraDrops = []
+) => {
     return new Promise(async (resolve, reject) => {
-        if (!window.google) {
+        if (!window.google || !window.google.maps) {
             try {
                 await loadGoogleMapsScript();
             } catch (e) {
@@ -158,10 +166,6 @@ function calculateFromDistanceMatrix(pickupAddress, dropoffAddress, pickupRef, d
         const service = new window.google.maps.DistanceMatrixService();
         const depotAddress = DEPOT_LOCATIONS[cityCode] || DEPOT_LOCATIONS.JHB;
 
-        /**
-         * Build the most accurate reference for each point.
-         * Priority: latLng object > placeId > text address string.
-         */
         const buildRef = (ref, textFallback) => {
             if (ref?.latLng) {
                 return new window.google.maps.LatLng(ref.latLng.lat, ref.latLng.lng);
@@ -172,19 +176,63 @@ function calculateFromDistanceMatrix(pickupAddress, dropoffAddress, pickupRef, d
             return textFallback;
         };
 
-        const pickupOrigin = buildRef(pickupRef, pickupAddress);
-        const dropoffDest = buildRef(dropoffRef, dropoffAddress);
+        const origins = [];
+        const destinations = [];
+        const legLabels = [];
 
-        /**
-         * We make a single Distance Matrix call with 3 origins and 3 destinations.
-         * This gives us all 3 legs of the trip in one API call:
-         *   - Row 0 (depot)   → Col 0 (pickup)   = depotToPickup
-         *   - Row 1 (pickup)  → Col 1 (dropoff)  = pickupToDropoff
-         *   - Row 2 (dropoff) → Col 2 (depot)    = dropoffToDepot
-         */
+        // Leg 1: Depot -> Primary Pickup
+        origins.push(depotAddress);
+        const primaryPickupRef = buildRef(pickupRef, pickupAddress);
+        destinations.push(primaryPickupRef);
+        legLabels.push({ from: 'Depot', to: 'Pickup' });
+
+        let prevRef = primaryPickupRef;
+        let prevLabel = 'Pickup';
+
+        // Extra Collections
+        if (Array.isArray(extraCollections)) {
+            extraCollections.forEach((coll, idx) => {
+                if (!coll?.address) return;
+                const collRef = buildRef(coll, coll.address);
+                origins.push(prevRef);
+                destinations.push(collRef);
+                const label = `Collection #${idx + 2}`;
+                legLabels.push({ from: prevLabel, to: label });
+                prevRef = collRef;
+                prevLabel = label;
+            });
+        }
+
+        // Primary Dropoff
+        const primaryDropoffRef = buildRef(dropoffRef, dropoffAddress);
+        origins.push(prevRef);
+        destinations.push(primaryDropoffRef);
+        legLabels.push({ from: prevLabel, to: 'Dropoff' });
+        prevRef = primaryDropoffRef;
+        prevLabel = 'Dropoff';
+
+        // Extra Drops
+        if (Array.isArray(extraDrops)) {
+            extraDrops.forEach((drop, idx) => {
+                if (!drop?.address) return;
+                const dropRef = buildRef(drop, drop.address);
+                origins.push(prevRef);
+                destinations.push(dropRef);
+                const label = `Drop-off #${idx + 2}`;
+                legLabels.push({ from: prevLabel, to: label });
+                prevRef = dropRef;
+                prevLabel = label;
+            });
+        }
+
+        // Final Leg: Last Drop -> Depot
+        origins.push(prevRef);
+        destinations.push(depotAddress);
+        legLabels.push({ from: prevLabel, to: 'Depot' });
+
         service.getDistanceMatrix({
-            origins: [depotAddress, pickupOrigin, dropoffDest],
-            destinations: [pickupOrigin, dropoffDest, depotAddress],
+            origins,
+            destinations,
             travelMode: 'DRIVING',
             unitSystem: window.google.maps.UnitSystem.METRIC,
             avoidHighways: false,
@@ -196,38 +244,44 @@ function calculateFromDistanceMatrix(pickupAddress, dropoffAddress, pickupRef, d
                 return;
             }
 
-            const depotToPickupEl   = response.rows[0]?.elements[0];
-            const pickupToDropoffEl = response.rows[1]?.elements[1];
-            const dropoffToDepotEl  = response.rows[2]?.elements[2];
+            const detailedLegs = [];
+            let totalDistance = 0;
+            let legFailed = false;
 
-            // Validate all 3 legs returned OK
-            if (
-                !depotToPickupEl   || depotToPickupEl.status   !== 'OK' ||
-                !pickupToDropoffEl || pickupToDropoffEl.status !== 'OK' ||
-                !dropoffToDepotEl  || dropoffToDepotEl.status  !== 'OK'
-            ) {
-                console.warn("[Distance Matrix] One or more route legs failed:", {
-                    depotToPickup:   depotToPickupEl?.status,
-                    pickupToDropoff: pickupToDropoffEl?.status,
-                    dropoffToDepot:  dropoffToDepotEl?.status,
-                });
+            origins.forEach((_, idx) => {
+                const element = response.rows[idx]?.elements[idx];
+                if (!element || element.status !== 'OK') {
+                    legFailed = true;
+                } else {
+                    const km = Math.round(element.distance.value / 1000);
+                    totalDistance += km;
+                    detailedLegs.push({
+                        from: legLabels[idx].from,
+                        to: legLabels[idx].to,
+                        label: `${legLabels[idx].from} → ${legLabels[idx].to}`,
+                        km
+                    });
+                }
+            });
+
+            if (legFailed || detailedLegs.length === 0) {
+                console.warn("[Distance Matrix] One or more route legs failed");
                 reject(new Error("Google Maps could not find a driving route for one or more legs of this trip."));
                 return;
             }
 
-            // Convert metres → km (rounded to nearest whole km)
-            const getKm = (el) => Math.round(el.distance.value / 1000);
+            const depotToPickup = detailedLegs[0]?.km || 0;
+            const dropoffToDepot = detailedLegs[detailedLegs.length - 1]?.km || 0;
+            const pickupToDropoff = detailedLegs.slice(1, -1).reduce((sum, leg) => sum + leg.km, 0);
 
             const breakdown = {
-                depotToPickup:   getKm(depotToPickupEl),
-                pickupToDropoff: getKm(pickupToDropoffEl),
-                dropoffToDepot:  getKm(dropoffToDepotEl),
+                depotToPickup,
+                pickupToDropoff,
+                dropoffToDepot,
+                detailedLegs
             };
 
-            const totalDistance = breakdown.depotToPickup + breakdown.pickupToDropoff + breakdown.dropoffToDepot;
-
-            console.log(`[Distance Matrix] Route: Depot(${depotAddress}) → Pickup → Dropoff → Depot`);
-            console.log(`[Distance Matrix] Legs: ${breakdown.depotToPickup}km + ${breakdown.pickupToDropoff}km + ${breakdown.dropoffToDepot}km = ${totalDistance}km total`);
+            console.log(`[Distance Matrix] Total Billable Distance: ${totalDistance}km across ${detailedLegs.length} legs`);
 
             resolve({
                 totalDistance,
@@ -237,48 +291,38 @@ function calculateFromDistanceMatrix(pickupAddress, dropoffAddress, pickupRef, d
             });
         });
     });
-}
+};
 
 /**
  * Main entry point: calculates the full billable trip distance.
- *
- * Full route: Depot → Pickup → Dropoff → Depot
- *
- * STRATEGY:
- *  1. PRIMARY:  Distance Matrix API (real road distances) — used whenever address data is available
- *  2. FALLBACK: Haversine formula × 1.40 — used only if Distance Matrix API call fails
- *
- * @param {string} pickupAddress  - Text address for pickup
- * @param {string} dropoffAddress - Text address for dropoff
- * @param {string} cityCode       - City code: JHB | DBN | CPT
- * @param {object|null} pickupRef  - { placeId, latLng } from Places autocomplete
- * @param {object|null} dropoffRef - { placeId, latLng } from Places autocomplete
  */
 export const calculateTripDistances = async (
     pickupAddress,
     dropoffAddress,
     cityCode = 'JHB',
     pickupRef = null,
-    dropoffRef = null
+    dropoffRef = null,
+    extraCollections = [],
+    extraDrops = []
 ) => {
     if (!pickupAddress || !dropoffAddress) {
         throw new Error("Pickup and Dropoff addresses are required.");
     }
 
-    // PRIMARY: Always try Distance Matrix API first for accurate road distances
-    console.log("[Distance] Using Distance Matrix API (primary — real road distances).");
+    console.log("[Distance] Using Distance Matrix API for all trip legs.");
     try {
         const result = await calculateFromDistanceMatrix(
             pickupAddress,
             dropoffAddress,
             pickupRef,
             dropoffRef,
-            cityCode
+            cityCode,
+            extraCollections,
+            extraDrops
         );
         return result;
     } catch (apiError) {
         console.warn("[Distance] Distance Matrix API failed:", apiError.message);
-        console.warn("[Distance] Falling back to Haversine estimate.");
 
         // FALLBACK: Use Haversine only if we have lat/lng coordinates
         const pickupCoords = pickupRef?.latLng;
