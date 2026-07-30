@@ -87,16 +87,21 @@ function App() {
         </Route>
 
         {/* Test Mode Quote Flow - Restricted navigation for sales testing */}
-        <Route path="/quote-test" element={<TestModeLayout />}>
+        <Route path="/quote-test/*" element={<TestModeLayout />}>
+          <Route index element={<MoveWizard />} />
+          <Route path="*" element={<MoveWizard />} />
+        </Route>
+        <Route path="/Quote-test/*" element={<TestModeLayout />}>
           <Route index element={<MoveWizard />} />
           <Route path="*" element={<MoveWizard />} />
         </Route>
 
         {/* Quote Flow - Use WebsiteLayout to show full header */}
-        <Route path="/quote" element={<WebsiteLayout />}>
+        <Route path="/quote/*" element={<WebsiteLayout />}>
           <Route index element={<MoveWizard />} />
           <Route path="*" element={<MoveWizard />} />
         </Route>
+        <Route path="/Quote/*" element={<WebsiteLayout />} />
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>

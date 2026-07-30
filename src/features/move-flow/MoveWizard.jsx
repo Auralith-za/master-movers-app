@@ -206,12 +206,13 @@ export default function MoveWizard() {
         { id: 'summary', label: 'Summary', path: `${basePath}/summary` },
     ], [basePath])
 
-    const currentStepIndex = STEPS.findIndex(s => s.path === location.pathname) !== -1
-        ? STEPS.findIndex(s => s.path === location.pathname)
+    const normalizedPath = location.pathname.toLowerCase().replace(/\/$/, '')
+    const currentStepIndex = STEPS.findIndex(s => s.path.toLowerCase() === normalizedPath) !== -1
+        ? STEPS.findIndex(s => s.path.toLowerCase() === normalizedPath)
         : 0
 
     const isStepCompleted = (stepId) => {
-        if (stepId === 'details') return true
+        if (stepId === 'details' || stepId === 'access' || stepId === 'inventory') return true
 
         const step1Ok = !!(
             moveDetails?.pickupAddress &&
@@ -225,29 +226,20 @@ export default function MoveWizard() {
             moveDetails?.contactEmail.includes('.')
         )
 
-        if (stepId === 'access') return step1Ok
-        if (stepId === 'inventory') return step1Ok
-
         const hasInventory = Object.keys(inventory || {}).length > 0
         if (stepId === 'summary') return step1Ok && hasInventory
 
-        return false
+        return true
     }
 
-    // Auto-redirect invalid step paths
+    // Auto-redirect invalid step paths safely
     useEffect(() => {
         const currentStep = STEPS[currentStepIndex]
-        if (currentStep) {
-            if (currentStep.id === 'access' && !isStepCompleted('access')) {
+        if (currentStep && currentStep.id === 'summary' && !isStepCompleted('summary')) {
+            if (!Object.keys(inventory || {}).length) {
+                navigate(`${basePath}/inventory`, { replace: true })
+            } else {
                 navigate(basePath, { replace: true })
-            } else if (currentStep.id === 'inventory' && !isStepCompleted('inventory')) {
-                navigate(basePath, { replace: true })
-            } else if (currentStep.id === 'summary' && !isStepCompleted('summary')) {
-                if (!isStepCompleted('inventory')) {
-                    navigate(basePath, { replace: true })
-                } else {
-                    navigate(`${basePath}/inventory`, { replace: true })
-                }
             }
         }
     }, [location.pathname, moveDetails, inventory, currentStepIndex, basePath, navigate])
@@ -344,8 +336,12 @@ export default function MoveWizard() {
                                 <Routes>
                                     <Route index element={<Step1Details />} />
                                     <Route path="access" element={<Step2Access />} />
+                                    <Route path="Access" element={<Step2Access />} />
                                     <Route path="inventory" element={<Step3Inventory />} />
+                                    <Route path="Inventory" element={<Step3Inventory />} />
                                     <Route path="summary" element={<Step4Summary submissionType="test" />} />
+                                    <Route path="Summary" element={<Step4Summary submissionType="test" />} />
+                                    <Route path="*" element={<Step1Details />} />
                                 </Routes>
                             </motion.div>
                         </AnimatePresence>
@@ -369,8 +365,12 @@ export default function MoveWizard() {
                         <Routes>
                             <Route index element={<Step1Details />} />
                             <Route path="access" element={<Step2Access />} />
+                            <Route path="Access" element={<Step2Access />} />
                             <Route path="inventory" element={<Step3Inventory />} />
+                            <Route path="Inventory" element={<Step3Inventory />} />
                             <Route path="summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : 'standard'} />} />
+                            <Route path="Summary" element={<Step4Summary submissionType={isAdmin ? 'admin' : 'standard'} />} />
+                            <Route path="*" element={<Step1Details />} />
                         </Routes>
                     </motion.div>
                 </AnimatePresence>
