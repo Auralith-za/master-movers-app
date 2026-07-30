@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase } from '../../../lib/supabaseClient'
-import { formatClientName, cleanClientName } from '../../../utils/quoteHelpers'
-import { INVENTORY_ITEMS } from '../data/mockItems'
+import { supabase } from '../../../lib/supabaseClient.js'
+import { formatClientName, cleanClientName } from '../../../utils/quoteHelpers.js'
+import { INVENTORY_ITEMS } from '../data/mockItems.js'
 import { 
     CITY_CODES, 
     NATIONAL_RATES, 
@@ -12,7 +12,7 @@ import {
     PRICING_CONSTANTS, 
     getCityCode,
     detectCityCode
-} from '../data/pricingRates'
+} from '../data/pricingRates.js'
 
 export const useMoveStore = create(
     persist(
@@ -672,14 +672,15 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
                              : 30))
 
     // ─── STEP 6: National Move Detection ─────────────────────────────────────────
+    // ─── STEP 6: National Move Detection ─────────────────────────────────────────
     // A move is national when it crosses between our three served city depots.
     // Note: outline province moves are caught by hasOutlineProvince — they are NOT
     // priced as national (we have no national rates for those routes).
     const isNationalMove =
         !hasOutlineProvince && (
             (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
-            isInterProvincial ||
-            (totalDistance > 250) ||
+            (isInterProvincial && pickupCityCode !== dropoffCityCode) ||
+            (totalDistance > 250 && pickupCityCode !== dropoffCityCode) ||
             (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
@@ -725,6 +726,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     let vehicleName = ''
     let transportRate = 0
     let volumeRate = 0
+    let routeMinCharge = PRICING_CONSTANTS.minOrder || 2600
 
     if (isNationalMove) {
         // Jose's National logic: Volume-based calculation (volume * ratePerCuFt)
@@ -736,16 +738,17 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             volumeCost = totalVolumeCuFt * volumeRate
             
             // Apply route-specific min charge
-            const minCharge = nationalRate.minCharge || 0
-            if (volumeCost < minCharge) {
-                volumeCost = minCharge
+            routeMinCharge = nationalRate.minCharge || 5000
+            if (volumeCost < routeMinCharge) {
+                volumeCost = routeMinCharge
             }
         } else {
             // Fallback for undefined routes
             volumeRate = 25
             volumeCost = totalVolumeCuFt * volumeRate
-            if (volumeCost < 5000) {
-                volumeCost = 5000
+            routeMinCharge = 5000
+            if (volumeCost < routeMinCharge) {
+                volumeCost = routeMinCharge
             }
         }
         
@@ -766,7 +769,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         vehicleName = vehicle.name
 
         // Apply flat minimum charge of R2600 for local moves
-        const localMinCharge = 2600
+        const localMinCharge = PRICING_CONSTANTS.minOrder || 2600
+        routeMinCharge = localMinCharge
         const currentLocalCost = transportCost + volumeCost
         if (currentLocalCost < localMinCharge) {
             const diff = localMinCharge - currentLocalCost
@@ -949,8 +953,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const isMidMonthDate = (moveDay !== null && !isNaN(moveDay) && moveDay >= 5 && moveDay <= 24);
     const isMonthEnd = !isMidMonthDate;
 
-    // Initial check: if base cost is at or below minimum order threshold (R2,600 ex-VAT), it's a minimum quote
-    let isMinQuote = (!isNationalMove && baseCost <= PRICING_CONSTANTS.minOrder)
+    // Check if raw move transport/volume cost was at or below minimum threshold
+    const rawTransportVolumeCost = isNationalMove
+        ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25))
+        : ((totalDistance * transportRate) + (totalVolumeCuFt * volumeRate));
+
+    let isMinQuote = isNationalMove
+        ? (rawTransportVolumeCost <= routeMinCharge)
+        : (rawTransportVolumeCost <= routeMinCharge || baseCost <= routeMinCharge);
 
     // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote
     let exclVatDiscount = 0
@@ -960,15 +970,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     let baseAfterDiscount = baseCost - exclVatDiscount
 
-    // Enforce minimum charge on the base (packaging costs always apply on top)
-    if (!isNationalMove && baseAfterDiscount < PRICING_CONSTANTS.minOrder) {
-        baseAfterDiscount = PRICING_CONSTANTS.minOrder
-    }
-
-    // Final verification: if base after discount is at minimum rate, zero out discount and flag as min quote
-    if (!isNationalMove && baseAfterDiscount <= PRICING_CONSTANTS.minOrder) {
+    // Enforce minimum charge on the base for BOTH local and national moves
+    if (baseAfterDiscount < routeMinCharge) {
+        // Clamp discount so base after discount does not drop below route minimum
+        exclVatDiscount = Math.max(0, baseCost - routeMinCharge)
+        baseAfterDiscount = routeMinCharge
         isMinQuote = true
-        exclVatDiscount = 0
+    } else if (baseAfterDiscount <= routeMinCharge) {
+        isMinQuote = true
     }
 
     // Storage with Master Movers: R1.50 per cubic foot, minimum R450/month (applied when client selects a depot)

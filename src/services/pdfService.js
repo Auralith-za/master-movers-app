@@ -252,11 +252,6 @@ export const generateProfessionalQuote = (data) => {
             const displayVolume = totalVolume || bd?.totalVolume || 0;
             if (displayVolume > 0 || serviceFees > 0) {
                 let transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0) + (bd?.moveProtectionCost || 0);
-                const isMinQuote = data.isMinQuote || bd?.isMinQuote || (serviceFees >= PRICING_CONSTANTS.minOrder && transportCost < PRICING_CONSTANTS.minOrder);
-                if (isMinQuote && !data.isNationalMove && !isSharedLoad) {
-                    // For local minimum quotes, transport line reflects the minimum base rate
-                    transportCost = Math.max(PRICING_CONSTANTS.minOrder, transportCost);
-                }
                 costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
             }
 
@@ -315,16 +310,17 @@ export const generateProfessionalQuote = (data) => {
             }
 
             // Auto-reconcile component lines with exact subtotal
-            const hasActualDiscount = (data.discount > 0) || (bd?.discount > 0) || Boolean(data.appliedCoupon) || (Number(data.discount_amount) > 0);
+            const actualDiscountVal = Number(data.discount || bd?.discount || data.discount_amount || 0);
             const sumOfCosts = costs.reduce((acc, row) => {
                 const valStr = String(row[1]).replace(/[^\d.-]/g, '');
                 return acc + (parseFloat(valStr) || 0);
             }, 0);
 
             const diff = serviceFees - sumOfCosts;
-            if (diff < -0.01 && hasActualDiscount) {
-                costs.push(['Discount Applied', `-R ${Math.abs(diff).toFixed(2)}`]);
-            } else if (Math.abs(diff) > 0.01 && !hasActualDiscount) {
+            if (actualDiscountVal > 0 || diff < -0.01) {
+                const discAmt = actualDiscountVal > 0 ? actualDiscountVal : Math.abs(diff);
+                costs.push(['Discount Applied', `-R ${Number(discAmt).toFixed(2)}`]);
+            } else if (Math.abs(diff) > 0.01) {
                 // If there's a breakdown discrepancy without an actual discount, adjust the Transport Services line so items equal subtotal
                 const transportIdx = costs.findIndex(c => c[0] === 'Transport Services');
                 if (transportIdx !== -1) {
