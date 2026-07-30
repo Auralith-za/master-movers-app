@@ -911,11 +911,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         })
     }
 
-    // Move Protection (added to transport cost instead of separate line) — LOCAL MOVES ONLY
-    const moveProtectionCost = isNationalMove ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
-    if (!isNationalMove) {
-        transportCost += moveProtectionCost
-    }
+    // Move Protection is included within base pricing rates
+    const moveProtectionCost = 0
     const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
@@ -963,9 +960,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         : (rawTransportVolumeCost <= routeMinCharge || baseCost <= routeMinCharge);
 
     // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote
+    // Applies ONLY to base move cost (transport + volume), not box supplies, shuttle or extra fees
+    const moveBaseCost = transportCost + volumeCost
     let exclVatDiscount = 0
     if (!isMonthEnd && !isMinQuote) {
-        exclVatDiscount = baseCost * 0.10
+        exclVatDiscount = moveBaseCost * 0.10
     }
 
     let baseAfterDiscount = baseCost - exclVatDiscount

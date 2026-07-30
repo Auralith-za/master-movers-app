@@ -1406,34 +1406,46 @@ export default function QuoteDetailPage() {
                                         <span className="font-bold">+ R {customProductsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {isEditing && recalculatedData?.breakdown?.packaging > 0 && (
+                                {(recalculatedData?.breakdown?.packaging > 0 || quote?.packaging_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Box Supplies {editForm.st7_boxes > 0 && `(${editForm.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {editForm.linen_boxes > 0 && `(${editForm.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
-                                        <span className="font-bold">+ R {recalculatedData.breakdown.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span>Box Supplies {(editForm.st7_boxes || quote?.st7_boxes) > 0 && `(${editForm.st7_boxes || quote?.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {(editForm.linen_boxes || quote?.linen_boxes) > 0 && `(${editForm.linen_boxes || quote?.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {isEditing && recalculatedData?.breakdown?.wrappingCost > 0 && (
+                                {(recalculatedData?.breakdown?.wrappingCost > 0 || quote?.wrapping_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Specialized Wrapping {recalculatedData?.breakdown?.wrappingVolume > 0 && `(${recalculatedData.breakdown.wrappingVolume.toFixed(2)} ft³ x R5.90)`}</span>
-                                        <span className="font-bold">+ R {recalculatedData.breakdown.wrappingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span>Specialized Wrapping {((recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume) > 0) && `(${(recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume).toFixed(2)} ft³ x R5.90)`}</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.wrappingCost || quote?.wrapping_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {isEditing && recalculatedData?.breakdown?.plasticSleeveCost > 0 && (
+                                {(recalculatedData?.breakdown?.plasticSleeveCost > 0 || quote?.plastic_sleeve_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Plastic Sleeves {recalculatedData?.breakdown?.plasticSleeveCount > 0 && `(${recalculatedData.breakdown.plasticSleeveCount} x R55)`}</span>
-                                        <span className="font-bold">+ R {recalculatedData.breakdown.plasticSleeveCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span>Plastic Sleeves {((recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count) > 0) && `(${(recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count)} x R55)`}</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {isEditing && recalculatedData?.breakdown?.access > 0 && (
+                                {(recalculatedData?.breakdown?.shuttleCost > 0 || quote?.shuttle_cost > 0) && (
+                                    <div className="flex justify-between text-xs text-amber-400">
+                                        <span>Shuttle Vehicle</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {(recalculatedData?.breakdown?.access > 0 || quote?.access_fees > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
-                                        <span title={Array.isArray(recalculatedData.breakdown.detailedAccess) ? recalculatedData.breakdown.detailedAccess.join(' | ') : recalculatedData.breakdown.detailedAccess}>Access & Surcharges</span>
-                                        <span className="font-bold">+ R {recalculatedData.breakdown.access.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span title={Array.isArray(recalculatedData?.breakdown?.detailedAccess) ? recalculatedData.breakdown.detailedAccess.join(' | ') : recalculatedData?.breakdown?.detailedAccess}>Access & Surcharges</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.access || quote?.access_fees || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {isEditing && recalculatedData?.breakdown?.crew > 0 && (
+                                {(recalculatedData?.breakdown?.crew > 0 || quote?.crew_fee > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
                                         <span>Heavy Item Crew</span>
-                                        <span className="font-bold">+ R {recalculatedData.breakdown.crew.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.crew || quote?.crew_fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                {(recalculatedData?.discount > 0 || quote?.discount_amount > 0) && (
+                                    <div className="flex justify-between text-xs text-emerald-400">
+                                        <span>Special Discount (Mid-Month)</span>
+                                        <span className="font-bold">- R {(recalculatedData?.discount || quote?.discount_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {((isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)) > 0) && (
