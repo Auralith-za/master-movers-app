@@ -317,9 +317,8 @@ export const generateProfessionalQuote = (data) => {
             }, 0);
 
             const diff = serviceFees - sumOfCosts;
-            if (actualDiscountVal > 0 || diff < -0.01) {
-                const discAmt = actualDiscountVal > 0 ? actualDiscountVal : Math.abs(diff);
-                costs.push(['Discount Applied', `-R ${Number(discAmt).toFixed(2)}`]);
+            if (actualDiscountVal > 0) {
+                costs.push(['Discount Applied', `-R ${Number(actualDiscountVal).toFixed(2)}`]);
             } else if (Math.abs(diff) > 0.01) {
                 // If there's a breakdown discrepancy without an actual discount, adjust the Transport Services line so items equal subtotal
                 const transportIdx = costs.findIndex(c => c[0] === 'Transport Services');
