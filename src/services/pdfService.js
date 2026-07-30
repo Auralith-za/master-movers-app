@@ -311,28 +311,24 @@ export const generateProfessionalQuote = (data) => {
 
             // Auto-reconcile component lines with exact subtotal
             const actualDiscountVal = Number(data.discount || bd?.discount || data.discount_amount || 0);
-            const sumOfCosts = costs.reduce((acc, row) => {
+            if (actualDiscountVal > 0) {
+                costs.push(['Discount Applied', `-R ${Number(actualDiscountVal).toFixed(2)}`]);
+            }
+
+            const calculatedSubtotal = costs.reduce((acc, row) => {
                 const valStr = String(row[1]).replace(/[^\d.-]/g, '');
                 return acc + (parseFloat(valStr) || 0);
             }, 0);
 
-            const diff = serviceFees - sumOfCosts;
-            if (actualDiscountVal > 0) {
-                costs.push(['Discount Applied', `-R ${Number(actualDiscountVal).toFixed(2)}`]);
-            } else if (Math.abs(diff) > 0.01) {
-                // If there's a breakdown discrepancy without an actual discount, adjust the Transport Services line so items equal subtotal
-                const transportIdx = costs.findIndex(c => c[0] === 'Transport Services');
-                if (transportIdx !== -1) {
-                    const currentTrans = parseFloat(String(costs[transportIdx][1]).replace(/[^\d.-]/g, '')) || 0;
-                    const adjustedTrans = Math.max(0, currentTrans + diff);
-                    costs[transportIdx][1] = `R ${adjustedTrans.toFixed(2)}`;
-                }
-            }
+            // Use calculated subtotal from valid lines so table and totals are 100% synchronized
+            const finalSubtotal = (bd || calculatedSubtotal > 0) ? calculatedSubtotal : serviceFees;
+            const finalVat = finalSubtotal * 0.15;
+            const finalTotal = finalSubtotal * 1.15;
 
             costs.push(
-                ['Subtotal Excl. VAT', `R ${serviceFees.toFixed(2)}`],
-                ['VAT (15%)', `R ${numVat.toFixed(2)}`],
-                ['TOTAL AMOUNT DUE', `R ${numTotal.toFixed(2)}`]
+                ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],
+                ['VAT (15%)', `R ${finalVat.toFixed(2)}`],
+                ['TOTAL AMOUNT DUE', `R ${finalTotal.toFixed(2)}`]
             );
 
             autoTable(doc, {
