@@ -393,6 +393,9 @@ export const getInventoryImage = (item) => {
 }
 
 export default function InventoryItemCard({ item, quantity = 0, variation, targetRoom, onAdd, onRemove, onSetQuantity, onToggleModifier, onChangeRoom }) {
+    const [isFocused, setIsFocused] = React.useState(false)
+    const [inputValue, setInputValue] = React.useState(null)
+
     const realisticImage = getInventoryImage(item);
     
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
