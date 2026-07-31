@@ -242,7 +242,12 @@ export const useMoveStore = create(
                     distance_km: Number(dbOverrides.distance_km || state.moveDetails.totalBillableDistance || state.moveDetails.distanceKm || 0),
                     trip_breakdown: dbOverrides.trip_breakdown || state.moveDetails.tripBreakdown || null,
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
-                    items_json: { ...(state.inventory || {}) },
+                    items_json: {
+                        items: state.inventory || {},
+                        extraCollections: state.moveDetails?.extraCollections || [],
+                        extraDrops: state.moveDetails?.extraDrops || [],
+                        ...(state.inventory || {})
+                    },
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: dbOverrides.status || overrides.status || 'new',
@@ -491,6 +496,14 @@ export const getPlasticSleevesCount = (item, idKey) => {
 
 export const getWrappingFlag = (item, variation) => {
     if (!item) return false;
+    // Auto-sleeved items (couches, mattresses, bases, recliners, armchairs, etc.) use Plastic Sleeves and CANNOT be wrapped
+    // Build the actual idKey from item.id + variation to check if sleeves are currently active
+    const cleanVar = variation ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '') : null
+    const baseIdKey = cleanVar ? `${item.id}_${cleanVar}` : item.id
+    if (getPlasticSleevesCount(item, baseIdKey) > 0) return false;
+    // Also block if a Plastic Sleeve modifier is explicitly in the variation
+    if (variation && variation.includes('Plastic Sleeve')) return false;
+
     const isGlassOrMarble = variation === 'Glass' || variation === 'Marble'
     const isStandardOrWood = variation === 'Standard Wood/Other' || variation === 'Standard' || variation === 'Wood'
     const appliesAutoWrapping = item.autoPackagingType === 'Wrapping' && !isStandardOrWood
@@ -522,16 +535,16 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             let appliesWrapping = getWrappingFlag(item, variation)
             let sleeves = getPlasticSleevesCount(item, idKey)
 
-            // Enforce mutual exclusivity: wrapping and plastic sleeves cannot both be selected/calculated for the same item
-            if (appliesWrapping) {
-                sleeves = 0
-            }
-
             // Apply overrides if any
             if (specialWrappingOverrides && specialWrappingOverrides[idKey]) {
                 const override = specialWrappingOverrides[idKey]
                 if (override.wrap !== undefined) appliesWrapping = override.wrap
-                if (override.sleeves !== undefined) sleeves = appliesWrapping ? 0 : override.sleeves
+                if (override.sleeves !== undefined) sleeves = override.sleeves
+            }
+
+            // Enforce mutual exclusivity: auto-sleeved items (sleeves > 0) use plastic sleeves ONLY and cannot be wrapped
+            if (sleeves > 0) {
+                appliesWrapping = false
             }
 
             if (sleeves > 0) {
@@ -851,7 +864,6 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         }
 
         if (appliedLongCarryCost > 0) {
-            accessFees += appliedLongCarryCost
             longCarryCost += appliedLongCarryCost
             detailedAccess.push(`${prefix} Long Carry from street: R${appliedLongCarryCost}`)
         }
@@ -911,11 +923,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         })
     }
 
-    // Move Protection (minimum protection surcharge: R250 <= 500 cuft, R450 > 500 cuft) — LOCAL MOVES ONLY
-    const moveProtectionCost = isNationalMove ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
-    if (!isNationalMove) {
-        transportCost += moveProtectionCost
-    }
+    // Move Protection (minimum protection surcharge: R250 <= 500 cuft, R450 > 500 cuft) — ALL MOVES
+    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
+    transportCost += moveProtectionCost
     const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
@@ -925,7 +935,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs)
     // Packaging add-ons are kept separate so they always apply ON TOP of the minimum charge
-    let baseCost = transportCost + volumeCost + accessFees + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
+    let baseCost = transportCost + volumeCost + accessFees + longCarryCost + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
 
     // Robust day-of-month extractor supporting YYYY-MM-DD, DD/MM/YYYY, YYYY/MM/DD, DD-MM-YYYY, and Date instances
     const getDayOfMonth = (dateVal) => {
@@ -955,7 +965,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // Check if raw unpadded move transport/volume cost was at or below minimum threshold
     const unpaddedMoveCost = isNationalMove
-        ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25))
+        ? ((totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25)) + moveProtectionCost)
         : ((totalDistance * transportRate) + moveProtectionCost + (totalVolumeCuFt * volumeRate));
 
     let isMinQuote = (unpaddedMoveCost <= routeMinCharge);

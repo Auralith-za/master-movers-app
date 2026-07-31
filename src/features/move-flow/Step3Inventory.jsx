@@ -144,6 +144,19 @@ export default function Step3Inventory() {
     }
 
     const handleToggleModifier = (itemId, modifier, targetRoom, currentVariation) => {
+        if (modifier === 'Wrapped') {
+            const targetItem = INVENTORY_ITEMS.find(i => i.id === itemId);
+            if (targetItem) {
+                // Strip manual Wrapped/Plastic Sleeve tags to get the base variation for sleeve check
+                const cleanVar = currentVariation ? currentVariation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '') : null
+                const baseIdKey = cleanVar ? `${itemId}_${cleanVar}` : itemId
+                // Block wrapping only if sleeves are currently auto-active (based on base variation)
+                if (getPlasticSleevesCount(targetItem, baseIdKey) > 0) return;
+                // Also block if a Plastic Sleeve modifier is explicitly in the current variation
+                if (currentVariation && currentVariation.includes('Plastic Sleeve')) return;
+            }
+        }
+
         const idKeys = Object.keys(inventory).filter(k => {
             const parsed = parseInventoryKey(k);
             return parsed.itemId === itemId && 

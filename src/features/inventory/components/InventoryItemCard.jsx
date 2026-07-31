@@ -41,7 +41,7 @@ const REAL_RENDERS = {
     'sideboard-large': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/31016WHT-KIT_01_2000x.jpg.webp',
     'sideboard-small': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/ew.jpeg',
     'welsh-dresser': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images.jpeg',
-    'display-cabinet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/u330a675_vm.webp',
+    'display-cabinet': '/inventory/Wooden Display Cabinet.webp',
     'wine-rack': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/dds.jpeg',
     'king-bed-base': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-1453505460-612x612-1.jpg',
     'king-size-bed-mattras': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-1453505460-612x612-1.jpg',
@@ -516,7 +516,7 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
                 </div>
 
                 <div className="flex flex-col gap-1 mt-1">
-                    {!isAutoWrapped && quantity > 0 && onToggleModifier && (
+                    {!isAutoWrapped && !isAutoSleeve && quantity > 0 && onToggleModifier && (
                         <div className="flex items-center gap-2">
                             <input 
                                 type="checkbox" 
