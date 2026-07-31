@@ -826,6 +826,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc, prefix) => {
+        if (!loc) return;
         const hasElevator = !!loc?.elevator
         const fl = loc?.floorLevel
         
@@ -868,25 +869,24 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             detailedAccess.push(`${prefix} Hoisting: R850`)
         }
 
-        // Shuttle: Track if needed — shuttle checkbox or panhandle
-        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle || loc?.specialConditions?.panhandle) {
+        let locationHasShuttle = false
+        // Shuttle: Track if needed — shuttle checkbox, panhandle, weight restriction, or parkingType shuttle
+        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle || loc?.specialConditions?.panhandle || loc?.specialConditions?.weightRestriction) {
+            locationHasShuttle = true
             hasShuttle = true
         }
 
         // Long Carry / Shuttle based on distance:
         let appliedLongCarryCost = 0
 
-
         if (loc?.specialConditions?.longCarry) {
-            const dist = parseFloat(loc?.longCarryDistance) || 0
+            const dist = parseFloat(loc?.longCarryDistance || loc?.longCarryMeters) || 0
             // Shuttle applied if 90m or greater
             if (dist >= 90) {
+                locationHasShuttle = true
                 hasShuttle = true
-            }
-            if (dist >= 50 && dist < 90) {
-                if (appliedLongCarryCost < 750) {
-                    appliedLongCarryCost = 750
-                }
+            } else if (!locationHasShuttle) {
+                appliedLongCarryCost = 750
             }
         }
 
@@ -895,8 +895,22 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             detailedAccess.push(`${prefix} Long Carry from street: R${appliedLongCarryCost}`)
         }
     }
-    if (accessDetails?.origin) addAccess(accessDetails.origin, 'Origin')
-    if (accessDetails?.destination) addAccess(accessDetails.destination, 'Dest')
+
+    // Process ALL locations present in accessDetails (origin, destination, extra_coll_*, extra_drop_*)
+    Object.entries(accessDetails || {}).forEach(([locKey, loc]) => {
+        if (!loc) return;
+        let prefix = 'Location';
+        if (locKey === 'origin') prefix = 'Origin';
+        else if (locKey === 'destination') prefix = 'Dest';
+        else if (locKey.startsWith('extra_coll_')) {
+            const idx = parseInt(locKey.replace('extra_coll_', '')) || 0;
+            prefix = `Pickup #${idx + 2}`;
+        } else if (locKey.startsWith('extra_drop_')) {
+            const idx = parseInt(locKey.replace('extra_drop_', '')) || 0;
+            prefix = `Drop #${idx + 2}`;
+        }
+        addAccess(loc, prefix);
+    });
 
     if (hasShuttle) {
         shuttleCost = ADDITIONAL_COSTS.shuttle.flatRate

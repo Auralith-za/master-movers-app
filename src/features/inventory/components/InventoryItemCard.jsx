@@ -517,18 +517,33 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
 
                 <div className="flex flex-col gap-1 mt-1">
                     {!isAutoWrapped && !isAutoSleeve && quantity > 0 && onToggleModifier && (
-                        <div className="flex items-center gap-2">
-                            <input 
-                                type="checkbox" 
-                                id={`wr-${item.id}`}
-                                checked={isManuallyWrapped}
-                                onChange={(e) => { e.stopPropagation(); onToggleModifier(item.id, 'Wrapped'); }}
-                                className="w-3.5 h-3.5 text-red-600 rounded border-gray-300"
-                            />
-                            <label htmlFor={`wr-${item.id}`} className="text-[10px] md:text-xs text-slate-500 font-bold cursor-pointer uppercase tracking-tight">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleModifier(item.id, 'Wrapped');
+                            }}
+                            className="flex items-center gap-2 group/wrap cursor-pointer text-left focus:outline-none"
+                        >
+                            <div className={clsx(
+                                "w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-200",
+                                isManuallyWrapped 
+                                    ? "bg-red-600 border-red-600 text-white" 
+                                    : "border-slate-300 bg-white group-hover/wrap:border-red-500"
+                            )}>
+                                {isManuallyWrapped && (
+                                    <svg className="w-2.5 h-2.5 stroke-white stroke-[3px]" fill="none" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                )}
+                            </div>
+                            <span className={clsx(
+                                "text-[10px] md:text-xs font-bold uppercase tracking-tight transition-colors duration-200",
+                                isManuallyWrapped ? "text-red-600" : "text-slate-500 group-hover/wrap:text-slate-700"
+                            )}>
                                 Add Wrapping (Vol)
-                            </label>
-                        </div>
+                            </span>
+                        </button>
                     )}
                 </div>
 

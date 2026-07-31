@@ -1240,10 +1240,36 @@ export default function QuoteDetailPage() {
                             </h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {['origin', 'destination'].map(loc => (
+                            {(() => {
+                                const locs = ['origin'];
+                                (editForm.extraCollections || editForm.extra_collections || quote?.extra_collections || []).forEach((_, idx) => {
+                                    locs.push(`extra_coll_${idx}`);
+                                });
+                                locs.push('destination');
+                                (editForm.extraDrops || editForm.extra_drops || quote?.extra_drops || []).forEach((_, idx) => {
+                                    locs.push(`extra_drop_${idx}`);
+                                });
+                                if (editForm.access_details) {
+                                    Object.keys(editForm.access_details).forEach(k => {
+                                        if (!locs.includes(k)) locs.push(k);
+                                    });
+                                }
+                                return locs;
+                            })().map(loc => {
+                                let locLabel = 'Pickup Access';
+                                if (loc === 'origin') locLabel = 'Pickup Access';
+                                else if (loc === 'destination') locLabel = 'Dropoff Access';
+                                else if (loc.startsWith('extra_coll_')) {
+                                    const idx = parseInt(loc.replace('extra_coll_', '')) || 0;
+                                    locLabel = `Pickup #${idx + 2} Access`;
+                                } else if (loc.startsWith('extra_drop_')) {
+                                    const idx = parseInt(loc.replace('extra_drop_', '')) || 0;
+                                    locLabel = `Dropoff #${idx + 2} Access`;
+                                }
+                                return (
                                 <div key={loc} className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
                                     <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                                        {loc === 'origin' ? 'Pickup' : 'Dropoff'} Access
+                                        {locLabel}
                                         <div className={`w-2 h-2 rounded-full ${loc === 'origin' ? 'bg-red-500' : 'bg-slate-900'}`} />
                                     </h4>
                                     
@@ -1376,7 +1402,8 @@ export default function QuoteDetailPage() {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

@@ -1114,9 +1114,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
                                         if (a.elevator) parts.push('Elevator: Yes')
                                         if (a.stairs) parts.push('Stairs: Yes')
-                                        if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                        const dist = a.longCarryMeters || a.longCarryDistance || 0
+                                        if (dist > 0) parts.push(`Long Carry: ${dist}m`)
+                                        else if (a.specialConditions?.longCarry) parts.push('Long Carry')
                                         if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
                                         if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                        if (a.specialConditions?.panhandle) parts.push('Panhandle')
                                         if (a.notes) parts.push(`Notes: ${a.notes}`)
                                         return parts.join(' • ')
                                     })()}
@@ -1137,8 +1140,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                             if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
                                             if (a.elevator) parts.push('Elevator: Yes')
                                             if (a.stairs) parts.push('Stairs: Yes')
-                                            if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                            const dist = a.longCarryMeters || a.longCarryDistance || 0
+                                            if (dist > 0) parts.push(`Long Carry: ${dist}m`)
+                                            else if (a.specialConditions?.longCarry) parts.push('Long Carry')
                                             if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                            if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                            if (a.specialConditions?.panhandle) parts.push('Panhandle')
                                             if (a.notes) parts.push(`Notes: ${a.notes}`)
                                             return parts.join(' • ')
                                         })()}
@@ -1161,9 +1168,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
                                         if (a.elevator) parts.push('Elevator: Yes')
                                         if (a.stairs) parts.push('Stairs: Yes')
-                                        if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                        const dist = a.longCarryMeters || a.longCarryDistance || 0
+                                        if (dist > 0) parts.push(`Long Carry: ${dist}m`)
+                                        else if (a.specialConditions?.longCarry) parts.push('Long Carry')
                                         if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
                                         if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                        if (a.specialConditions?.panhandle) parts.push('Panhandle')
                                         if (a.notes) parts.push(`Notes: ${a.notes}`)
                                         return parts.join(' • ')
                                     })()}
@@ -1184,8 +1194,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                             if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
                                             if (a.elevator) parts.push('Elevator: Yes')
                                             if (a.stairs) parts.push('Stairs: Yes')
-                                            if (a.longCarryMeters > 0) parts.push(`Long Carry: ${a.longCarryMeters}m`)
+                                            const dist = a.longCarryMeters || a.longCarryDistance || 0
+                                            if (dist > 0) parts.push(`Long Carry: ${dist}m`)
+                                            else if (a.specialConditions?.longCarry) parts.push('Long Carry')
                                             if (a.specialConditions?.hoisting) parts.push('Hoisting Required')
+                                            if (a.specialConditions?.shuttle) parts.push('Shuttle Required')
+                                            if (a.specialConditions?.panhandle) parts.push('Panhandle')
                                             if (a.notes) parts.push(`Notes: ${a.notes}`)
                                             return parts.join(' • ')
                                         })()}
