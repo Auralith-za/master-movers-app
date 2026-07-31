@@ -67,12 +67,32 @@ export const generateProfessionalQuote = (data) => {
             doc.text(`Phone: ${clientPhone || 'N/A'}`, 20, currentY + 6);
             doc.text(`Email: ${clientEmail || 'N/A'}`, 20, currentY + 12);
 
+            const extraColls = data.extraCollections || data.moveDetails?.extraCollections || data.items_json?.extraCollections || data.quote?.items_json?.extraCollections || [];
+            const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || data.items_json?.extraDrops || data.quote?.items_json?.extraDrops || [];
+
             // Move Column
             doc.text(`Date: ${moveDate || 'N/A'}`, 110, currentY);
-            doc.text(`From: ${pickupAddress || 'N/A'}`, 110, currentY + 6, { maxWidth: 80 });
-            doc.text(`To: ${dropoffAddress || 'N/A'}`, 110, currentY + 18, { maxWidth: 80 });
+            let moveY = currentY + 6;
 
-            currentY += 30;
+            const fromLines = [`From: ${pickupAddress || 'N/A'}`];
+            extraColls.forEach((c, idx) => {
+                if (c.address) fromLines.push(`Coll #${idx + 2}: ${c.address}`);
+            });
+            const fromText = fromLines.join('\n');
+            doc.text(fromText, 110, moveY, { maxWidth: 80 });
+            const fromDim = doc.getTextDimensions(fromText, { maxWidth: 80 });
+            moveY += (fromDim.h || 6) + 3;
+
+            const toLines = [`To: ${dropoffAddress || 'N/A'}`];
+            extraDrops.forEach((d, idx) => {
+                if (d.address) toLines.push(`Drop #${idx + 2}: ${d.address}`);
+            });
+            const toText = toLines.join('\n');
+            doc.text(toText, 110, moveY, { maxWidth: 80 });
+            const toDim = doc.getTextDimensions(toText, { maxWidth: 80 });
+            moveY += (toDim.h || 6) + 4;
+
+            currentY = Math.max(currentY + 30, moveY + 2);
 
             // --- Site Access & Logistics Section ---
             doc.setTextColor(...slate900);
@@ -104,7 +124,7 @@ export const generateProfessionalQuote = (data) => {
                 return parts.join(' • ');
             };
 
-            const accDetails = data.accessDetails || data.moveDetails?.accessDetails || {};
+            const accDetails = data.accessDetails || data.moveDetails?.accessDetails || data.quote?.access_details || {};
             const pickupAccessStr = getAccessSummaryString(accDetails.origin);
             const dropoffAccessStr = getAccessSummaryString(accDetails.destination);
 
@@ -122,26 +142,28 @@ export const generateProfessionalQuote = (data) => {
             const dropoffHeight = doc.getTextDimensions(dropoffAccessStr, { maxWidth: 142 }).h || 5;
             currentY += Math.max(6, dropoffHeight + 2);
 
-            const extraColls = data.extraCollections || data.moveDetails?.extraCollections || [];
             extraColls.forEach((coll, idx) => {
                 if (!coll.address) return;
                 const extraAccStr = getAccessSummaryString(accDetails[`extra_coll_${idx}`]);
                 doc.setFont('helvetica', 'bold');
                 doc.text(`Collection #${idx + 2}:`, 20, currentY);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`${coll.address} (${extraAccStr})`, 48, currentY, { maxWidth: 142 });
-                currentY += 6;
+                const textStr = `${coll.address} (${extraAccStr})`;
+                doc.text(textStr, 48, currentY, { maxWidth: 142 });
+                const h = doc.getTextDimensions(textStr, { maxWidth: 142 }).h || 5;
+                currentY += Math.max(6, h + 2);
             });
 
-            const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || [];
             extraDrops.forEach((drop, idx) => {
                 if (!drop.address) return;
                 const extraAccStr = getAccessSummaryString(accDetails[`extra_drop_${idx}`]);
                 doc.setFont('helvetica', 'bold');
                 doc.text(`Drop-off #${idx + 2}:`, 20, currentY);
                 doc.setFont('helvetica', 'normal');
-                doc.text(`${drop.address} (${extraAccStr})`, 48, currentY, { maxWidth: 142 });
-                currentY += 6;
+                const textStr = `${drop.address} (${extraAccStr})`;
+                doc.text(textStr, 48, currentY, { maxWidth: 142 });
+                const h = doc.getTextDimensions(textStr, { maxWidth: 142 }).h || 5;
+                currentY += Math.max(6, h + 2);
             });
 
             const notes = data.generalNotes || data.notes || data.customer_comments || data.moveDetails?.generalNotes || data.moveDetails?.notes || data.quote?.general_notes || data.quote?.notes || data.quote?.customer_comments || '';

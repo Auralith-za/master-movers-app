@@ -829,6 +829,24 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             </div>
                         )}
 
+                        {/* Long Carry Surcharge */}
+                        {breakdown.longCarryCost > 0 && (
+                            <div className="space-y-2 py-4 border-b border-gray-100">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                        Long Carry Surcharge
+                                    </span>
+                                    <span className="font-bold text-slate-900">+ R {breakdown.longCarryCost.toFixed(2)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1.5 mt-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <span>Long Carry distance (50m - 90m)</span>
+                                        <span className="text-slate-500">R {breakdown.longCarryCost.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Move Protection is bundled into Transport Services */}
                         
                         {/* Documentation Fee */}

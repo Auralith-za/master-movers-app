@@ -108,7 +108,10 @@ export default function QuotesPage() {
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
                 subTotal: (quote.total_price || 0) / 1.15,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: quote.items_json?.breakdown || null
+                breakdown: quote.items_json?.breakdown || null,
+                accessDetails: quote.access_details || {},
+                extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
+                extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
             });
 
             if (result.success) {

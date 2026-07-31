@@ -4,7 +4,7 @@ import { useMoveStore } from '../inventory/store/moveStore'
 import { Button } from '../../components/ui/Button'
 import { Label } from '../../components/ui/Label'
 import { Input } from '../../components/ui/Input'
-import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus, Loader2, Phone } from 'lucide-react'
+import { Home, Building2, User, Truck, Clock, AlertTriangle, Shield, Sparkles, Info, HelpCircle, Plus, Minus, Loader2, Phone, Warehouse, CheckCircle } from 'lucide-react'
 import { LeadCaptureModal } from './Step1Details'
 import { emailService } from '../../services/emailService'
 import clsx from 'clsx'
@@ -48,6 +48,28 @@ export default function Step2Access() {
     const [addedBoxes, setAddedBoxes] = React.useState(false)
     const [isSavingBoxes, setIsSavingBoxes] = React.useState(false)
 
+    const isStorageDropoff = Boolean(
+        (moveDetails?.storageDestination && moveDetails.storageDestination !== '') ||
+        (moveDetails?.dropoffAddress && moveDetails.dropoffAddress.toLowerCase().includes('master movers storage'))
+    )
+
+    React.useEffect(() => {
+        if (isStorageDropoff) {
+            const current = accessDetails?.destination;
+            if (current?.type !== 'house' || current?.floorLevel !== 0 || current?.elevator || current?.stairs) {
+                setAccessDetails('destination', {
+                    type: 'house',
+                    floorLevel: 0,
+                    elevator: false,
+                    stairs: false,
+                    specialConditions: {},
+                    parkingType: 'driveway',
+                    notes: current?.notes || ''
+                })
+            }
+        }
+    }, [isStorageDropoff])
+
     const handleUpdate = (location, field, value) => {
         setAccessDetails(location, { [field]: value })
     }
@@ -65,6 +87,70 @@ export default function Step2Access() {
         setAccessDetails(location, {
             specialConditions: updated
         })
+    }
+
+    const renderStorageDropoffCard = () => {
+        const depotCode = moveDetails?.storageDestination;
+        const depotName = depotCode && depotCode !== 'PICK' 
+            ? `Master Movers Storage Depot (${depotCode})` 
+            : (moveDetails?.dropoffAddress || 'Master Movers Storage Depot');
+
+        return (
+            <div className="space-y-6 bg-slate-900 text-white p-6 rounded-2xl border-2 border-slate-800 shadow-xl border-l-4 border-l-red-600 flex flex-col justify-between">
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-xl bg-red-600/20 text-red-500 border border-red-500/30">
+                                <Warehouse size={20} />
+                            </div>
+                            <div>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-red-400 block">Primary Drop-off</span>
+                                <h4 className="font-extrabold text-white uppercase tracking-wider text-sm">Storage Facility</h4>
+                            </div>
+                        </div>
+                        <span className="px-2.5 py-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-sm">
+                            Depot Storage
+                        </span>
+                    </div>
+
+                    <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-700 space-y-2">
+                        <p className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                            {depotName}
+                        </p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Your goods will be offloaded and securely stored directly at our Master Movers warehouse depot.
+                            Standard property access options (stairs, elevators, long carry) do not apply to storage drop-offs.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-300">
+                        <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/50 flex items-center gap-2">
+                            <span className="text-emerald-400">✓</span> Ground Floor Depot
+                        </div>
+                        <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/50 flex items-center gap-2">
+                            <span className="text-emerald-400">✓</span> 24/7 Security
+                        </div>
+                        <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/50 flex items-center gap-2">
+                            <span className="text-emerald-400">✓</span> No Access Surcharges
+                        </div>
+                        <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/50 flex items-center gap-2">
+                            <span className="text-emerald-400">✓</span> Professional Handling
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800 space-y-1">
+                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Storage Notes (Optional)</Label>
+                    <textarea
+                        placeholder="Additional instructions for storage depot? (e.g. 'Keep inventory in pallet wrap')..."
+                        value={accessDetails?.destination?.notes || ''}
+                        onChange={(e) => handleUpdate('destination', 'notes', e.target.value)}
+                        className="w-full p-3 text-xs bg-slate-800 border border-slate-700 rounded-xl focus:border-red-500 outline-none text-slate-200 placeholder-slate-500 resize-none h-20 transition-all"
+                    />
+                </div>
+            </div>
+        )
     }
 
     const renderLocationForm = (locationType, customLabel = null) => {
@@ -305,7 +391,7 @@ export default function Step2Access() {
                         {(moveDetails.extraCollections || []).map((coll, idx) => 
                             renderLocationForm(`extra_coll_${idx}`, `Collection #${idx + 2} (${coll.address ? coll.address.split(',')[0] : 'Address'})`)
                         )}
-                        {renderLocationForm('destination')}
+                        {isStorageDropoff ? renderStorageDropoffCard() : renderLocationForm('destination')}
                         {(moveDetails.extraDrops || []).map((drop, idx) => 
                             renderLocationForm(`extra_drop_${idx}`, `Drop-off #${idx + 2} (${drop.address ? drop.address.split(',')[0] : 'Address'})`)
                         )}

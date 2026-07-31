@@ -251,7 +251,7 @@ export const INVENTORY_ITEMS = [
     "image": "/inventory/lounge-recliner.png",
     "requiresPhoto": false,
     "requiresCrate": false,
-    "autoPackagingType": "Wrapping",
+    "autoPackagingType": "Plastic Covers",
     "variationOptions": null
 },
 {
@@ -643,9 +643,9 @@ export const INVENTORY_ITEMS = [
     "name": "DISPLAY CABINET",
     "category": "Dining Room",
     "volume": 51,
-    "image": "/inventory/display-cabinet.png",
+    "image": "/inventory/Wooden Display Cabinet.webp",
     "requiresPhoto": false,
-    "requiresCrate": true,
+    "requiresCrate": false,
     "autoPackagingType": null,
     "variationOptions": null
 },

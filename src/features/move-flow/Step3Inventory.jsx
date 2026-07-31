@@ -157,12 +157,28 @@ export default function Step3Inventory() {
             }
         }
 
-        const idKeys = Object.keys(inventory).filter(k => {
+        // Try strict match: itemId + room + variation
+        let idKeys = Object.keys(inventory).filter(k => {
             const parsed = parseInventoryKey(k);
             return parsed.itemId === itemId && 
                    (parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category) === targetRoom &&
                    parsed.variation === currentVariation;
         });
+
+        // Fallback: match by itemId + room only (handles stale variation in closure)
+        if (idKeys.length === 0) {
+            idKeys = Object.keys(inventory).filter(k => {
+                const parsed = parseInventoryKey(k);
+                return parsed.itemId === itemId &&
+                       (parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category) === targetRoom;
+            });
+        }
+
+        // Last resort: match by itemId only
+        if (idKeys.length === 0) {
+            idKeys = Object.keys(inventory).filter(k => parseInventoryKey(k).itemId === itemId);
+        }
+
         if (idKeys.length === 0) return;
         
         const currentKey = idKeys[0];

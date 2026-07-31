@@ -362,6 +362,11 @@ export default function TestCalcBreakdown() {
                             <Row label="Shuttle Vehicle" value={`R ${result.breakdown.shuttleCost.toFixed(2)}`} warn />
                         )}
 
+                        {/* Long Carry */}
+                        {result.breakdown?.longCarryCost > 0 && (
+                            <Row label="Long Carry Surcharge" value={`R ${result.breakdown.longCarryCost.toFixed(2)}`} warn />
+                        )}
+
                         {/* Additional crew (heavy items) */}
                         <Row label="Heavy Item Crew" value={result.breakdown?.crew > 0 ? `${R(result.breakdown.crew)} (2 crew @ R550)` : '✓ None'} warn={result.breakdown?.crew > 0} />
 

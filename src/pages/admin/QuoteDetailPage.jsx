@@ -605,7 +605,9 @@ export default function QuoteDetailPage() {
                 accessDetails: quote.access_details || recalculatedData?.accessDetails || {},
                 generalNotes: quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || '',
                 customProducts: editForm.custom_products || quote.custom_products || [],
-                isMinQuote: recalculatedData?.isMinQuote || false
+                isMinQuote: recalculatedData?.isMinQuote || false,
+                extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
+                extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
             })
         } catch (err) {
             console.error('PDF generation error:', err)
@@ -1048,6 +1050,11 @@ export default function QuoteDetailPage() {
                                                                     {/* WRAPPING COLUMN — vol × R5.90 */}
                                                                     <td className="px-6 py-4 text-center">
                                                                         {(() => {
+                                                                            const isAutoSleeved = getPlasticSleevesCount(item, itemId) > 0
+                                                                            if (isAutoSleeved) {
+                                                                                return <span className="text-slate-400 text-xs">—</span>
+                                                                            }
+
                                                                             const defaultWrapped = getWrappingFlag(item, variation)
                                                                             const wrappingEnabled = wrapInfo.wrap !== undefined ? wrapInfo.wrap : defaultWrapped
                                                                             const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0

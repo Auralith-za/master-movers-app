@@ -173,7 +173,9 @@ export default function DashboardPage() {
                 breakdown: quote.items_json?.breakdown || null,
                 accessDetails: quote.access_details || {},
                 generalNotes: quote.general_notes || quote.notes || quote.customer_comments || '',
-                customProducts: quote.custom_products || []
+                customProducts: quote.custom_products || [],
+                extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
+                extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
             })
         } catch (err) {
             console.error('PDF error:', err)
