@@ -189,6 +189,33 @@ export const useMoveStore = create(
             },
             clearInventory: () => set((state) => ({ inventory: {}, undoHistory: [...state.undoHistory, state.inventory] })),
             setInventory: (newInventory) => set((state) => ({ inventory: newInventory, undoHistory: [...state.undoHistory, state.inventory] })),
+            toggleItemModifier: (itemId, modifier, room) => set((state) => {
+                const inventory = state.inventory;
+                // Find the key for this item in the given room (with any existing variation)
+                const matchKey = Object.keys(inventory).find(k => {
+                    const p = parseInventoryKey(k);
+                    if (p.itemId !== itemId) return false;
+                    const itemRoom = p.room || (INVENTORY_ITEMS.find(i => i.id === itemId)?.category);
+                    if (room && itemRoom !== room) return false;
+                    return true;
+                }) || Object.keys(inventory).find(k => parseInventoryKey(k).itemId === itemId);
+                if (!matchKey) return state;
+                const parsed = parseInventoryKey(matchKey);
+                const qty = inventory[matchKey];
+                let newVariation = parsed.variation || '';
+                if (newVariation.includes(modifier)) {
+                    newVariation = newVariation.split('_').filter(v => v !== modifier).join('_') || null;
+                } else {
+                    newVariation = newVariation ? `${newVariation}_${modifier}` : modifier;
+                }
+                let newKey = itemId;
+                if (newVariation) newKey += `_${newVariation}`;
+                if (parsed.room) newKey += `__room:${parsed.room}`;
+                const newInventory = { ...inventory };
+                delete newInventory[matchKey];
+                newInventory[newKey] = qty;
+                return { inventory: newInventory, undoHistory: [...state.undoHistory, inventory] };
+            }),
             
             manualServiceCharges: {},
             updateManualServiceCharge: (key, value) => set((state) => ({

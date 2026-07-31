@@ -41,7 +41,7 @@ export default function Step3Inventory() {
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
-    const { inventory: rawInventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, setItemQuantity, clearInventory, setInventory, undo, submitQuote, setMoveDetails } = useMoveStore()
+    const { inventory: rawInventory, moveDetails, accessDetails, manualServiceCharges, addItem, removeItem, setItemQuantity, clearInventory, setInventory, toggleItemModifier, undo, submitQuote, setMoveDetails } = useMoveStore()
     const inventory = rawInventory || {}
     const [searchTerm, setSearchTerm] = useState('')
     const [activeCategory, setActiveCategory] = useState(orderedCategories[0] || 'Lounge / Living Room')
@@ -156,53 +156,10 @@ export default function Step3Inventory() {
                 if (currentVariation && currentVariation.includes('Plastic Sleeve')) return;
             }
         }
-
-        // Try strict match: itemId + room + variation
-        let idKeys = Object.keys(inventory).filter(k => {
-            const parsed = parseInventoryKey(k);
-            return parsed.itemId === itemId && 
-                   (parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category) === targetRoom &&
-                   parsed.variation === currentVariation;
-        });
-
-        // Fallback: match by itemId + room only (handles stale variation in closure)
-        if (idKeys.length === 0) {
-            idKeys = Object.keys(inventory).filter(k => {
-                const parsed = parseInventoryKey(k);
-                return parsed.itemId === itemId &&
-                       (parsed.room || INVENTORY_ITEMS.find(i => i.id === itemId)?.category) === targetRoom;
-            });
-        }
-
-        // Last resort: match by itemId only
-        if (idKeys.length === 0) {
-            idKeys = Object.keys(inventory).filter(k => parseInventoryKey(k).itemId === itemId);
-        }
-
-        if (idKeys.length === 0) return;
-        
-        const currentKey = idKeys[0];
-        const currentQty = inventory[currentKey];
-        
-        const parsed = parseInventoryKey(currentKey);
-        let newVariation = parsed.variation || '';
-        
-        if (newVariation.includes(modifier)) {
-            newVariation = newVariation.split('_').filter(v => v !== modifier).join('_');
-            if (newVariation === '') newVariation = null;
-        } else {
-            newVariation = newVariation ? `${newVariation}_${modifier}` : modifier;
-        }
-        
-        let newKey = itemId;
-        if (newVariation) newKey += `_${newVariation}`;
-        if (parsed.room) newKey += `__room:${parsed.room}`;
-        
-        const newInventory = { ...inventory };
-        delete newInventory[currentKey];
-        newInventory[newKey] = currentQty;
-        setInventory(newInventory);
+        // Delegate to the store action which runs atomically with guaranteed fresh state
+        toggleItemModifier(itemId, modifier, targetRoom);
     };
+
 
     const [showVolumeModal, setShowVolumeModal] = useState(false)
     const VOLUME_THRESHOLD_FT3 = 10594 // 300m3
