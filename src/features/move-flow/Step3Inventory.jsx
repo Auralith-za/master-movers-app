@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useMoveStore, calculateQuote, parseInventoryKey } from '../inventory/store/moveStore'
+import { useMoveStore, calculateQuote, parseInventoryKey, getPlasticSleevesCount } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS, CATEGORIES } from '../inventory/data/mockItems'
 import InventoryItemCard from '../inventory/components/InventoryItemCard'
 import VolumeSummary from '../inventory/components/VolumeSummary'

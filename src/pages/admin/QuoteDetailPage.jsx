@@ -596,6 +596,7 @@ export default function QuoteDetailPage() {
                 total: finalPrice,
                 vat: finalVat,
                 subTotal: finalSubTotal,
+                discount: recalculatedData?.discount || quote.items_json?.breakdown?.discount || 0,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || null,
                 boxQty: recalculatedData?.boxQty,

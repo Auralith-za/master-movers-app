@@ -169,6 +169,7 @@ export default function DashboardPage() {
                 total: quote.total_price || 0,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
                 subTotal: (quote.total_price || 0) / 1.15,
+                discount: quote.items_json?.breakdown?.discount || 0,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: quote.items_json?.breakdown || null,
                 accessDetails: quote.access_details || {},

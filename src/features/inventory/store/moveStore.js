@@ -1120,7 +1120,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             volumeRate: volumeRate,
             isSharedLoad: sharedLoadPreference !== null ? sharedLoadPreference : (isNationalMove && totalVolumeCuFt < 850),
             payflexSurcharge,
-            paymentMethod: moveDetails.paymentMethod || 'eft'
+            paymentMethod: moveDetails.paymentMethod || 'eft',
+            discount: exclVatDiscount
         }
     }
 }
