@@ -356,7 +356,7 @@ export default function Step2Access() {
                                 />
                                 <span className="text-xs font-bold text-slate-400 uppercase">meters</span>
                             </div>
-                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: 50–89m incurs a flat rate of R750. Distances of 90m or more will incur an additional shuttle vehicle fee of R2,500.</p>
+                            <p className="text-[9px] text-red-400 font-bold mt-2 uppercase">Note: Long Carry incurs a flat rate of R750. Distances of 90m or more will incur Long Carry (R750) AND an additional shuttle vehicle fee of R2,500.</p>
                         </div>
                     )}
 

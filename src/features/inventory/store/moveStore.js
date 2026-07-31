@@ -881,12 +881,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance || loc?.longCarryMeters) || 0
+            appliedLongCarryCost = 750
             // Shuttle applied if 90m or greater
             if (dist >= 90) {
                 locationHasShuttle = true
                 hasShuttle = true
-            } else if (!locationHasShuttle) {
-                appliedLongCarryCost = 750
             }
         }
 

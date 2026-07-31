@@ -1368,7 +1368,7 @@ export default function QuoteDetailPage() {
                                                 />
                                                 <span className="text-xs text-slate-400 font-bold uppercase">meters</span>
                                             </div>
-                                            <p className="text-[8px] text-indigo-500 font-bold mt-1 uppercase">30-50m is R450. 50m and over needs shuttle (R2500).</p>
+                                            <p className="text-[8px] text-indigo-500 font-bold mt-1 uppercase">Long Carry is R750. 90m+ adds Shuttle (R2,500).</p>
                                         </div>
                                     )}
 
