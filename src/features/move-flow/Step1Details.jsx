@@ -134,6 +134,7 @@ export default function Step1Details() {
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
     const [showOutlineModal, setShowOutlineModal] = React.useState(false)
+    const [showMultipleStopsWarning, setShowMultipleStopsWarning] = React.useState(false)
     const [addressError, setAddressError] = React.useState(null)
     const [isValidating, setIsValidating] = React.useState(false)
     const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
@@ -267,15 +268,16 @@ export default function Step1Details() {
             })
             // 🔴 Google Ads: Lead conversion
             trackCallbackRequest({ step: 'Step 1 — Multiple Stops' })
-            await emailService.sendOutlineAreaEmail({
+            await emailService.sendCallbackEmail({
                 name: moveDetails.contactName,
                 email: moveDetails.contactEmail,
                 phone: moveDetails.contactPhone,
-                pickup: `${moveDetails.pickupAddress || 'Not specified yet'} (with extra collections requested)`,
-                dropoff: `${moveDetails.dropoffAddress || 'Not specified yet'} (with extra drops requested)`,
+                step: 'Step 1 — Multiple Collection Quote',
+                pickup: moveDetails.pickupAddress || '',
+                dropoff: moveDetails.dropoffAddress || '',
                 moveDate: moveDetails.moveDate || ''
             })
-            alert("Request Sent! One of our consultants will contact you shortly to coordinate your multi-stop quote. 📞")
+            alert("Request Sent! One of our consultants will contact you shortly to coordinate your Multiple Collection Quote. 📞")
         } catch (err) {
             console.error("Multi-stop lead error:", err)
             alert("Request Sent! (Note: Offline mode) We will contact you shortly.")
@@ -283,6 +285,8 @@ export default function Step1Details() {
             setIsSubmittingLead(false)
         }
     };
+
+
 
     const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
     const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
@@ -751,9 +755,12 @@ export default function Step1Details() {
                             <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
                                 <button
                                     type="button"
-                                    onClick={() => setMoveDetails({ locationMode: 'single' })}
+                                    onClick={() => {
+                                        setMoveDetails({ locationMode: 'single' })
+                                        setShowMultipleStopsWarning(false)
+                                    }}
                                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                        (moveDetails.locationMode || 'single') === 'single'
+                                        (moveDetails.locationMode || 'single') === 'single' && !showMultipleStopsWarning
                                             ? 'bg-white text-slate-900 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-900'
                                     }`}
@@ -762,17 +769,35 @@ export default function Step1Details() {
                                 </button>
                                  <button
                                      type="button"
-                                     onClick={async () => {
-                                         if (confirm("Moves with multiple collections and drop-offs require manual routing and coordination. Would you like to request a manual quote callback?")) {
-                                             await handleMultipleLocationsCallback()
-                                         }
+                                     onClick={() => {
+                                         setShowMultipleStopsWarning(true)
                                      }}
-                                     className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-900"
+                                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                                         showMultipleStopsWarning
+                                             ? 'bg-red-600 text-white shadow-md'
+                                             : 'text-slate-500 hover:text-slate-900'
+                                     }`}
                                  >
                                      <Sparkles size={13} /> Multiple Collections & Drops
                                  </button>
                             </div>
                         </div>
+
+                        {showMultipleStopsWarning && (
+                            <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold animate-in fade-in space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <span>⚠️ Multiple Collections & Drops: Additional stops require manual routing and coordination. We will request a callback to quote you manually.</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleMultipleLocationsCallback}
+                                    disabled={isSubmittingLead}
+                                    className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
+                                </button>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Pickup Group */}
@@ -1314,14 +1339,14 @@ export default function Step1Details() {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
                     <Button 
-                        type={isOutline ? "button" : "submit"}
-                        onClick={isOutline ? handleOutlineCallbackSubmit : undefined}
+                        type={isOutline || showMultipleStopsWarning ? "button" : "submit"}
+                        onClick={isOutline || showMultipleStopsWarning ? (isOutline ? handleOutlineCallbackSubmit : handleMultipleLocationsCallback) : undefined}
                         size="lg" 
-                        disabled={(!!addressError && !isOutline) || isValidating || isSubmittingLead}
+                        disabled={(!!addressError && !isOutline && !showMultipleStopsWarning) || isValidating || isSubmittingLead}
                         className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isValidating ? 'Verifying...' : isOutline ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
-                        {isOutline ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
+                        {isValidating ? 'Verifying...' : (isOutline || showMultipleStopsWarning) ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
+                        {(isOutline || showMultipleStopsWarning) ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
                     </Button>
                 </div>
 
