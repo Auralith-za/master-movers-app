@@ -139,6 +139,75 @@ export default function Step1Details() {
     const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
     const [dropoffHelpSent, setDropoffHelpSent] = React.useState(false)
 
+    const isOutlineAddress = (address, components, latLng) => {
+        if (!address && !components && !latLng) return false;
+        
+        const cityCode = detectCityCode(address, components, latLng);
+        
+        // If it resolves to JHB, DBN, or CPT, it's NOT outline
+        if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
+            return false;
+        }
+        
+        const textOrComponentMatchesOutline = (addr, comps) => {
+            const outlineTerms = [
+                'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
+                'mpumulanga', 'mphumulanga',
+                'potchefstroom', 'klerksdorp', 'rustenburg', 
+                'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+                'kimberley', 'upington',
+                'east london', 'eastlondon', 'buffalo city',
+                'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
+                'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
+            ];
+            
+            const lowerAddr = (addr || '').toLowerCase();
+            if (outlineTerms.some(term => lowerAddr.includes(term))) return true;
+            
+            if (comps && Array.isArray(comps)) {
+                return comps.some(c => {
+                    const val = (c.long_name || c.short_name || '').toLowerCase().trim();
+                    return outlineTerms.some(term => val === term || val.includes(term));
+                });
+            }
+            return false;
+        };
+
+        if (textOrComponentMatchesOutline(address, components)) {
+            return true;
+        }
+
+        // GPS check: if it has coordinates but is far from hubs
+        if (latLng && latLng.lat && latLng.lng) {
+            const lat = parseFloat(latLng.lat);
+            const lng = parseFloat(latLng.lng);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const haversineKm = (lat1, lon1, lat2, lon2) => {
+                    const R = 6371;
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lon2 - lon1) * Math.PI / 180;
+                    const a = 
+                        Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    return R * c;
+                };
+                const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
+                const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
+                const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
+                
+                if (distToJhb > 150 && distToDbn > 150 && distToCpt > 150) {
+                    return true;
+                }
+            }
+        } else {
+            return true; // No GPS coords and not resolved -> treat as outline
+        }
+
+        return false;
+    };
+
     // ─── Storage destination constants ──────────────────────────────────────
     const STORAGE_DEPOTS = [
         {
@@ -326,22 +395,24 @@ export default function Step1Details() {
             return
         }
 
-        // Outline province check — if the Google address_components contain an
-        // outline province (Northern Cape, Free State, Limpopo, etc.) we don't
-        // need a Distance Matrix call. The quote engine will flag it as
-        // needsQuoteRequest and block automated pricing.
-        const outlineProvinces = ['free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape', 'mpumulanga', 'mphumulanga']
-        const isOutlineComponent = (components) => {
-            if (!components || !Array.isArray(components)) return false
-            return components.some(c => {
-                const val = (c.long_name || c.short_name || '').toLowerCase().trim()
-                return outlineProvinces.some(prov => val === prov || val.includes(prov))
-            })
+        // Outline area check (using shared helper)
+        const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
+        const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
+        
+        let extraIsOutline = false;
+        if (Array.isArray(moveDetails.extraCollections)) {
+            extraIsOutline = extraIsOutline || moveDetails.extraCollections.some(coll => 
+                isOutlineAddress(coll.address, coll.addressComponents, coll.latLng)
+            );
         }
-        const pickupIsOutline = isOutlineComponent(moveDetails.pickupAddressComponents)
-        const dropoffIsOutline = isOutlineComponent(moveDetails.dropoffAddressComponents)
-        if (pickupIsOutline || dropoffIsOutline) {
-            // Store zeros — the quote engine's hasOutlineProvince flag handles the rest
+        if (Array.isArray(moveDetails.extraDrops)) {
+            extraIsOutline = extraIsOutline || moveDetails.extraDrops.some(drop => 
+                isOutlineAddress(drop.address, drop.addressComponents, drop.latLng)
+            );
+        }
+
+        if (pickupIsOutline || dropoffIsOutline || extraIsOutline) {
+            // Store zeros — the quote engine's outline check handles the rest
             setMoveDetails({ distanceKm: 0, tripBreakdown: null, totalBillableDistance: 0 })
             setAddressError(null)
             setIsValidating(false)
@@ -425,74 +496,7 @@ export default function Step1Details() {
         const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
         const isManual = moveDetails.pickupManualActive || moveDetails.dropoffManualActive
 
-        const isOutlineAddress = (address, components, latLng) => {
-            if (!address && !components && !latLng) return false;
-            
-            const cityCode = detectCityCode(address, components, latLng);
-            
-            // If it resolves to JHB, DBN, or CPT, it's NOT outline
-            if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
-                return false;
-            }
-            
-            const textOrComponentMatchesOutline = (addr, comps) => {
-                const outlineTerms = [
-                    'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
-                    'mpumulanga', 'mphumulanga',
-                    'potchefstroom', 'klerksdorp', 'rustenburg', 
-                    'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
-                    'kimberley', 'upington',
-                    'east london', 'eastlondon', 'buffalo city',
-                    'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
-                    'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
-                ];
-                
-                const lowerAddr = (addr || '').toLowerCase();
-                if (outlineTerms.some(term => lowerAddr.includes(term))) return true;
-                
-                if (comps && Array.isArray(comps)) {
-                    return comps.some(c => {
-                        const val = (c.long_name || c.short_name || '').toLowerCase().trim();
-                        return outlineTerms.some(term => val === term || val.includes(term));
-                    });
-                }
-                return false;
-            };
 
-            if (textOrComponentMatchesOutline(address, components)) {
-                return true;
-            }
-
-            // GPS check: if it has coordinates but is far from hubs
-            if (latLng && latLng.lat && latLng.lng) {
-                const lat = parseFloat(latLng.lat);
-                const lng = parseFloat(latLng.lng);
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    const haversineKm = (lat1, lon1, lat2, lon2) => {
-                        const R = 6371;
-                        const dLat = (lat2 - lat1) * Math.PI / 180;
-                        const dLon = (lon2 - lon1) * Math.PI / 180;
-                        const a = 
-                            Math.sin(dLat/2) * Math.sin(dLat/2) +
-                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                            Math.sin(dLon/2) * Math.sin(dLon/2);
-                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                        return R * c;
-                    };
-                    const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
-                    const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
-                    const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
-                    
-                    if (distToJhb > 150 && distToDbn > 150 && distToCpt > 150) {
-                        return true;
-                    }
-                }
-            } else {
-                return true; // No GPS coords and not resolved -> treat as outline
-            }
-
-            return false;
-        };
 
         const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
         const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
@@ -731,6 +735,11 @@ export default function Step1Details() {
                                         required
                                     />
                                 )}
+                                {moveDetails.pickupAddress && isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng) && (
+                                    <div className="p-3.5 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
+                                        <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                    </div>
+                                )}
                                 {!pickupHelpSent ? (
                                     !moveDetails.pickupManualActive && (
                                         <button
@@ -800,6 +809,11 @@ export default function Step1Details() {
                                                          setMoveDetails({ extraCollections: list })
                                                      }}
                                                  />
+                                                 {coll.address && isOutlineAddress(coll.address, coll.addressComponents, coll.latLng) && (
+                                                     <div className="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
+                                                         <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                     </div>
+                                                 )}
                                                 <Input
                                                     label="Unit & Complex Name (Optional)"
                                                     placeholder="e.g. Unit 12, Parkgate"
@@ -944,6 +958,11 @@ export default function Step1Details() {
                                                 required
                                             />
                                         )}
+                                        {moveDetails.dropoffAddress && isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng) && (
+                                            <div className="p-3.5 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
+                                                <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                            </div>
+                                        )}
                                         {!dropoffHelpSent ? (
                                             !moveDetails.dropoffManualActive && (
                                                 <button
@@ -1015,6 +1034,11 @@ export default function Step1Details() {
                                                          setMoveDetails({ extraDrops: list })
                                                      }}
                                                  />
+                                                 {drop.address && isOutlineAddress(drop.address, drop.addressComponents, drop.latLng) && (
+                                                     <div className="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
+                                                         <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                     </div>
+                                                 )}
                                                 <Input
                                                     label="Unit & Complex Name (Optional)"
                                                     placeholder="e.g. Unit 5, Marina View"
