@@ -610,24 +610,6 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const rawDropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
 
     // ─── STEP 2: Outline Province / Unknown Location Detection ──────────────────
-    // These are the SA provinces we do NOT serve with a live price.
-    // NOTE: Eastern Cape is NOT in this list — it is a served national route (GR code).
-    const outlineProvinces = [
-        'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
-        'mpumulanga', 'mphumulanga',
-        'potchefstroom', 'klerksdorp', 'rustenburg', 
-        'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
-        'kimberley', 'upington'
-    ];
-
-    const checkComponentsForOutline = (components) => {
-        if (!components || !Array.isArray(components)) return false;
-        return components.some(c => {
-            const name = (c.long_name || c.short_name || '').toLowerCase().trim();
-            return outlineProvinces.some(prov => name === prov || name.includes(prov));
-        });
-    };
-
     const haversineKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -640,9 +622,6 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         return R * c;
     };
 
-    // Returns true when GPS coords are present but the point sits outside all 3 depot
-    // metro radii AND is not in the Eastern Cape / GR region (which IS served nationally).
-    // GR coords: Gqeberha ~(-33.96, 25.60), George ~(-33.96, 22.45)
     const isGPSOutline = (latLng) => {
         if (!latLng || !latLng.lat || !latLng.lng) return false;
         const lat = parseFloat(latLng.lat);
@@ -651,39 +630,71 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
         const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
         const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
-        // Check if it resolves to a GR city code (Eastern Cape / Garden Route — nationally served)
         const resolvedCode = detectCityCode(null, null, latLng);
         if (resolvedCode === CITY_CODES.GR) return false;
         return distToJhb > 150 && distToDbn > 150 && distToCpt > 150;
     };
 
-    // Text-based outline province detection (address string or components)
-    const textIsOutline = [pickupAddress, dropoffAddress].some(addr =>
-        outlineProvinces.some(prov => addr.toLowerCase().includes(prov))
-    );
-    const componentsIsOutline =
-        checkComponentsForOutline(moveDetails.pickupAddressComponents) ||
-        checkComponentsForOutline(moveDetails.dropoffAddressComponents);
+    const outlineProvinces = [
+        'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
+        'mpumulanga', 'mphumulanga',
+        'potchefstroom', 'klerksdorp', 'rustenburg', 
+        'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+        'kimberley', 'upington',
+        'east london', 'eastlondon', 'buffalo city',
+        'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
+        'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
+    ];
 
-    // GPS-based outline detection (only run if text didn't resolve a city)
-    const gpsIsOutline =
-        (!rawPickupCityCode && isGPSOutline(moveDetails.pickupLatLng)) ||
-        (!rawDropoffCityCode && isGPSOutline(moveDetails.dropoffLatLng));
+    const allLocations = [
+        { address: pickupAddress, components: moveDetails.pickupAddressComponents, latLng: moveDetails.pickupLatLng, rawCityCode: rawPickupCityCode },
+        { address: dropoffAddress, components: moveDetails.dropoffAddressComponents, latLng: moveDetails.dropoffLatLng, rawCityCode: rawDropoffCityCode }
+    ];
 
-    // An address is "unresolved" if detectCityCode returned null (not a known hub)
-    // AND it either has GPS coordinates placing it outside all hubs, OR it is entirely
-    // missing GPS coordinates (meaning the user typed an unknown town and bypassed Google Maps).
-    const pickupUnresolved = !rawPickupCityCode && (!moveDetails.pickupLatLng || isGPSOutline(moveDetails.pickupLatLng));
-    const dropoffUnresolved = !rawDropoffCityCode && (!moveDetails.dropoffLatLng || isGPSOutline(moveDetails.dropoffLatLng));
+    if (Array.isArray(moveDetails.extraCollections)) {
+        moveDetails.extraCollections.forEach(coll => {
+            if (coll?.address) {
+                const rawCode = detectCityCode(coll.address, coll.addressComponents, coll.latLng);
+                allLocations.push({ address: coll.address.toLowerCase(), components: coll.addressComponents, latLng: coll.latLng, rawCityCode: rawCode });
+            }
+        });
+    }
 
-    // NOTE: GR city code (Eastern Cape) is intentionally excluded from this check —
-    // those routes have defined national rates and should be priced, not quote-requested.
-    const hasOutlineProvince =
-        textIsOutline ||
-        componentsIsOutline ||
-        gpsIsOutline ||
-        pickupUnresolved ||
-        dropoffUnresolved;
+    if (Array.isArray(moveDetails.extraDrops)) {
+        moveDetails.extraDrops.forEach(drop => {
+            if (drop?.address) {
+                const rawCode = detectCityCode(drop.address, drop.addressComponents, drop.latLng);
+                allLocations.push({ address: drop.address.toLowerCase(), components: drop.addressComponents, latLng: drop.latLng, rawCityCode: rawCode });
+            }
+        });
+    }
+
+    const isLocationOutline = (loc) => {
+        // 1. Text-based search
+        if (outlineProvinces.some(prov => loc.address.includes(prov))) return true;
+
+        // 2. Component-based search
+        if (loc.components && Array.isArray(loc.components)) {
+            const hasOutlineComp = loc.components.some(c => {
+                const name = (c.long_name || c.short_name || '').toLowerCase().trim();
+                return outlineProvinces.some(prov => name === prov || name.includes(prov));
+            });
+            if (hasOutlineComp) return true;
+        }
+
+        // 3. Unresolved and GPS outline check
+        if (!loc.rawCityCode) {
+            if (loc.latLng?.lat) {
+                if (isGPSOutline(loc.latLng)) return true;
+            } else {
+                return true; // No GPS coords and not resolved -> treat as outline
+            }
+        }
+
+        return false;
+    };
+
+    const hasOutlineProvince = allLocations.some(isLocationOutline);
 
     // ─── STEP 3: Resolve final city codes (fallback after outline check) ─────────
     // Cross-address fallback: if one side is resolved, propagate it to the other.
@@ -761,6 +772,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     const needsQuoteRequest = hasOutlineProvince || (!isNationalMove && isDepotOver80)
 
+    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
+
     let transportCost = 0
     let volumeCost = 0
     let vehicleName = ''
@@ -777,22 +790,28 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             volumeRate = nationalRate.ratePerCuFt
             volumeCost = totalVolumeCuFt * volumeRate
             
-            // Apply route-specific min charge
+            // Apply route-specific min charge (including move protection as part of it)
             routeMinCharge = nationalRate.minCharge || 5000
-            if (volumeCost < routeMinCharge) {
-                volumeCost = routeMinCharge
+            transportCost = moveProtectionCost
+            
+            const currentMoveCost = volumeCost + transportCost
+            if (currentMoveCost < routeMinCharge) {
+                volumeCost += routeMinCharge - currentMoveCost
             }
         } else {
             // Fallback for undefined routes
             volumeRate = 25
             volumeCost = totalVolumeCuFt * volumeRate
             routeMinCharge = 5000
-            if (volumeCost < routeMinCharge) {
-                volumeCost = routeMinCharge
+            transportCost = moveProtectionCost
+            
+            const currentMoveCost = volumeCost + transportCost
+            if (currentMoveCost < routeMinCharge) {
+                volumeCost += routeMinCharge - currentMoveCost
             }
         }
         
-        transportCost = 0 // National has no distance charge in Jose's volume-based mode
+        // transportCost has moveProtectionCost
         transportRate = 0
         vehicleName = 'Standard National Link'
     } else {
@@ -811,6 +830,10 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         // Apply flat minimum charge of R2600 for local moves
         const localMinCharge = PRICING_CONSTANTS.minOrder || 2600
         routeMinCharge = localMinCharge
+        
+        // Add move protection cost before checking minimum
+        transportCost += moveProtectionCost
+        
         const currentLocalCost = transportCost + volumeCost
         if (currentLocalCost < localMinCharge) {
             const diff = localMinCharge - currentLocalCost
@@ -963,9 +986,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         })
     }
 
-    // Move Protection (minimum protection surcharge: R250 <= 500 cuft, R450 > 500 cuft) — ALL MOVES
-    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
-    transportCost += moveProtectionCost
+    // Move Protection is already added to transportCost above
     const standardInsurance = 0 // Hide separate line item
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.

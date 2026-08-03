@@ -210,15 +210,6 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 return CITY_CODES.DBN;
             }
 
-            // Check Garden Route / PE
-            if (
-                val === "george" || val === "knysna" || val === "mossel bay" || val === "plettenberg bay" ||
-                val === "gqeberha" || val === "port elizabeth" || val === "eastern cape" || val === "pe" ||
-                val === "garden route" || val.includes("nelson mandela bay") || val.includes("garden route district")
-            ) {
-                return CITY_CODES.GR;
-            }
-
             // Check Gauteng / JHB
             if (
                 val === "johannesburg" || val === "joburg" || val === "jhb" ||
@@ -233,19 +224,6 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
     // 2. Full Text Search fallback
     if (addressStr) {
         const name = addressStr.toLowerCase().trim();
-
-        // Check Garden Route / PE first
-        if (
-            name.includes('george') || name.includes('knysna') || name.includes('plettenberg') ||
-            name.includes('plett') || name.includes('mossel bay') || name.includes('mosselbay') ||
-            name.includes('sedgefield') || name.includes('wilderness') || name.includes('tsitsikamma') ||
-            name.includes('storms river') || name.includes('jeffreys bay') || name.includes('st francis') ||
-            name.includes('gqeberha') || name.includes('port elizabeth') || name.includes('portelizabeth') ||
-            name.includes('eastern cape') || name.includes('garden route') ||
-            name.includes('nelson mandela bay')
-        ) {
-            return CITY_CODES.GR;
-        }
 
         // Check Cape Town / Western Cape
         if (

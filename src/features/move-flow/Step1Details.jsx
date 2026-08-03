@@ -425,17 +425,91 @@ export default function Step1Details() {
         const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
         const isManual = moveDetails.pickupManualActive || moveDetails.dropoffManualActive
 
-        const outlineProvinces = ['free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape', 'mpumulanga', 'mphumulanga']
-        const isOutlineComponent = (components) => {
-            if (!components || !Array.isArray(components)) return false
-            return components.some(c => {
-                const val = (c.long_name || c.short_name || '').toLowerCase().trim()
-                return outlineProvinces.some(prov => val === prov || val.includes(prov))
-            })
+        const isOutlineAddress = (address, components, latLng) => {
+            if (!address && !components && !latLng) return false;
+            
+            const cityCode = detectCityCode(address, components, latLng);
+            
+            // If it resolves to JHB, DBN, or CPT, it's NOT outline
+            if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
+                return false;
+            }
+            
+            const textOrComponentMatchesOutline = (addr, comps) => {
+                const outlineTerms = [
+                    'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
+                    'mpumulanga', 'mphumulanga',
+                    'potchefstroom', 'klerksdorp', 'rustenburg', 
+                    'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+                    'kimberley', 'upington',
+                    'east london', 'eastlondon', 'buffalo city',
+                    'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
+                    'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
+                ];
+                
+                const lowerAddr = (addr || '').toLowerCase();
+                if (outlineTerms.some(term => lowerAddr.includes(term))) return true;
+                
+                if (comps && Array.isArray(comps)) {
+                    return comps.some(c => {
+                        const val = (c.long_name || c.short_name || '').toLowerCase().trim();
+                        return outlineTerms.some(term => val === term || val.includes(term));
+                    });
+                }
+                return false;
+            };
+
+            if (textOrComponentMatchesOutline(address, components)) {
+                return true;
+            }
+
+            // GPS check: if it has coordinates but is far from hubs
+            if (latLng && latLng.lat && latLng.lng) {
+                const lat = parseFloat(latLng.lat);
+                const lng = parseFloat(latLng.lng);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    const haversineKm = (lat1, lon1, lat2, lon2) => {
+                        const R = 6371;
+                        const dLat = (lat2 - lat1) * Math.PI / 180;
+                        const dLon = (lon2 - lon1) * Math.PI / 180;
+                        const a = 
+                            Math.sin(dLat/2) * Math.sin(dLat/2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                            Math.sin(dLon/2) * Math.sin(dLon/2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                        return R * c;
+                    };
+                    const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
+                    const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
+                    const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
+                    
+                    if (distToJhb > 150 && distToDbn > 150 && distToCpt > 150) {
+                        return true;
+                    }
+                }
+            } else {
+                return true; // No GPS coords and not resolved -> treat as outline
+            }
+
+            return false;
+        };
+
+        const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
+        const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
+        
+        let extraIsOutline = false;
+        if (Array.isArray(moveDetails.extraCollections)) {
+            extraIsOutline = extraIsOutline || moveDetails.extraCollections.some(coll => 
+                isOutlineAddress(coll.address, coll.addressComponents, coll.latLng)
+            );
         }
-        const pickupIsOutline = isOutlineComponent(moveDetails.pickupAddressComponents)
-        const dropoffIsOutline = isOutlineComponent(moveDetails.dropoffAddressComponents)
-        const isOutline = pickupIsOutline || dropoffIsOutline
+        if (Array.isArray(moveDetails.extraDrops)) {
+            extraIsOutline = extraIsOutline || moveDetails.extraDrops.some(drop => 
+                isOutlineAddress(drop.address, drop.addressComponents, drop.latLng)
+            );
+        }
+
+        const isOutline = pickupIsOutline || dropoffIsOutline || extraIsOutline;
 
         // For local moves, ensure Google Maps resolved a real distance (unless manual entry or storage is selected)
         if (!isManual && !isNational && !isOutline && !moveDetails.storageDestination && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
@@ -709,16 +783,23 @@ export default function Step1Details() {
                                                     </button>
                                                 </div>
                                                 <AddressAutocomplete
-                                                    label={`Additional Collection Address #${idx + 2}`}
-                                                    name={`extra_coll_${idx}`}
-                                                    placeholder="Street Number, Street Name, Suburb"
-                                                    value={coll.address || ''}
-                                                    onChange={({ target: { value } }) => {
-                                                        const list = [...(moveDetails.extraCollections || [])]
-                                                        list[idx] = { ...list[idx], address: value }
-                                                        setMoveDetails({ extraCollections: list })
-                                                    }}
-                                                />
+                                                     label={`Additional Collection Address #${idx + 2}`}
+                                                     name={`extra_coll_${idx}`}
+                                                     placeholder="Street Number, Street Name, Suburb"
+                                                     value={coll.address || ''}
+                                                     onChange={(e) => {
+                                                         const { value, placeId, latLng, addressComponents } = e.target;
+                                                         const list = [...(moveDetails.extraCollections || [])]
+                                                         list[idx] = { 
+                                                             ...list[idx], 
+                                                             address: value,
+                                                             placeId: placeId || null,
+                                                             latLng: latLng || null,
+                                                             addressComponents: addressComponents || null
+                                                         }
+                                                         setMoveDetails({ extraCollections: list })
+                                                     }}
+                                                 />
                                                 <Input
                                                     label="Unit & Complex Name (Optional)"
                                                     placeholder="e.g. Unit 12, Parkgate"
@@ -917,16 +998,23 @@ export default function Step1Details() {
                                                     </button>
                                                 </div>
                                                 <AddressAutocomplete
-                                                    label={`Additional Drop-off Address #${idx + 2}`}
-                                                    name={`extra_drop_${idx}`}
-                                                    placeholder="Street Number, Street Name, Suburb"
-                                                    value={drop.address || ''}
-                                                    onChange={({ target: { value } }) => {
-                                                        const list = [...(moveDetails.extraDrops || [])]
-                                                        list[idx] = { ...list[idx], address: value }
-                                                        setMoveDetails({ extraDrops: list })
-                                                    }}
-                                                />
+                                                     label={`Additional Drop-off Address #${idx + 2}`}
+                                                     name={`extra_drop_${idx}`}
+                                                     placeholder="Street Number, Street Name, Suburb"
+                                                     value={drop.address || ''}
+                                                     onChange={(e) => {
+                                                         const { value, placeId, latLng, addressComponents } = e.target;
+                                                         const list = [...(moveDetails.extraDrops || [])]
+                                                         list[idx] = { 
+                                                             ...list[idx], 
+                                                             address: value,
+                                                             placeId: placeId || null,
+                                                             latLng: latLng || null,
+                                                             addressComponents: addressComponents || null
+                                                         }
+                                                         setMoveDetails({ extraDrops: list })
+                                                     }}
+                                                 />
                                                 <Input
                                                     label="Unit & Complex Name (Optional)"
                                                     placeholder="e.g. Unit 5, Marina View"
