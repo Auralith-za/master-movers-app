@@ -1088,8 +1088,8 @@ export default function Step1Details() {
                             </div>
                         )}
 
-                        {/* Distance Breakdown Panel — shown for moves once Google Maps has calculated the route */}
-                        {!isValidating && !addressError && moveDetails.tripBreakdown && moveDetails.totalBillableDistance > 0 && (
+                        {/* Distance Breakdown Panel — shown only on the test flow (/quote-test) */}
+                        {basePath === '/quote-test' && !isValidating && !addressError && moveDetails.tripBreakdown && moveDetails.totalBillableDistance > 0 && (
                             <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl animate-in fade-in slide-in-from-top-2">
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
