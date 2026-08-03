@@ -831,14 +831,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const localMinCharge = PRICING_CONSTANTS.minOrder || 2600
         routeMinCharge = localMinCharge
         
-        // Add move protection cost before checking minimum
-        transportCost += moveProtectionCost
-        
         const currentLocalCost = transportCost + volumeCost
         if (currentLocalCost < localMinCharge) {
             const diff = localMinCharge - currentLocalCost
             volumeCost += diff
         }
+        
+        // Add move protection cost on top of the local minimum / base move cost
+        transportCost += moveProtectionCost
     }
 
     let accessFees = 0
