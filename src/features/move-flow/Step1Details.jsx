@@ -208,6 +208,61 @@ export default function Step1Details() {
         return false;
     };
 
+    const handleOutlineCallbackSubmit = async () => {
+        if (!moveDetails.contactName || !moveDetails.contactEmail || !moveDetails.contactPhone) {
+            alert("Please enter your Name, Email, and Phone Number at the top of the form first so we know who to contact.");
+            const nameInput = document.getElementsByName('contactName')[0] || document.querySelector('input[name="contactName"]');
+            if (nameInput) {
+                nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                nameInput.focus();
+            }
+            return;
+        }
+
+        setIsSubmittingLead(true)
+        try {
+            await submitQuote({ 
+                status: 'lead', 
+                request_call_back: true,
+                customer_comments: '[OUTLAYING AREA] User requested custom quote from callback button.',
+                forceNew: true
+            })
+            // 🔴 Google Ads: Lead conversion (Outline Area callback)
+            trackCallbackRequest({ step: 'Step 1 — Outlaying Area' })
+            await emailService.sendOutlineAreaEmail({
+                name: moveDetails.contactName,
+                email: moveDetails.contactEmail,
+                phone: moveDetails.contactPhone,
+                pickup: moveDetails.pickupAddress || '',
+                dropoff: moveDetails.dropoffAddress || '',
+                moveDate: moveDetails.moveDate || ''
+            })
+            alert("Request Sent! One of our consultants will contact you shortly with a custom quote. 📞")
+        } catch (err) {
+            console.error("Outline lead error:", err)
+            alert("Request Sent! (Note: Offline mode) We will contact you shortly.")
+        } finally {
+            setIsSubmittingLead(false)
+        }
+    };
+
+    const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
+    const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
+    
+    let extraIsOutline = false;
+    if (Array.isArray(moveDetails.extraCollections)) {
+        extraIsOutline = extraIsOutline || moveDetails.extraCollections.some(coll => 
+            isOutlineAddress(coll.address, coll.addressComponents, coll.latLng)
+        );
+    }
+    if (Array.isArray(moveDetails.extraDrops)) {
+        extraIsOutline = extraIsOutline || moveDetails.extraDrops.some(drop => 
+            isOutlineAddress(drop.address, drop.addressComponents, drop.latLng)
+        );
+    }
+
+    const isOutline = pickupIsOutline || dropoffIsOutline || extraIsOutline;
+
     // ─── Storage destination constants ──────────────────────────────────────
     const STORAGE_DEPOTS = [
         {
@@ -498,23 +553,6 @@ export default function Step1Details() {
 
 
 
-        const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
-        const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
-        
-        let extraIsOutline = false;
-        if (Array.isArray(moveDetails.extraCollections)) {
-            extraIsOutline = extraIsOutline || moveDetails.extraCollections.some(coll => 
-                isOutlineAddress(coll.address, coll.addressComponents, coll.latLng)
-            );
-        }
-        if (Array.isArray(moveDetails.extraDrops)) {
-            extraIsOutline = extraIsOutline || moveDetails.extraDrops.some(drop => 
-                isOutlineAddress(drop.address, drop.addressComponents, drop.latLng)
-            );
-        }
-
-        const isOutline = pickupIsOutline || dropoffIsOutline || extraIsOutline;
-
         // For local moves, ensure Google Maps resolved a real distance (unless manual entry or storage is selected)
         if (!isManual && !isNational && !isOutline && !moveDetails.storageDestination && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
             setAddressError("Could not calculate a driving route. Please make sure you selected an address from the Google Maps suggestions.")
@@ -522,7 +560,7 @@ export default function Step1Details() {
         }
 
         if (isOutline) {
-            setShowOutlineModal(true)
+            handleOutlineCallbackSubmit()
             return
         }
 
@@ -736,8 +774,18 @@ export default function Step1Details() {
                                     />
                                 )}
                                 {moveDetails.pickupAddress && isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng) && (
-                                    <div className="p-3.5 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
-                                        <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                    <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleOutlineCallbackSubmit}
+                                            disabled={isSubmittingLead}
+                                            className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                        >
+                                            {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
+                                        </button>
                                     </div>
                                 )}
                                 {!pickupHelpSent ? (
@@ -810,8 +858,18 @@ export default function Step1Details() {
                                                      }}
                                                  />
                                                  {coll.address && isOutlineAddress(coll.address, coll.addressComponents, coll.latLng) && (
-                                                     <div className="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
-                                                         <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                     <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
+                                                         <div className="flex items-center gap-2">
+                                                             <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                         </div>
+                                                         <button
+                                                             type="button"
+                                                             onClick={handleOutlineCallbackSubmit}
+                                                             disabled={isSubmittingLead}
+                                                             className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                         >
+                                                             {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
+                                                         </button>
                                                      </div>
                                                  )}
                                                 <Input
@@ -959,8 +1017,18 @@ export default function Step1Details() {
                                             />
                                         )}
                                         {moveDetails.dropoffAddress && isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng) && (
-                                            <div className="p-3.5 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
-                                                <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                            <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOutlineCallbackSubmit}
+                                                    disabled={isSubmittingLead}
+                                                    className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                >
+                                                    {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
+                                                </button>
                                             </div>
                                         )}
                                         {!dropoffHelpSent ? (
@@ -1035,8 +1103,18 @@ export default function Step1Details() {
                                                      }}
                                                  />
                                                  {drop.address && isOutlineAddress(drop.address, drop.addressComponents, drop.latLng) && (
-                                                     <div className="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2 mt-2 animate-in fade-in">
-                                                         <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                     <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
+                                                         <div className="flex items-center gap-2">
+                                                             <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                         </div>
+                                                         <button
+                                                             type="button"
+                                                             onClick={handleOutlineCallbackSubmit}
+                                                             disabled={isSubmittingLead}
+                                                             className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                         >
+                                                             {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
+                                                         </button>
                                                      </div>
                                                  )}
                                                 <Input
@@ -1198,12 +1276,14 @@ export default function Step1Details() {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
                     <Button 
-                        type="submit" 
+                        type={isOutline ? "button" : "submit"}
+                        onClick={isOutline ? handleOutlineCallbackSubmit : undefined}
                         size="lg" 
-                        disabled={!!addressError || isValidating}
+                        disabled={(!!addressError && !isOutline) || isValidating || isSubmittingLead}
                         className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isValidating ? 'Verifying...' : 'Next Step'} <Truck className="ml-3" size={20} />
+                        {isValidating ? 'Verifying...' : isOutline ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
+                        {isOutline ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
                     </Button>
                 </div>
 
