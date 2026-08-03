@@ -281,10 +281,15 @@ export default function Step1Details() {
         } catch (err) {
             console.error("Multi-stop lead error:", err)
             alert("Request Sent! (Note: Offline mode) We will contact you shortly.")
-        } finally {
-            setIsSubmittingLead(false)
         }
     };
+
+    React.useEffect(() => {
+        if (moveDetails.locationMode === 'multiple') {
+            setMoveDetails({ locationMode: 'single', extraCollections: [], extraDrops: [] })
+            setShowMultipleStopsWarning(true)
+        }
+    }, [moveDetails.locationMode, setMoveDetails]);
 
 
 
@@ -771,6 +776,7 @@ export default function Step1Details() {
                                      type="button"
                                      onClick={() => {
                                          setShowMultipleStopsWarning(true)
+                                         setMoveDetails({ locationMode: 'single', extraCollections: [], extraDrops: [] })
                                      }}
                                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                                          showMultipleStopsWarning
@@ -883,7 +889,7 @@ export default function Step1Details() {
                                 />
 
                                 {/* Multiple Collections Section */}
-                                {(moveDetails.locationMode === 'multiple' || (moveDetails.extraCollections && moveDetails.extraCollections.length > 0)) && (
+                                {(moveDetails.locationMode === 'multiple' && !showMultipleStopsWarning) && (
                                     <div className="space-y-4 pt-4 border-t border-slate-100">
                                         <h4 className="text-xs font-black text-red-600 uppercase tracking-wider">Additional Collection Addresses</h4>
                                         {(moveDetails.extraCollections || []).map((coll, idx) => (
@@ -1128,7 +1134,7 @@ export default function Step1Details() {
                                 )}
 
                                 {/* Multiple Drop-offs Section */}
-                                {(moveDetails.locationMode === 'multiple' || (moveDetails.extraDrops && moveDetails.extraDrops.length > 0)) && (
+                                {(moveDetails.locationMode === 'multiple' && !showMultipleStopsWarning) && (
                                     <div className="space-y-4 pt-4 border-t border-slate-100">
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Additional Drop-off Addresses</h4>
                                         {(moveDetails.extraDrops || []).map((drop, idx) => (
