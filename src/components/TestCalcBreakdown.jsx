@@ -49,7 +49,7 @@ function Section({ title, icon: Icon, children, color = 'slate' }) {
 
 function R(n) {
     if (n === null || n === undefined || isNaN(n)) return '—'
-    return `R ${Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+    return `R\u00a0${Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────

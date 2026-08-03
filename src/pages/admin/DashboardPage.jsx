@@ -192,7 +192,7 @@ export default function DashboardPage() {
                 </div>
             </div>
             <h3 className="text-slate-500 text-sm font-medium">{label}</h3>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1 whitespace-nowrap">{value}</p>
             {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
         </div>
     )
@@ -305,7 +305,7 @@ export default function DashboardPage() {
 
                                         <div className="flex items-center gap-3 justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
                                             <div className="text-right">
-                                                <div className="font-bold text-slate-900 text-base">
+                                                <div className="font-bold text-slate-900 text-base whitespace-nowrap">
                                                     R {Number(q.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400">Incl VAT</div>

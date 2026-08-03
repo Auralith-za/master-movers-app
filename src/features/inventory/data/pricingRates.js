@@ -225,6 +225,22 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
     if (addressStr) {
         const name = addressStr.toLowerCase().trim();
 
+        // 2.1 Postal Code geographic matching (South Africa)
+        // Matches 4-digit codes at the end or right before "South Africa"
+        const postalMatch = name.match(/\b(\d{4})\s*(?:,\s*south\s+africa)?\s*$/);
+        if (postalMatch) {
+            const code = parseInt(postalMatch[1], 10);
+            if (code >= 7000 && code <= 8299) {
+                return CITY_CODES.CPT;
+            }
+            if (code >= 2900 && code <= 4799) {
+                return CITY_CODES.DBN;
+            }
+            if (code >= 1 && code <= 2899) {
+                return CITY_CODES.JHB;
+            }
+        }
+
         // Check Cape Town / Western Cape
         if (
             name.includes('cape town') || name.includes('capetown') || name.includes('western cape') || name.includes('cpt') ||

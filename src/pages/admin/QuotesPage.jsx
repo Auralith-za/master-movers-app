@@ -274,7 +274,7 @@ export default function QuotesPage() {
                                             </div>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                    <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
                                         {quote.total_price ? `R ${Number(quote.total_price).toFixed(2)}` : '-'}
                                     </td>
                                     {filter === 'rejected' && (

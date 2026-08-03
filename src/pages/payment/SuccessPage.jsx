@@ -263,15 +263,15 @@ export default function SuccessPage() {
                             <div className="border-t border-slate-100 pt-4 space-y-2">
                                 <div className="flex justify-between text-sm text-slate-500">
                                     <span>Subtotal (excl. VAT)</span>
-                                    <span>R {displaySubTotal.toFixed(2)}</span>
+                                    <span className="whitespace-nowrap">R {displaySubTotal.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-slate-500">
                                     <span>VAT (15%)</span>
-                                    <span>R {displayVat.toFixed(2)}</span>
+                                    <span className="whitespace-nowrap">R {displayVat.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t border-slate-200">
                                     <span className="font-black text-slate-900 uppercase tracking-wide text-sm">Total Paid</span>
-                                    <span className="text-2xl font-black text-emerald-600">R {Number(displayTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-2xl font-black text-emerald-600 whitespace-nowrap">R {Number(displayTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         )}

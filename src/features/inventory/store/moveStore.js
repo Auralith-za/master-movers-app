@@ -671,13 +671,23 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     const isLocationOutline = (loc) => {
         // 1. Text-based search
-        if (outlineProvinces.some(prov => loc.address.includes(prov))) return true;
+        if (outlineProvinces.some(prov => {
+            if (prov === 'pe') {
+                return new RegExp('\\bpe\\b', 'i').test(loc.address);
+            }
+            return loc.address.includes(prov);
+        })) return true;
 
         // 2. Component-based search
         if (loc.components && Array.isArray(loc.components)) {
             const hasOutlineComp = loc.components.some(c => {
                 const name = (c.long_name || c.short_name || '').toLowerCase().trim();
-                return outlineProvinces.some(prov => name === prov || name.includes(prov));
+                return outlineProvinces.some(prov => {
+                    if (prov === 'pe') {
+                        return name === 'pe' || new RegExp('\\bpe\\b', 'i').test(name);
+                    }
+                    return name === prov || name.includes(prov);
+                });
             });
             if (hasOutlineComp) return true;
         }
@@ -698,10 +708,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // ─── STEP 3: Resolve final city codes (fallback after outline check) ─────────
     // Cross-address fallback: if one side is resolved, propagate it to the other.
+    // BUT only if the route is not long-distance (distance > 250km).
     let pickupCityCode = rawPickupCityCode;
     let dropoffCityCode = rawDropoffCityCode;
-    if (pickupCityCode && !dropoffCityCode) dropoffCityCode = pickupCityCode;
-    if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
+    const isLongDistance = (parseFloat(moveDetails.distanceKm) || 0) > 250 || (parseFloat(moveDetails.totalBillableDistance) || 0) > 250;
+    if (!isLongDistance) {
+        if (pickupCityCode && !dropoffCityCode) dropoffCityCode = pickupCityCode;
+        if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
+    }
     // Absolute fallback — only reached for addresses with no GPS and no text match.
     // The outline-province flag above will have already caught most real cases.
     if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;

@@ -655,18 +655,18 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 {appliedCoupon ? (
                                     <>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Subtotal (ex-VAT)</div>
-                                        <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
-                                        <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         {breakdown?.payflexSurcharge > 0 && (
                                             <>
                                                 <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Payflex Surcharge (7%)</div>
-                                                <div className="text-sm font-bold text-slate-300">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                             </>
                                         )}
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Total (incl. VAT)</div>
-                                        <div className="text-lg font-bold text-slate-500 line-through">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                        <div className="text-3xl font-bold text-emerald-400">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-slate-500 line-through whitespace-nowrap">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-3xl font-bold text-emerald-400 whitespace-nowrap">R {discountedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-black">
                                             {appliedCoupon.discount_type === 'fixed' ? `-R ${appliedCoupon.discount_amount}` : `-${appliedCoupon.discount_percent}%`} Coupon Applied!
                                         </div>
@@ -674,18 +674,18 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 ) : (
                                     <>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Subtotal (ex-VAT)</div>
-                                        <div className="text-sm font-bold text-slate-300">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">VAT (15%)</div>
-                                        <div className="text-sm font-bold text-slate-300">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                         {breakdown?.payflexSurcharge > 0 && (
                                             <>
                                                 <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-2 mb-1">Payflex Surcharge (7%)</div>
-                                                <div className="text-sm font-bold text-slate-300">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                <div className="text-sm font-bold text-slate-300 whitespace-nowrap">R {breakdown.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                             </>
                                         )}
                                         <div className="w-full border-t border-slate-700 my-2"></div>
                                         <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Total (incl. VAT)</div>
-                                        <div className="text-3xl font-bold text-primary-500">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                        <div className="text-3xl font-bold text-primary-500 whitespace-nowrap">R {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                     </>
                                 )}
                                 <div className="text-[10px] text-slate-500 mt-2 italic">* Pricing valid for 7 days from date of issue.</div>
@@ -700,7 +700,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <span className="text-emerald-700 font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
                                     🏷️ Coupon: {appliedCoupon.code}
                                 </span>
-                                <span className="font-black text-emerald-600">- R {couponDiscount.toFixed(2)}</span>
+                                <span className="font-black text-emerald-600 whitespace-nowrap">- R {couponDiscount.toFixed(2)}</span>
                             </div>
                         )}
                         {packagingCost > 0 && (() => {
@@ -715,25 +715,25 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <div className="space-y-2 py-4 border-b border-gray-100">
                                     <div className="flex justify-between items-center bg-slate-100 rounded-lg p-4 mb-2">
                                         <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Box Supplies & Packing</span>
-                                        <span className="font-bold text-slate-900">+ R {packagingCost.toFixed(2)}</span>
+                                        <span className="font-bold text-slate-900 whitespace-nowrap">+ R {packagingCost.toFixed(2)}</span>
                                     </div>
                                     <div className="pl-4 space-y-1.5 mt-1">
                                         {st7Qty > 0 && (
                                             <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                                 <span>{st7Qty}× ST7 Boxes <span className="text-slate-300 font-medium normal-case">@ R{rates.st7.toFixed(2)} ea</span></span>
-                                                <span className="text-slate-500">R {st7Total.toFixed(2)}</span>
+                                                <span className="text-slate-500 whitespace-nowrap">R {st7Total.toFixed(2)}</span>
                                             </div>
                                         )}
                                         {linenQty > 0 && (
                                             <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                                 <span>{linenQty}× Linen Boxes <span className="text-slate-300 font-medium normal-case">@ R{rates.linen.toFixed(2)} ea</span></span>
-                                                <span className="text-slate-500">R {linenTotal.toFixed(2)}</span>
+                                                <span className="text-slate-500 whitespace-nowrap">R {linenTotal.toFixed(2)}</span>
                                             </div>
                                         )}
                                         {deliveryFee > 0 && (
                                             <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                                 <span>Delivery &amp; Handling Fee</span>
-                                                <span className="text-slate-500">R {deliveryFee.toFixed(2)}</span>
+                                                <span className="text-slate-500 whitespace-nowrap">R {deliveryFee.toFixed(2)}</span>
                                             </div>
                                         )}
                                     </div>
@@ -748,7 +748,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
                                         Heavy Item Logistics
                                     </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.crew.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.crew.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
@@ -763,19 +763,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <div className="space-y-2 py-4 border-b border-gray-100">
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Specialized Wrapping & Covers</span>
-                                    <span className="font-bold text-slate-900">+ R {(breakdown.wrappingCost + breakdown.plasticSleeveCost).toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {(breakdown.wrappingCost + breakdown.plasticSleeveCost).toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     {breakdown.wrappingCost > 0 && (
                                         <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                             <span>Specialized Furniture Wrapping</span>
-                                            <span className="text-slate-500">R {breakdown.wrappingCost.toFixed(2)}</span>
+                                            <span className="text-slate-500 whitespace-nowrap">R {breakdown.wrappingCost.toFixed(2)}</span>
                                         </div>
                                     )}
                                     {breakdown.plasticSleeveCost > 0 && (
                                         <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                             <span>Mattress / Couch Plastic Sleeves <span className="text-slate-300 font-medium normal-case">@ R55.00 ea</span></span>
-                                            <span className="text-slate-500">R {breakdown.plasticSleeveCost.toFixed(2)}</span>
+                                            <span className="text-slate-500 whitespace-nowrap">R {breakdown.plasticSleeveCost.toFixed(2)}</span>
                                         </div>
                                     )}
                                 </div>
@@ -787,7 +787,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <div className="space-y-2 py-4 border-b border-gray-100">
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest">Access & Special Services</span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.access.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.access.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     {breakdown.detailedAccess && breakdown.detailedAccess.length > 0 ? (
@@ -818,12 +818,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
                                         Shuttle Vehicle Surcharge
                                     </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.shuttleCost.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.shuttleCost.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                         <span>Required due to site restrictions or carry distance &gt; 90m</span>
-                                        <span className="text-slate-500">R {breakdown.shuttleCost.toFixed(2)}</span>
+                                        <span className="text-slate-500 whitespace-nowrap">R {breakdown.shuttleCost.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -836,12 +836,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
                                         Long Carry Surcharge
                                     </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.longCarryCost.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.longCarryCost.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                         <span>Long Carry distance (50m - 90m)</span>
-                                        <span className="text-slate-500">R {breakdown.longCarryCost.toFixed(2)}</span>
+                                        <span className="text-slate-500 whitespace-nowrap">R {breakdown.longCarryCost.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -856,7 +856,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
                                         Documentation Fee
                                     </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.documentationFee.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.documentationFee.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
@@ -872,12 +872,12 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     <span className="text-slate-600 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
                                         📦 Master Movers Storage (Monthly Fee)
                                     </span>
-                                    <span className="font-bold text-slate-900">+ R {breakdown.storageCost.toFixed(2)}</span>
+                                    <span className="font-bold text-slate-900 whitespace-nowrap">+ R {breakdown.storageCost.toFixed(2)}</span>
                                 </div>
                                 <div className="pl-4 space-y-1.5 mt-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-tight">
                                         <span>{breakdown.storageDestination} Depot · {totalVolume?.toFixed(2)} ft³ × R1.50/cuft/mo{breakdown.storageCost === (PRICING_CONSTANTS.minStorageFee || 450) && (totalVolume * 1.5 < (PRICING_CONSTANTS.minStorageFee || 450)) ? ` (Min. R${PRICING_CONSTANTS.minStorageFee || 450}/mo)` : ''}</span>
-                                        <span className="text-slate-500">R {breakdown.storageCost.toFixed(2)}</span>
+                                        <span className="text-slate-500 whitespace-nowrap">R {breakdown.storageCost.toFixed(2)}</span>
                                     </div>
                                     <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Note: Delivery out of storage is not included</p>
                                 </div>
@@ -974,7 +974,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                     </span>
                                     <span className="text-green-600 text-[10px] font-bold">Applied on ex-VAT subtotal</span>
                                 </div>
-                                <span className="font-black text-green-700 text-xl">- R {discount.toFixed(2)}</span>
+                                <span className="font-black text-green-700 text-xl whitespace-nowrap">- R {discount.toFixed(2)}</span>
                             </div>
                         )}
                     </div>

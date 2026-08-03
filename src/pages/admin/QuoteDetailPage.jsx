@@ -117,9 +117,12 @@ export default function QuoteDetailPage() {
                 calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
                     .then(({ totalDistance, breakdown }) => {
                         setMapsStatus(`Success: ${totalDistance}km (Breakdown: ${JSON.stringify(breakdown)})`);
+                        const pickupCity = detectCityCode(editForm.pickup_address);
+                        const dropoffCity = detectCityCode(editForm.dropoff_address);
+                        const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || ((breakdown.pickupToDropoff || 0) > 250);
                         setEditForm(prev => ({ 
                             ...prev, 
-                            distance_km: totalDistance,
+                            distance_km: isNational ? (breakdown.pickupToDropoff || 0) : totalDistance,
                             trip_breakdown: breakdown
                         }))
                     })
@@ -151,15 +154,21 @@ export default function QuoteDetailPage() {
             const rawItems = data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {})
             const rawSpecialWrapping = data.items_json?.special_wrapping || {}
             
-            // If the quote already has a trip breakdown, ensure distance_km represents the full billable circuit (depot legs included)
+            // If the quote already has a trip breakdown, ensure distance_km represents the full billable circuit (depot legs included) for local moves
             let initialDistance = Number(data.distance_km || 0);
             if (data.trip_breakdown && typeof data.trip_breakdown === 'object') {
+                const pickupCity = detectCityCode(data.pickup_address);
+                const dropoffCity = detectCityCode(data.dropoff_address);
                 const breakdown = data.trip_breakdown;
                 const pickupToDropoff = breakdown.pickupToDropoff || 0;
-                const totalCircuit = (breakdown.depotToPickup || 0) + (breakdown.pickupToDropoff || 0) + (breakdown.dropoffToDepot || 0);
+                const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || (pickupToDropoff > 250);
                 
-                if (Math.abs(initialDistance - pickupToDropoff) < Math.abs(initialDistance - totalCircuit)) {
-                    initialDistance = totalCircuit;
+                if (!isNational) {
+                    const totalCircuit = (breakdown.depotToPickup || 0) + (breakdown.pickupToDropoff || 0) + (breakdown.dropoffToDepot || 0);
+                    
+                    if (Math.abs(initialDistance - pickupToDropoff) < Math.abs(initialDistance - totalCircuit)) {
+                        initialDistance = totalCircuit;
+                    }
                 }
             }
 
@@ -385,15 +394,15 @@ export default function QuoteDetailPage() {
         }
     }, [quote, recalculatedData, hasCalculatedOffset, isEditing, customProductsTotal, editForm.trip_breakdown, mapsStatus])
 
-    const finalPrice = isEditing 
+    const finalPrice = (isEditing || !quote?.total_price)
         ? (((recalculatedData?.total || 0) + customProductsTotal) + priceOffset)
         : (Number(quote?.total_price) || 0);
 
-    const finalVat = isEditing
+    const finalVat = (isEditing || !quote?.total_price)
         ? ((recalculatedData?.vat || 0) + (priceOffset * 0.15 / 1.15))
         : ((Number(quote?.total_price) || 0) * 0.15 / 1.15);
 
-    const finalSubTotal = isEditing
+    const finalSubTotal = (isEditing || !quote?.total_price)
         ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
         : ((Number(quote?.total_price) || 0) / 1.15);
 
@@ -1419,7 +1428,7 @@ export default function QuoteDetailPage() {
                         <div className="relative z-10">
                             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Quote Value</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-white">R {finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-4xl font-black text-white whitespace-nowrap">R {finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 {isEditing && (
                                     <span className="text-emerald-400 text-xs font-bold animate-pulse">Live</span>
                                 )}
@@ -1438,56 +1447,56 @@ export default function QuoteDetailPage() {
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Custom Products</span>
-                                        <span className="font-bold">+ R {customProductsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {customProductsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.packaging > 0 || quote?.packaging_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
                                         <span>Box Supplies {(editForm.st7_boxes || quote?.st7_boxes) > 0 && `(${editForm.st7_boxes || quote?.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {(editForm.linen_boxes || quote?.linen_boxes) > 0 && `(${editForm.linen_boxes || quote?.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.wrappingCost > 0 || quote?.wrapping_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
                                         <span>Specialized Wrapping {((recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume) > 0) && `(${(recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume).toFixed(2)} ft³ x R5.90)`}</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.wrappingCost || quote?.wrapping_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.wrappingCost || quote?.wrapping_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.plasticSleeveCost > 0 || quote?.plastic_sleeve_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
                                         <span>Plastic Sleeves {((recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count) > 0) && `(${(recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count)} x R55)`}</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.shuttleCost > 0 || quote?.shuttle_cost > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Shuttle Vehicle</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.access > 0 || quote?.access_fees > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
                                         <span title={Array.isArray(recalculatedData?.breakdown?.detailedAccess) ? recalculatedData.breakdown.detailedAccess.join(' | ') : recalculatedData?.breakdown?.detailedAccess}>Access & Surcharges</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.access || quote?.access_fees || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.access || quote?.access_fees || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.crew > 0 || quote?.crew_fee > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
                                         <span>Heavy Item Crew</span>
-                                        <span className="font-bold">+ R {(recalculatedData?.breakdown?.crew || quote?.crew_fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.crew || quote?.crew_fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.discount > 0 || quote?.discount_amount > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400">
                                         <span>Special Discount (Mid-Month)</span>
-                                        <span className="font-bold">- R {(recalculatedData?.discount || quote?.discount_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">- R {(recalculatedData?.discount || quote?.discount_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {((isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)) > 0) && (
                                     <div className="flex flex-col gap-1 text-xs text-amber-400/90 py-1 border-t border-slate-700/50">
                                         <div className="flex justify-between">
                                             <span>Master Movers Storage (Monthly Fee)</span>
-                                            <span className="font-bold">+ R {(isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-bold whitespace-nowrap">+ R {(isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                         <p className="text-[10px] text-amber-300/80 font-medium">Note: Delivery out of storage is not included</p>
                                     </div>
@@ -1501,12 +1510,12 @@ export default function QuoteDetailPage() {
                                 {(recalculatedData?.payflexSurcharge > 0) && (
                                     <div className="flex justify-between text-xs text-indigo-400">
                                         <span>Payflex Surcharge (7%)</span>
-                                        <span className="font-bold">+ R {recalculatedData.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {recalculatedData.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Vat Included (15%)</span>
-                                    <span className="text-white font-bold tracking-wide">R {finalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-white font-bold tracking-wide whitespace-nowrap">R {finalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>
@@ -1529,7 +1538,7 @@ export default function QuoteDetailPage() {
                                                 {p.cubes > 0 && <span className="text-[10px] text-slate-400">Vol: {p.cubes} ft³</span>}
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <span className={`font-bold ${p.price < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                <span className={`font-bold whitespace-nowrap ${p.price < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
                                                     {p.price < 0 ? '-' : '+'} R {Math.abs(p.price).toFixed(2)}
                                                 </span>
                                                 <button onClick={() => handleRemoveCustomProduct(p.id)} className="text-slate-400 hover:text-red-500">
