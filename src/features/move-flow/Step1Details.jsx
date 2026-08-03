@@ -246,6 +246,44 @@ export default function Step1Details() {
         }
     };
 
+    const handleMultipleLocationsCallback = async () => {
+        if (!moveDetails.contactName || !moveDetails.contactEmail || !moveDetails.contactPhone) {
+            alert("Please enter your Name, Email, and Phone Number at the top of the form first so we know who to contact.");
+            const nameInput = document.getElementsByName('contactName')[0] || document.querySelector('input[name="contactName"]');
+            if (nameInput) {
+                nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                nameInput.focus();
+            }
+            return;
+        }
+
+        setIsSubmittingLead(true)
+        try {
+            await submitQuote({ 
+                status: 'lead', 
+                request_call_back: true,
+                customer_comments: '[MULTIPLE STOPS] User requested callback for a move with multiple collections & drops.',
+                forceNew: true
+            })
+            // 🔴 Google Ads: Lead conversion
+            trackCallbackRequest({ step: 'Step 1 — Multiple Stops' })
+            await emailService.sendOutlineAreaEmail({
+                name: moveDetails.contactName,
+                email: moveDetails.contactEmail,
+                phone: moveDetails.contactPhone,
+                pickup: `${moveDetails.pickupAddress || 'Not specified yet'} (with extra collections requested)`,
+                dropoff: `${moveDetails.dropoffAddress || 'Not specified yet'} (with extra drops requested)`,
+                moveDate: moveDetails.moveDate || ''
+            })
+            alert("Request Sent! One of our consultants will contact you shortly to coordinate your multi-stop quote. 📞")
+        } catch (err) {
+            console.error("Multi-stop lead error:", err)
+            alert("Request Sent! (Note: Offline mode) We will contact you shortly.")
+        } finally {
+            setIsSubmittingLead(false)
+        }
+    };
+
     const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
     const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
     
@@ -722,17 +760,17 @@ export default function Step1Details() {
                                 >
                                     Single Location
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setMoveDetails({ locationMode: 'multiple' })}
-                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                                        moveDetails.locationMode === 'multiple'
-                                            ? 'bg-red-600 text-white shadow-md'
-                                            : 'text-slate-500 hover:text-slate-900'
-                                    }`}
-                                >
-                                    <Sparkles size={13} /> Multiple Collections & Drops
-                                </button>
+                                 <button
+                                     type="button"
+                                     onClick={async () => {
+                                         if (confirm("Moves with multiple collections and drop-offs require manual routing and coordination. Would you like to request a manual quote callback?")) {
+                                             await handleMultipleLocationsCallback()
+                                         }
+                                     }}
+                                     className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 text-slate-500 hover:text-slate-900"
+                                 >
+                                     <Sparkles size={13} /> Multiple Collections & Drops
+                                 </button>
                             </div>
                         </div>
 

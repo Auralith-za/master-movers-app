@@ -722,11 +722,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
                              ? (moveDetails.tripBreakdown.depotToPickup || 0) + (moveDetails.tripBreakdown.dropoffToDepot || 0)
                              : 30))
 
-    // ─── STEP 6: National Move Detection ─────────────────────────────────────────
-    // ─── STEP 6: National Move Detection ─────────────────────────────────────────
-    // A move is national when it crosses between our three served city depots.
-    // Note: outline province moves are caught by hasOutlineProvince — they are NOT
-    // priced as national (we have no national rates for those routes).
+    const hasDifferentCityCode = allLocations.some(loc => {
+        const cityCode = loc.rawCityCode || detectCityCode(loc.address, loc.components, loc.latLng);
+        return cityCode && cityCode !== pickupCityCode;
+    });
+
     const isNationalMove =
         !hasOutlineProvince && (
             (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
@@ -735,8 +735,36 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
-            (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg'))
+            (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg')) ||
+            hasDifferentCityCode
         );
+
+    let nationalDestinationCityCode = dropoffCityCode;
+    if (isNationalMove) {
+        const sequence = [];
+        if (Array.isArray(moveDetails.extraCollections)) {
+            moveDetails.extraCollections.forEach(coll => {
+                if (coll?.address) {
+                    const rawCode = detectCityCode(coll.address, coll.addressComponents, coll.latLng);
+                    if (rawCode) sequence.push(rawCode);
+                }
+            });
+        }
+        sequence.push(dropoffCityCode);
+        if (Array.isArray(moveDetails.extraDrops)) {
+            moveDetails.extraDrops.forEach(drop => {
+                if (drop?.address) {
+                    const rawCode = detectCityCode(drop.address, drop.addressComponents, drop.latLng);
+                    if (rawCode) sequence.push(rawCode);
+                }
+            });
+        }
+        
+        const firstDiff = sequence.find(code => code && code !== pickupCityCode);
+        if (firstDiff) {
+            nationalDestinationCityCode = firstDiff;
+        }
+    }
 
     // ─── STEP 7: Local 80km Depot Rule ───────────────────────────────────────────
     // If this is a local move and either the depot→pickup OR dropoff→depot leg
@@ -783,7 +811,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     if (isNationalMove) {
         // Jose's National logic: Volume-based calculation (volume * ratePerCuFt)
-        const routeKey = `${pickupCityCode}-${dropoffCityCode}`
+        const routeKey = `${pickupCityCode}-${nationalDestinationCityCode}`
         const nationalRate = NATIONAL_RATES[routeKey]
         
         if (nationalRate) {
