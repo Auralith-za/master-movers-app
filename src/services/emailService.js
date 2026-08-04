@@ -398,6 +398,76 @@ export const emailService = {
         }
     },
 
+    /**
+     * Send instant admin alert when a client rejects a quote (frontend customer side)
+     */
+    sendRejectedQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, rejectionReason }) => {
+        try {
+            console.log(`Generating in-memory PDF for rejected quote alert...`)
+
+            let pdfBase64 = null
+            let pdfFilename = null
+
+            try {
+                const doc = await generateProfessionalQuote({
+                    quoteId,
+                    clientName,
+                    clientEmail,
+                    clientPhone,
+                    pickupAddress,
+                    dropoffAddress,
+                    moveDate,
+                    inventory: inventory || {},
+                    breakdown: breakdown || {},
+                    total: total || 0,
+                    vat: vat || 0,
+                    subTotal: subTotal || 0,
+                    inventoryItems: inventoryItems || [],
+                    isSharedLoad: breakdown?.isSharedLoad || false,
+                    shouldSave: false
+                })
+                pdfBase64 = doc.output('base64')
+                pdfFilename = `MasterMovers_Rejected_Quote_${quoteId || 'New'}.pdf`
+            } catch (pdfErr) {
+                console.warn('PDF generation failed for rejected quote alert:', pdfErr)
+            }
+
+            const quoteData = {
+                id: quoteId,
+                client_name: clientName,
+                client_email: clientEmail,
+                client_phone: clientPhone,
+                move_date: moveDate,
+                pickup_address: pickupAddress,
+                dropoff_address: dropoffAddress,
+                total_price: total || 0,
+                rejection_reason: rejectionReason || 'No reason provided'
+            }
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'quote_rejected_alert',
+                    quoteData,
+                    pdfBase64,
+                    pdfFilename
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Rejected quote alert failed')
+            console.log('❌ Quote rejected admin alert sent to all admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendRejectedQuoteAlert error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
     sendEmail: async ({ type, to, quoteData, paymentLink }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''

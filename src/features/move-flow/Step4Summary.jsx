@@ -448,7 +448,28 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 ...extraData
             })
 
-            if (result.success && result.data?.[0]) {
+            const savedQuote = result.data?.[0] || lastSavedQuote
+            const quoteId = savedQuote?.id || lastSavedQuote?.id
+
+            if (status === 'rejected') {
+                const reason = extraData.rejection_reason || extraData.reject_reason || rejectReason || 'No reason provided'
+                emailService.sendRejectedQuoteAlert({
+                    quoteId: quoteId,
+                    clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                    clientEmail: moveDetails.contactEmail,
+                    clientPhone: moveDetails.contactPhone,
+                    moveDate: moveDetails.moveDate,
+                    pickupAddress: moveDetails.pickupAddress,
+                    dropoffAddress: moveDetails.dropoffAddress,
+                    total: discountedTotal || total,
+                    vat: vat,
+                    subTotal: subTotal,
+                    inventory: inventory,
+                    breakdown: breakdown,
+                    inventoryItems: INVENTORY_ITEMS,
+                    rejectionReason: reason
+                }).catch(err => console.error('Rejected quote email alert error:', err))
+            } else if (result.success && result.data?.[0]) {
                 sendProposalEmail(result.data[0])
             }
 

@@ -641,6 +641,42 @@ serve(async (req) => {
 
                 <p style="font-size:12px;color:#94a3b8;text-align:center;">This link is unique to your quote. If you have any questions, call us on <strong>+27 11 493 7569</strong>.</p>
             `
+        } else if (type === 'quote_rejected_alert') {
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
+            subject = `❌ QUOTE REJECTED — ${quoteData?.client_name || 'Customer'} [MM-${ref}]`
+            recipients = adminEmails
+
+            const reasonText = quoteData?.rejection_reason || quoteData?.reject_reason || 'No reason provided'
+
+            innerHtml = `
+                <h1 style="color:#e31837;">❌ Quote Rejected by Client</h1>
+                <p>A customer has rejected/declined their move quote on the website. Details and customer reason are provided below for follow-up.</p>
+
+                <div class="highlight-box" style="background:#fff5f5; border-left-color:#e31837;">
+                    <p style="margin:0 0 6px 0; font-size:11px; font-weight:800; color:#e31837; text-transform:uppercase; letter-spacing:1px;">Reason for Rejection:</p>
+                    <p style="margin:0; font-size:15px; font-weight:700; color:#0f172a; white-space:pre-wrap;">"${reasonText}"</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Quote Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Customer Name:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
+                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                    <tr><td class="label">Quote Amount:</td><td class="value" style="font-weight:900;color:#e31837;">R ${Number(quoteData?.total_price || 0).toFixed(2)} (Incl. VAT)</td></tr>
+                    <tr><td class="label">Rejection Reason:</td><td class="value" style="font-weight:700;color:#991b1b;">${reasonText}</td></tr>
+                </table>
+
+                <div style="text-align:center;margin:30px 0;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#e31837;">
+                        View Quote in Admin →
+                    </a>
+                </div>
+
+                <p style="font-size:13px;color:#64748b;">Contact the customer on <strong>${quoteData?.client_phone || '—'}</strong> to discuss alternative pricing or options.</p>
+            `
         } else {
             throw new Error(`Unsupported email type: ${type}`)
         }

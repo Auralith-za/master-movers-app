@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone } from 'lucide-react';
+import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
 import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
+import { emailService } from '../services/emailService';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -21,6 +22,56 @@ export default function QuoteReviewPage() {
     const [accepted, setAccepted] = useState(false);
     const [signatureData, setSignatureData] = useState(null);
     const [appSettings, setAppSettings] = useState(null);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleRejectQuote = async () => {
+        if (!quote) return;
+        setIsSubmitting(true);
+        const reason = rejectReason || 'No reason provided';
+        try {
+            const { error } = await supabase
+                .from('quotes')
+                .update({
+                    status: 'rejected',
+                    rejection_reason: reason,
+                    items_json: {
+                        ...(quote.items_json || {}),
+                        rejection_reason: reason
+                    }
+                })
+                .eq('id', quote.id);
+
+            if (error) console.error('Error updating quote status to rejected:', error);
+
+            await emailService.sendRejectedQuoteAlert({
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                moveDate: quote.move_date,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                total: quote.total_price || 0,
+                vat: (quote.total_price || 0) - ((quote.total_price || 0) / 1.15),
+                subTotal: (quote.total_price || 0) / 1.15,
+                inventory: quote.items_json?.items || quote.items_json || {},
+                breakdown: {},
+                inventoryItems: INVENTORY_ITEMS,
+                rejectionReason: reason
+            });
+
+            setQuote(prev => prev ? { ...prev, status: 'rejected', rejection_reason: reason } : null);
+            setShowRejectModal(false);
+            alert("Thank you for your feedback! Our team has been notified. ✅");
+        } catch (err) {
+            console.error('Error rejecting quote:', err);
+            alert("Feedback submitted. Thank you!");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     useEffect(() => {
         fetchQuote();
@@ -359,13 +410,26 @@ export default function QuoteReviewPage() {
                         </div>
                         )}
 
-                        {/* Support Card */}
-                        <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100">
-                            <p className="text-xs text-slate-500 font-medium mb-3">Questions about your quote?</p>
-                            <a href="tel:+27114937569" className="w-full py-3 bg-white text-slate-900 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2 mb-2">
+                        {/* Support & Decline Card */}
+                        <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100 space-y-3">
+                            <p className="text-xs text-slate-500 font-medium mb-1">Questions or need to decline?</p>
+                            <a href="tel:+27114937569" className="w-full py-3 bg-white text-slate-900 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
                                 <Phone size={16} /> Contact a Human
                             </a>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Office: +27 11 493 7569</p>
+                            {quote?.status !== 'rejected' ? (
+                                <button
+                                    onClick={() => setShowRejectModal(true)}
+                                    className="w-full py-3 bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold text-xs hover:bg-red-100 transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
+                                >
+                                    <XCircle size={16} /> Decline / Reject Quote
+                                </button>
+                            ) : (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+                                    <p className="font-bold">Quote Declined</p>
+                                    <p className="text-[11px] opacity-80 mt-0.5">Reason: "{quote.rejection_reason || 'No reason provided'}"</p>
+                                </div>
+                            )}
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1">Office: +27 11 493 7569</p>
                         </div>
                     </div>
                 </div>
@@ -381,6 +445,40 @@ export default function QuoteReviewPage() {
                     </p>
                 </div>
             </div>
+
+            {/* Reject Reason Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+                        <div className="text-4xl text-center mb-3">💬</div>
+                        <h3 className="text-xl font-black text-center text-slate-900 mb-1">Thanks for your feedback</h3>
+                        <p className="text-sm text-slate-500 text-center mb-6">
+                            Please let us know why you're declining this quote today — our team will follow up with you.
+                        </p>
+                        <textarea
+                            className="w-full rounded-xl border-2 border-gray-200 p-4 text-sm text-slate-700 focus:border-[#e31837] focus:outline-none resize-none h-28 mb-4"
+                            placeholder="e.g. Price is too high, need to think about it, dates changed..."
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                        />
+                        <div className="flex flex-col gap-3">
+                            <button
+                                className="w-full py-4 rounded-2xl bg-[#e31837] hover:bg-[#c0152f] text-white font-black uppercase tracking-widest text-sm transition-colors disabled:opacity-50"
+                                disabled={isSubmitting}
+                                onClick={handleRejectQuote}
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Submit & Close'}
+                            </button>
+                            <button
+                                className="w-full py-3 text-slate-400 text-sm hover:text-slate-600"
+                                onClick={() => setShowRejectModal(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <TermsModal 
                 isOpen={isTermsOpen} 

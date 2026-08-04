@@ -266,6 +266,7 @@ export const useMoveStore = create(
                 const trackingData = getStoredTrackingData()
                 const targetStatus = dbOverrides.status || overrides.status || 'new'
                 const isWon = ['booked', 'paid', 'booked_paid', 'completed'].includes(targetStatus)
+                const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || null
 
                 const quotePayload = {
                     client_name: cleanClientName(rawName),
@@ -280,8 +281,10 @@ export const useMoveStore = create(
                         items: state.inventory || {},
                         extraCollections: state.moveDetails?.extraCollections || [],
                         extraDrops: state.moveDetails?.extraDrops || [],
+                        rejection_reason: rejectionReason,
                         ...(state.inventory || {})
                     },
+                    rejection_reason: rejectionReason,
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
