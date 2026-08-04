@@ -54,7 +54,9 @@ export const emailService = {
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
                 total_price: total,
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                items_json: inventory || inventoryItems,
+                total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
             }
 
             // 4. Send request to Supabase Edge Function
@@ -158,7 +160,9 @@ export const emailService = {
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
                 total_price: total,
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                items_json: inventory || inventoryItems,
+                total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
             }
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''

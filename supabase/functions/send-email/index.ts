@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,143 @@ function cleanClientName(name?: string): string {
         cleaned = cleaned.replace(/\b(.+?)\s+\1\b/gi, '$1').trim()
     }
     return cleaned
+}
+
+// Helper to format inventory list as clean HTML table for email templates
+function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | string): string {
+    if (!rawItemsInput) return ''
+
+    let rawItems: any = rawItemsInput
+    if (typeof rawItems === 'string') {
+        try {
+            rawItems = JSON.parse(rawItems)
+        } catch (_) {
+            return ''
+        }
+    }
+
+    if (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)) {
+        if (rawItems.items) {
+            rawItems = rawItems.items
+        }
+    }
+
+    const itemRows: Array<{ name: string; qty: number; room?: string }> = []
+
+    if (Array.isArray(rawItems)) {
+        for (const it of rawItems) {
+            if (!it) continue
+            const qty = Number(it.quantity || it.qty || it.count || 1)
+            if (qty <= 0) continue
+            const name = it.name || it.item_name || it.description || it.id || 'Item'
+            const room = it.room || it.category || undefined
+            itemRows.push({ name: String(name), qty, room: room ? String(room) : undefined })
+        }
+    } else if (rawItems && typeof rawItems === 'object') {
+        for (const [key, val] of Object.entries(rawItems)) {
+            const qty = Number(val)
+            if (isNaN(qty) || qty <= 0) continue
+
+            let itemKey = key
+            let room: string | undefined = undefined
+
+            if (itemKey.includes('__')) {
+                const parts = itemKey.split('__')
+                itemKey = parts[0]
+                room = parts[1] ? parts[1].replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : undefined
+            }
+
+            let cleanName = itemKey
+                .replace(/_/g, ' ')
+                .replace(/([a-z])([A-Z])/g, '$1 $2')
+                .replace(/\b(\w)/g, (c: string) => c.toUpperCase())
+                .replace(/\b3seater\b/i, '3-Seater')
+                .replace(/\b2seater\b/i, '2-Seater')
+                .replace(/\b1seater\b/i, '1-Seater')
+                .replace(/\b4seater\b/i, '4-Seater')
+
+            itemRows.push({ name: cleanName, qty, room })
+        }
+    }
+
+    if (itemRows.length === 0) return ''
+
+    const totalQty = itemRows.reduce((sum, item) => sum + item.qty, 0)
+    const hasRooms = itemRows.some(item => !!item.room)
+
+    let rowsHtml = ''
+
+    if (hasRooms) {
+        const grouped: { [room: string]: Array<{ name: string; qty: number }> } = {}
+        for (const item of itemRows) {
+            const roomName = item.room || 'General Inventory'
+            if (!grouped[roomName]) grouped[roomName] = []
+            grouped[roomName].push(item)
+        }
+
+        for (const [roomName, items] of Object.entries(grouped)) {
+            rowsHtml += `
+                <tr style="background:#f1f5f9;">
+                    <td colspan="2" style="padding:8px 14px;font-size:11px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0;">
+                        📍 ${roomName}
+                    </td>
+                </tr>
+            `
+            for (const item of items) {
+                rowsHtml += `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:10px 14px;font-size:13px;color:#334155;">${item.name}</td>
+                        <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;text-align:center;">${item.qty}</td>
+                    </tr>
+                `
+            }
+        }
+    } else {
+        for (let i = 0; i < itemRows.length; i++) {
+            const item = itemRows[i]
+            const bgStyle = i % 2 === 1 ? 'background-color:#f8fafc;' : ''
+            rowsHtml += `
+                <tr style="border-bottom:1px solid #f1f5f9;${bgStyle}">
+                    <td style="padding:10px 14px;font-size:13px;color:#334155;">${item.name}</td>
+                    <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;text-align:center;">${item.qty}</td>
+                </tr>
+            `
+        }
+    }
+
+    const volText = totalVolume ? Number(totalVolume).toFixed(1) : null
+
+    return `
+        <div style="margin:25px 0;">
+            <div style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">
+                <table style="width:100%;">
+                    <tr>
+                        <td style="font-size:14px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">
+                            📦 Order Inventory <span style="font-size:12px;font-weight:600;color:#64748b;text-transform:none;">(${totalQty} ${totalQty === 1 ? 'item' : 'items'})</span>
+                        </td>
+                        ${volText ? `
+                        <td style="text-align:right;">
+                            <span style="font-size:11px;font-weight:700;color:#059669;background:#ecfdf5;padding:4px 10px;border-radius:20px;border:1px solid #a7f3d0;display:inline-block;">
+                                Volume: ${volText} cuft
+                            </span>
+                        </td>
+                        ` : ''}
+                    </tr>
+                </table>
+            </div>
+            <table style="width:100%;border-collapse:collapse;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+                <thead>
+                    <tr style="background:#0f172a;color:#ffffff;">
+                        <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Item Description</th>
+                        <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;width:70px;">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `
 }
 
 // Branded CSS/HTML Wrapper
@@ -240,6 +378,32 @@ serve(async (req) => {
             subject = `🔔 NEW PENDING QUOTE — ${quoteData?.client_name || 'Customer'} [MM-${ref}]`
             recipients = adminEmails // Admin-only
 
+            let inventoryData = quoteData?.items_json || quoteData?.inventory || quoteData?.items
+            let totalVolume = quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || quoteData?.items_json?.breakdown?.cubicFeet
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteData?.id) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteData.id)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+
             innerHtml = `
                 <h1 style="color:#0f172a;">🔔 New Pending Quote</h1>
                 <p>A customer has completed their inventory and is <strong>viewing their quote on Step 4</strong>. They may need a follow-up call to convert to a booking.</p>
@@ -261,6 +425,8 @@ serve(async (req) => {
                     <tr><td class="label">Payment Method:</td><td class="value">${quoteData?.payment_method || 'Not selected'}</td></tr>
                 </table>
 
+                ${inventoryHtml}
+
                 <div style="text-align:center;margin:30px 0;">
                     <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#2563eb;">
                         View Quote in Admin →
@@ -279,6 +445,32 @@ serve(async (req) => {
                     recipients.push(email)
                 }
             }
+
+            let inventoryData = quoteData?.items_json || quoteData?.inventory || quoteData?.items
+            let totalVolume = quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || quoteData?.items_json?.breakdown?.cubicFeet
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteData?.id) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteData.id)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
 
             innerHtml = `
                 <h1>Move Quote Proposal</h1>
@@ -309,6 +501,8 @@ serve(async (req) => {
                     </tr>
                 </table>
 
+                ${inventoryHtml}
+
                 <p>We have attached the official, itemized PDF quote detailing all inventory items and services requested.</p>
                 <p>To confirm and lock in this booking, you can proceed with card or interest-free Payflex payments directly from your quote summary page, or reach out to our booking team to pay via bank EFT.</p>
                 
@@ -321,6 +515,32 @@ serve(async (req) => {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
             subject = `✅ BOOKING CONFIRMED — ${quoteData?.client_name || 'Customer'} [MM-${ref}] — R ${Number(quoteData?.total_price || 0).toFixed(2)}`
             recipients = adminEmails
+
+            let inventoryData = quoteData?.items_json || quoteData?.inventory || quoteData?.items
+            let totalVolume = quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || quoteData?.items_json?.breakdown?.cubicFeet
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteData?.id) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteData.id)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
 
             innerHtml = `
                 <h1 style="color:#059669;">✅ Booking Confirmed — Payment Received</h1>
@@ -345,6 +565,8 @@ serve(async (req) => {
                     <tr><td class="label" style="font-size:14px;color:#0f172a;">Total Paid:</td><td class="value" style="font-size:18px;font-weight:900;color:#059669;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</td></tr>
                 </table>
 
+                ${inventoryHtml}
+
                 <div style="text-align:center;margin:30px 0;">
                     <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#059669;">
                         View Booking in Admin →
@@ -364,6 +586,32 @@ serve(async (req) => {
                 }
             }
 
+            let inventoryData = quoteData?.items_json || quoteData?.inventory || quoteData?.items
+            let totalVolume = quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || quoteData?.items_json?.breakdown?.cubicFeet
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteData?.id) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteData.id)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+
             innerHtml = `
                 <h1>Booking Confirmation</h1>
                 <p>Dear ${quoteData?.client_name || 'Valued Customer'},</p>
@@ -382,6 +630,8 @@ serve(async (req) => {
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
                     <tr><td class="label">Payment Method:</td><td class="value" style="text-transform: uppercase;">${quoteData?.payment_method || 'Card/EFT'}</td></tr>
                 </table>
+
+                ${inventoryHtml}
 
                 <!-- Pricing Breakdown -->
                 <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:24px;">
