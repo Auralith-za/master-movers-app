@@ -204,10 +204,16 @@ export default function DashboardPage() {
                     <h2 className="text-2xl font-bold text-slate-900">Executive Overview</h2>
                     <p className="text-slate-500">Real-time business insights & client quote search.</p>
                 </div>
-                <Button variant="outline" onClick={handleExportExcel} disabled={isLoading}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Report
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => navigate('/admin/offline-conversions')}>
+                        <Target className="mr-2 h-4 w-4 text-primary-600" />
+                        Google Ads OCI
+                    </Button>
+                    <Button variant="outline" onClick={handleExportExcel} disabled={isLoading}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Report
+                    </Button>
+                </div>
             </div>
 
             {/* Dashboard Global Search Engine Bar */}

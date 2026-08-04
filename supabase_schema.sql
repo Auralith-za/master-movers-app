@@ -26,6 +26,17 @@ create table public.quotes (
   total_volume numeric,
   total_price numeric,
   
+  -- Google Ads & Campaign Tracking (Offline Conversion Import)
+  gclid text,
+  gbraid text,
+  wbraid text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  utm_term text,
+  utm_content text,
+  won_at timestamp with time zone,
+
   -- Payment Tracking
   payment_status text default 'pending', -- pending, paid, failed, cancelled
   payment_method text, -- payfast, payflex, eft

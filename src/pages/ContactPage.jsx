@@ -6,6 +6,7 @@ import Label from '../components/ui/Label'
 import { emailService } from '../services/emailService'
 import { trackLeadConversion } from '../lib/gtag'
 import { supabase } from '../lib/supabaseClient'
+import { getStoredTrackingData } from '../utils/tracking'
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -33,6 +34,7 @@ export default function ContactPage() {
         setIsSubmitting(true)
         try {
             const name = `${formData.firstName} ${formData.lastName}`.trim()
+            const trackingData = getStoredTrackingData()
 
             // 1. Save to DB (contact_submissions table) — always works regardless of email
             await supabase.from('contact_submissions').insert({
@@ -40,7 +42,15 @@ export default function ContactPage() {
                 email: formData.email,
                 phone: formData.phone,
                 message: formData.message,
-                status: 'new'
+                status: 'new',
+                gclid: trackingData.gclid || null,
+                gbraid: trackingData.gbraid || null,
+                wbraid: trackingData.wbraid || null,
+                utm_source: trackingData.utm_source || null,
+                utm_medium: trackingData.utm_medium || null,
+                utm_campaign: trackingData.utm_campaign || null,
+                utm_term: trackingData.utm_term || null,
+                utm_content: trackingData.utm_content || null
             })
 
             // 2. Send admin email notification
