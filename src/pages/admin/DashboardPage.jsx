@@ -205,10 +205,6 @@ export default function DashboardPage() {
                     <p className="text-slate-500">Real-time business insights & client quote search.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => navigate('/admin/offline-conversions')}>
-                        <Target className="mr-2 h-4 w-4 text-primary-600" />
-                        Google Ads OCI
-                    </Button>
                     <Button variant="outline" onClick={handleExportExcel} disabled={isLoading}>
                         <Download className="mr-2 h-4 w-4" />
                         Export Report

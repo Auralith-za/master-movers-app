@@ -16,11 +16,9 @@ import DashboardPage from './pages/admin/DashboardPage'
 import QuotesPage from './pages/admin/QuotesPage'
 import QuoteDetailPage from './pages/admin/QuoteDetailPage'
 import LeadsPage from './pages/admin/LeadsPage'
-import OfflineConversionsPage from './pages/admin/OfflineConversionsPage'
 import AdminCoupons from './pages/admin/AdminCoupons'
 import AdminSettings from './pages/admin/AdminSettings'
 import ContactSubmissionsPage from './pages/admin/ContactSubmissionsPage'
-import { initTracking } from './utils/tracking'
 import CommercialMoversPage from './pages/services/CommercialMoversPage'
 import ResidentialMoversPage from './pages/services/ResidentialMoversPage'
 import InternationalMoversPage from './pages/services/InternationalMoversPage'
@@ -49,10 +47,6 @@ function ExternalRedirect({ to }) {
 }
 
 function App() {
-  React.useEffect(() => {
-    initTracking()
-  }, [])
-
   return (
     <Router>
       <Routes>
@@ -119,7 +113,6 @@ function App() {
           <Route path="quotes" element={<QuotesPage />} />
           <Route path="quotes/:id" element={<QuoteDetailPage />} />
           <Route path="leads" element={<LeadsPage />} />
-          <Route path="offline-conversions" element={<OfflineConversionsPage />} />
           <Route path="coupons" element={<AdminCoupons />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="contact-submissions" element={<ContactSubmissionsPage />} />

@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../../../lib/supabaseClient.js'
 import { formatClientName, cleanClientName } from '../../../utils/quoteHelpers.js'
-import { getStoredTrackingData } from '../../../utils/tracking.js'
 import { INVENTORY_ITEMS } from '../data/mockItems.js'
 import { 
     CITY_CODES, 
@@ -262,8 +261,6 @@ export const useMoveStore = create(
                 const defaultFullName = formatClientName(state.moveDetails.contactName, state.moveDetails.surname) || 'Anonymous'
                 const rawName = dbOverrides.client_name || overrides.contactName || defaultFullName
 
-                // Fetch Google Ads / UTM tracking parameters stored on landing
-                const trackingData = getStoredTrackingData()
                 const targetStatus = dbOverrides.status || overrides.status || 'new'
                 const isWon = ['booked', 'paid', 'booked_paid', 'completed'].includes(targetStatus)
                 const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || null
@@ -296,16 +293,6 @@ export const useMoveStore = create(
                     linen_boxes: Number(dbOverrides.linen_boxes || state.moveDetails.linenBoxes || 0),
                     insurance_enabled: Boolean(dbOverrides.insurance_enabled !== undefined ? dbOverrides.insurance_enabled : state.moveDetails.insuranceEnabled),
                     payment_method: dbOverrides.payment_method || state.moveDetails.paymentMethod || 'eft',
-
-                    // Google Ads & UTM Attribution tracking
-                    gclid: dbOverrides.gclid !== undefined ? dbOverrides.gclid : (trackingData.gclid || null),
-                    gbraid: dbOverrides.gbraid !== undefined ? dbOverrides.gbraid : (trackingData.gbraid || null),
-                    wbraid: dbOverrides.wbraid !== undefined ? dbOverrides.wbraid : (trackingData.wbraid || null),
-                    utm_source: dbOverrides.utm_source !== undefined ? dbOverrides.utm_source : (trackingData.utm_source || null),
-                    utm_medium: dbOverrides.utm_medium !== undefined ? dbOverrides.utm_medium : (trackingData.utm_medium || null),
-                    utm_campaign: dbOverrides.utm_campaign !== undefined ? dbOverrides.utm_campaign : (trackingData.utm_campaign || null),
-                    utm_term: dbOverrides.utm_term !== undefined ? dbOverrides.utm_term : (trackingData.utm_term || null),
-                    utm_content: dbOverrides.utm_content !== undefined ? dbOverrides.utm_content : (trackingData.utm_content || null),
                     won_at: dbOverrides.won_at || (isWon ? new Date().toISOString() : null)
                 }
 

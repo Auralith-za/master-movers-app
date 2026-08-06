@@ -786,33 +786,6 @@ export default function QuoteDetailPage() {
                                         </span>
                                     )}
                                 </div>
-
-                                <div className="pt-2 border-t border-slate-100">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Google Ads Attribution</label>
-                                    {quote?.gclid ? (
-                                        <div className="bg-emerald-50 text-emerald-800 p-2.5 rounded-lg border border-emerald-200 text-xs space-y-1">
-                                            <div className="font-bold flex items-center justify-between">
-                                                <span>Google Click ID Captured</span>
-                                                <span className="bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded text-[10px]">GCLID</span>
-                                            </div>
-                                            <div className="font-mono text-[11px] break-all bg-white/80 p-1.5 rounded border border-emerald-100">
-                                                {quote.gclid}
-                                            </div>
-                                            {quote.utm_campaign && (
-                                                <div className="text-[10px] text-emerald-700">
-                                                    Campaign: <strong>{quote.utm_campaign}</strong> {quote.utm_source ? `(${quote.utm_source})` : ''}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : quote?.gbraid || quote?.wbraid ? (
-                                        <div className="bg-purple-50 text-purple-800 p-2.5 rounded-lg border border-purple-200 text-xs">
-                                            <span className="font-bold">iOS/App Privacy Click ID:</span>
-                                            <div className="font-mono text-[11px] break-all mt-1">{quote.gbraid || quote.wbraid}</div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-400 italic">Organic / Direct (No GCLID attached)</p>
-                                    )}
-                                </div>
                             </div>
 
                             <div className="p-4 bg-slate-50 rounded-xl space-y-4 border border-slate-100">
