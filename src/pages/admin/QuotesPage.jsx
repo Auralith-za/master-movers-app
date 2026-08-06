@@ -25,7 +25,12 @@ export default function QuotesPage() {
                 .order('created_at', { ascending: false })
 
             if (error) throw error
-            setQuotes(data || [])
+            const sorted = [...(data || [])].sort((a, b) => {
+                const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+                const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+                return dateB - dateA
+            })
+            setQuotes(sorted)
         } catch (error) {
             console.error('Error fetching quotes:', error)
         } finally {

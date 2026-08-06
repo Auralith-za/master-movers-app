@@ -611,8 +611,13 @@ export default function Step1Details() {
             return
         }
 
+        // 🔴 Save lead immediately to Supabase so every Step 1 completion is captured
+        submitQuote({ 
+            status: (lastSavedQuote?.status && lastSavedQuote.status !== 'new') ? lastSavedQuote.status : 'lead',
+            forceNew: !lastSavedQuote
+        }).catch(err => console.error('Step 1 lead save error:', err))
+
         // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion
-        // while pricing is hidden behind a "get in touch" message.
         trackStep1Complete()
         navigate(`${basePath}/access`)
     }

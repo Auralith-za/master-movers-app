@@ -25,7 +25,11 @@ export default function LeadsPage() {
                 quote.status === 'lead' ||
                 Boolean(quote.request_call_back) === true ||
                 Boolean(quote.items_json?.request_call_back) === true
-            )
+            ).sort((a, b) => {
+                const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+                const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+                return dateB - dateA
+            })
             setLeads(processedLeads)
         } catch (error) {
             console.error('Error fetching leads:', error)
