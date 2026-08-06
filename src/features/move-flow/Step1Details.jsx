@@ -611,17 +611,11 @@ export default function Step1Details() {
             return
         }
 
-        // 🔴 Save lead immediately to Supabase so every Step 1 completion is captured as a fresh lead
-        const step1SessionKey = `mm_step1_saved_${moveDetails.contactEmail || moveDetails.contactPhone || Date.now()}`
-        const isAlreadySavedThisSession = Boolean(lastSavedQuote?.id && sessionStorage.getItem(step1SessionKey))
-
+        // 🔴 Save/confirm lead in Supabase — auto-save has already created/updated the record
+        // Just ensure the status is set to 'lead' (update if exists, insert if somehow not yet saved)
         submitQuote({ 
             status: 'lead',
-            forceNew: !isAlreadySavedThisSession
-        }).then(result => {
-            if (result?.data?.id) {
-                sessionStorage.setItem(step1SessionKey, result.data.id)
-            }
+            forceNew: !lastSavedQuote?.id
         }).catch(err => console.error('Step 1 lead save error:', err))
 
         // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion

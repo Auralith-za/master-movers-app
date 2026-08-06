@@ -91,12 +91,17 @@ export default function MoveWizard() {
 
     // ─── 1. Debounced Auto-Save to Database ─────────────────────────────────
     useEffect(() => {
+        // Only auto-save once we have at least one contact field
         if (!moveDetails?.contactEmail && !moveDetails?.contactPhone && !moveDetails?.contactName) return
 
         const timeoutId = setTimeout(() => {
-            console.log("Auto-saving progress to database...")
-            submitQuote({ status: lastSavedQuote?.status || 'new' }).catch(console.error)
-        }, 3000)
+            // Preserve existing advanced statuses, but always at least 'lead'
+            const currentStatus = lastSavedQuote?.status
+            const advancedStatuses = ['processing', 'pending_payment', 'booked', 'paid', 'booked_paid', 'completed', 'rejected', 'on_hold']
+            const statusToUse = (currentStatus && advancedStatuses.includes(currentStatus)) ? currentStatus : 'lead'
+            console.log('Auto-saving progress to database as status:', statusToUse)
+            submitQuote({ status: statusToUse }).catch(console.error)
+        }, 1500)
 
         return () => clearTimeout(timeoutId)
     }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status])
