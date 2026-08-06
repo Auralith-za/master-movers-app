@@ -292,9 +292,7 @@ export const useMoveStore = create(
                     st7_boxes: Number(dbOverrides.st7_boxes || state.moveDetails.st7Boxes || 0),
                     linen_boxes: Number(dbOverrides.linen_boxes || state.moveDetails.linenBoxes || 0),
                     insurance_enabled: Boolean(dbOverrides.insurance_enabled !== undefined ? dbOverrides.insurance_enabled : state.moveDetails.insuranceEnabled),
-                    payment_method: dbOverrides.payment_method || state.moveDetails.paymentMethod || 'eft',
-                    won_at: dbOverrides.won_at || (isWon ? new Date().toISOString() : null),
-                    updated_at: new Date().toISOString()
+                    payment_method: dbOverrides.payment_method || state.moveDetails.paymentMethod || 'eft'
                 }
 
                 console.log('SUBMITTING QUOTE PAYLOAD (clean):', quotePayload)
@@ -308,9 +306,8 @@ export const useMoveStore = create(
                             .eq('id', state.lastSavedQuote.id)
                             .select()
                     } else {
-                        // For new inserts, remove the ID if it's a temp one and include created_at
+                        // For new inserts, strip any id field and let Supabase auto-set timestamps
                         const { id, ...insertPayload } = quotePayload
-                        insertPayload.created_at = new Date().toISOString()
                         result = await supabase
                             .from('quotes')
                             .insert([insertPayload])
