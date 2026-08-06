@@ -20,17 +20,14 @@ export default function LeadsPage() {
 
             if (error) throw error
 
-            // Filter for leads: any quote that is in progress/lead status or has a callback request
             const activeLeadStatuses = ['lead', 'new', 'processing', 'pending_payment', 'on_hold']
             const processedLeads = (data || []).filter(quote =>
                 activeLeadStatuses.includes(quote.status) ||
                 Boolean(quote.request_call_back) === true ||
                 Boolean(quote.items_json?.request_call_back) === true
-            ).sort((a, b) => {
-                const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
-                const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
-                return dateB - dateA
-            })
+            ).sort((a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
             setLeads(processedLeads)
         } catch (error) {
             console.error('Error fetching leads:', error)

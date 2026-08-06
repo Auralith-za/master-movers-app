@@ -34,11 +34,9 @@ export default function DashboardPage() {
                 .order('created_at', { ascending: false })
 
             if (data) {
-                const sorted = [...data].sort((a, b) => {
-                    const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
-                    const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
-                    return dateB - dateA
-                })
+                const sorted = [...data].sort((a, b) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                )
                 setQuotes(sorted)
                 calculateStats(sorted)
             }

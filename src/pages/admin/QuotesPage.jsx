@@ -25,10 +25,9 @@ export default function QuotesPage() {
                 .order('created_at', { ascending: false })
 
             if (error) throw error
+            // Sort by created_at descending — newest quote at the top
             const sorted = [...(data || [])].sort((a, b) => {
-                const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
-                const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
-                return dateB - dateA
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             })
             setQuotes(sorted)
         } catch (error) {
