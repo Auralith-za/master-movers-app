@@ -20,9 +20,10 @@ export default function LeadsPage() {
 
             if (error) throw error
 
-            // Filter for leads client-side to handle missing columns gracefully
+            // Filter for leads: any quote that is in progress/lead status or has a callback request
+            const activeLeadStatuses = ['lead', 'new', 'processing', 'pending_payment', 'on_hold']
             const processedLeads = (data || []).filter(quote =>
-                quote.status === 'lead' ||
+                activeLeadStatuses.includes(quote.status) ||
                 Boolean(quote.request_call_back) === true ||
                 Boolean(quote.items_json?.request_call_back) === true
             ).sort((a, b) => {
