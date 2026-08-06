@@ -64,17 +64,30 @@ export default function MoveWizard() {
 
     // ─── Auto-Reset if returning to an already completed quote ──────────────
     useEffect(() => {
-        if (lastSavedQuote && ['booked', 'paid', 'completed'].includes(lastSavedQuote.status)) {
-            const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
-                location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
-            
-            // If they are on step 1, auto-clear it
-            if (location.pathname === currentBase || location.pathname === currentBase + '/') {
-                console.log('Previous quote was completed. Auto-resetting for a fresh quote.');
-                useMoveStore.getState().reset();
+        const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
+            location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
+        const isOnStep1 = location.pathname === currentBase || location.pathname === currentBase + '/'
+
+        if (!isOnStep1 || !lastSavedQuote) return
+
+        // Always reset if the quote was fully completed
+        if (['booked', 'paid', 'booked_paid', 'completed'].includes(lastSavedQuote.status)) {
+            console.log('Previous quote was completed. Auto-resetting for a fresh quote.')
+            useMoveStore.getState().reset()
+            return
+        }
+
+        // Reset if the saved quote is more than 2 hours old (stale session)
+        // This ensures a new browser session / returning visitor gets a fresh record
+        const savedAt = lastSavedQuote.created_at || lastSavedQuote.updated_at
+        if (savedAt) {
+            const ageHours = (Date.now() - new Date(savedAt).getTime()) / (1000 * 60 * 60)
+            if (ageHours > 2) {
+                console.log(`Stale quote (${ageHours.toFixed(1)}h old). Auto-resetting for fresh session.`)
+                useMoveStore.getState().reset()
             }
         }
-    }, [lastSavedQuote, location.pathname])
+    }, [lastSavedQuote?.id, lastSavedQuote?.status, location.pathname])
 
     // ─── 1. Debounced Auto-Save to Database ─────────────────────────────────
     useEffect(() => {

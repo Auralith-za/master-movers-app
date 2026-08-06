@@ -20,11 +20,10 @@ export default function LeadsPage() {
 
             if (error) throw error
 
-            const activeLeadStatuses = ['lead', 'new', 'processing', 'pending_payment', 'on_hold']
+            // Only show genuine leads: status=lead OR has a callback request
             const processedLeads = (data || []).filter(quote =>
-                activeLeadStatuses.includes(quote.status) ||
-                Boolean(quote.request_call_back) === true ||
-                Boolean(quote.items_json?.request_call_back) === true
+                quote.status === 'lead' ||
+                Boolean(quote.request_call_back) === true
             ).sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )
