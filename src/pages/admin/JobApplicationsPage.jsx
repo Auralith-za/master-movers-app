@@ -54,6 +54,20 @@ export default function JobApplicationsPage() {
                             .replace(/\[JOB APPLICATION\]/gi, '')
                             .replace(/JOB APPLICATION/gi, '')
                             .trim() || 'Applicant'
+
+                        let cv_name = null
+                        let cv_url = null
+                        if (c.message) {
+                            const nameMatch = c.message.match(/CV Attached:\s*([^\n]+)/i)
+                            if (nameMatch && !nameMatch[1].toLowerCase().includes('no cv file')) {
+                                cv_name = nameMatch[1].trim()
+                            }
+                            const urlMatch = c.message.match(/CV Download Link:\s*(https?:\/\/[^\s]+)/i)
+                            if (urlMatch) {
+                                cv_url = urlMatch[1].trim()
+                            }
+                        }
+
                         return {
                             id: c.id,
                             full_name: cleanName,
@@ -64,6 +78,8 @@ export default function JobApplicationsPage() {
                             license_type: 'N/A',
                             availability: 'Immediate',
                             notes: c.message || '',
+                            cv_name,
+                            cv_url,
                             status: c.status === 'read' ? 'reviewed' : (c.status || 'new'),
                             created_at: c.created_at,
                             isBackup: true

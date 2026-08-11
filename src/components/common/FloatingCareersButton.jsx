@@ -114,6 +114,8 @@ ${formData.notes || 'No extra notes provided.'}`
                     phone: formData.phone,
                     position: 'General Applicant',
                     notes: formData.notes,
+                    cv_name: cvFile?.name || null,
+                    cv_url: cvUrl,
                     status: 'new'
                 })
                 .select()
@@ -132,6 +134,7 @@ ${formData.notes || 'No extra notes provided.'}`
                 phone: formData.phone,
                 message: appMessage
             })
+            console.log('Job application admin email sent successfully')
         } catch (emailErr) {
             console.warn('Job application email alert notice:', emailErr)
         }
