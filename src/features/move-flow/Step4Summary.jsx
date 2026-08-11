@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useMoveStore, calculateQuote, parseInventoryKey } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
-import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone, ChevronDown, ChevronUp, Plus, Minus, RotateCcw } from 'lucide-react'
+import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone, ChevronDown, ChevronUp, Plus, Minus, RotateCcw, Clock, XCircle } from 'lucide-react'
 import { PRICING_CONSTANTS, LOCAL_VEHICLE_RATES, PACKAGING_RATES } from '../inventory/data/pricingRates'
 import { generateProfessionalQuote } from '../../services/pdfService'
 import { emailService } from '../../services/emailService'
@@ -318,6 +318,72 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             })
         }
         // Always show payment options for non-admin
+        setSearchParams({ saved: 'true' })
+    }
+
+    const handlePayLater = async () => {
+        // If contact details are missing, capture them first via modal
+        if (submissionType !== 'admin' && (!moveDetails.contactName || !moveDetails.contactEmail)) {
+            setShowLeadModal(true)
+            return
+        }
+
+        if (!isNationalMove && subTotal < PRICING_CONSTANTS.minOrder) {
+            alert(`Minimum Charge Notice:\n\nOur minimum rate for a local move is R ${PRICING_CONSTANTS.minOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.00 + VAT (R ${(PRICING_CONSTANTS.minOrder * 1.15).toFixed(2)}).\n\nYour current quote (R ${subTotal.toFixed(2)} + VAT) is below this amount. Please add more items or services to proceed, or contact us for a custom arrangement.`)
+            return
+        }
+
+        setIsSubmitting(true)
+        try {
+            // Save to backend — update lead status to pending_payment
+            const result = await submitQuote({
+                status: 'pending_payment',
+                submission_type: submissionType,
+                forceNew: false
+            })
+            
+            const savedQuote = result.data?.[0] || lastSavedQuote
+            if (result.success && savedQuote) {
+                if (submissionType !== 'admin') {
+                    emailService.sendPendingQuoteAlert({
+                        quoteId: savedQuote.id,
+                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                        clientEmail: moveDetails.contactEmail,
+                        clientPhone: moveDetails.contactPhone,
+                        moveDate: moveDetails.moveDate,
+                        pickupAddress: moveDetails.pickupAddress,
+                        dropoffAddress: moveDetails.dropoffAddress,
+                        total: discountedTotal || total,
+                        vat: vat,
+                        subTotal: subTotal,
+                        inventory: inventory,
+                        breakdown: breakdown,
+                        inventoryItems: INVENTORY_ITEMS,
+                        moveType: moveDetails.moveType || '',
+                        paymentMethod: moveDetails.paymentMethod || 'not selected'
+                    }).catch(err => console.error('Non-blocking admin alert error:', err))
+                }
+
+                sendProposalEmail(savedQuote)
+            }
+
+            if (!result.success) {
+                console.warn('Backend save failed (non-blocking):', result.error)
+            }
+        } catch (error) {
+            console.warn('Submit error (non-blocking):', error)
+        } finally {
+            setIsSubmitting(false)
+        }
+
+        if (submissionType !== 'admin') {
+            trackLeadConversion({
+                label: 'Pay Later',
+                value: discountedTotal || total || 0
+            })
+        }
+
+        alert("Thank you! Your quote has been saved with Payment Pending status. A sales consultant will follow up with you shortly, or you can complete payment anytime via the email sent to you. ✅")
         setSearchParams({ saved: 'true' })
     }
 
@@ -1020,13 +1086,22 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </Button>
 
                                 {submissionType !== 'admin' && (
-                                    <button
-                                        onClick={() => setShowRejectModal(true)}
-                                        disabled={isSubmitting}
-                                        className="w-full py-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] hover:bg-[#e31837] hover:border-[#e31837] transition-all shadow-lg text-center"
-                                    >
-                                        Reject Payment / Pay Later
-                                    </button>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                        <button
+                                            onClick={handlePayLater}
+                                            disabled={isSubmitting}
+                                            className="w-full py-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-widest text-[11px] hover:bg-slate-800 transition-all shadow-lg text-center flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            <Clock size={16} /> Pay Later
+                                        </button>
+                                        <button
+                                            onClick={() => setShowRejectModal(true)}
+                                            disabled={isSubmitting}
+                                            className="w-full py-4 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 font-black uppercase tracking-widest text-[11px] hover:bg-red-100 hover:border-red-300 transition-all shadow-sm text-center flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            <XCircle size={16} /> Reject Payment
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         ) : (
