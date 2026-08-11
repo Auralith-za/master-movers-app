@@ -43,7 +43,12 @@ export default function DashboardPage() {
             }
 
             const { data: jobApps } = await supabase.from('job_applications').select('id')
-            if (jobApps) setJobAppCount(jobApps.length)
+            const { data: contactApps } = await supabase.from('contact_submissions').select('id, name, message')
+
+            const count1 = jobApps ? jobApps.length : 0
+            const count2 = contactApps ? contactApps.filter(c => (c.name || '').includes('[JOB APPLICATION]') || (c.message || '').includes('[JOB APPLICATION]')).length : 0
+
+            setJobAppCount(Math.max(count1, count2, count1 + count2))
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {

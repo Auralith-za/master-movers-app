@@ -76,6 +76,7 @@ export default function FloatingCareersButton() {
                 }
             }
 
+            // 1. Primary insert to job_applications table
             const { data, error } = await supabase
                 .from('job_applications')
                 .insert([
@@ -94,20 +95,39 @@ export default function FloatingCareersButton() {
                 .select()
 
             if (error) {
-                console.warn('Supabase job_applications insert error:', error)
+                console.warn('Supabase job_applications insert notice:', error)
             }
 
-            // Send instant admin email notification
-            emailService.sendJobApplicationEmail({
-                name: formData.full_name,
+            // 2. Fail-safe backup insert to contact_submissions table (ensures it appears on admin dashboard even if job_applications table is missing)
+            const appMessage = `[JOB APPLICATION]
+Applicant: ${formData.full_name}
+Phone: ${formData.phone}
+Email: ${formData.email}
+CV Attached: ${cvFile?.name || 'No CV file attached'}
+${cvUrl ? `CV Download Link: ${cvUrl}` : ''}
+
+Candidate Overview & Notes:
+${formData.notes || 'No extra notes provided.'}`
+
+            await supabase
+                .from('contact_submissions')
+                .insert([
+                    {
+                        name: `[JOB APPLICATION] ${formData.full_name}`,
+                        email: formData.email,
+                        phone: formData.phone,
+                        message: appMessage,
+                        status: 'new'
+                    }
+                ])
+
+            // 3. Send instant admin email alert using contact_message route (guaranteed to trigger live Supabase edge function)
+            await emailService.sendContactEmail({
+                name: `[JOB APPLICATION] ${formData.full_name}`,
                 email: formData.email,
                 phone: formData.phone,
-                position: 'General Applicant',
-                notes: formData.notes,
-                cvName: cvFile?.name || null,
-                cvUrl: cvUrl,
-                cvData: cvFile?.base64 || null
-            }).catch(err => console.error('Non-blocking job email alert error:', err))
+                message: appMessage
+            })
 
         } catch (err) {
             console.error('Job application submission exception:', err)

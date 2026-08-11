@@ -24,18 +24,62 @@ export default function JobApplicationsPage() {
     const fetchApplications = async () => {
         setIsLoading(true)
         try {
-            const { data, error } = await supabase
+            let primaryApps = []
+            let backupApps = []
+
+            // 1. Fetch from job_applications table
+            const { data: jobData, error: jobErr } = await supabase
                 .from('job_applications')
                 .select('*')
                 .order('created_at', { ascending: false })
 
-            if (error) {
-                console.warn('Error fetching job applications from Supabase:', error)
-                setApplications([])
-            } else if (data) {
-                setApplications(data)
-                computeStats(data)
+            if (!jobErr && jobData) {
+                primaryApps = jobData
             }
+
+            // 2. Fetch backup job applications from contact_submissions table
+            const { data: contactData } = await supabase
+                .from('contact_submissions')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (contactData) {
+                backupApps = contactData
+                    .filter(c => (c.name || '').includes('[JOB APPLICATION]') || (c.message || '').includes('[JOB APPLICATION]'))
+                    .map(c => {
+                        const isJobTitle = (c.name || '').includes('[JOB APPLICATION]')
+                        const cleanName = isJobTitle ? c.name.replace('[JOB APPLICATION]', '').trim() : c.name
+                        return {
+                            id: c.id,
+                            full_name: cleanName || 'Applicant',
+                            email: c.email || '',
+                            phone: c.phone || '',
+                            position: 'General Applicant',
+                            experience_years: 'N/A',
+                            license_type: 'N/A',
+                            availability: 'Immediate',
+                            notes: c.message || '',
+                            status: c.status === 'read' ? 'reviewed' : (c.status || 'new'),
+                            created_at: c.created_at,
+                            isBackup: true
+                        }
+                    })
+            }
+
+            // Combine both sources, excluding duplicates by email + created date
+            const combined = [...primaryApps]
+            const existingEmails = new Set(primaryApps.map(a => `${a.email}_${new Date(a.created_at).toLocaleDateString()}`))
+
+            for (const backup of backupApps) {
+                const key = `${backup.email}_${new Date(backup.created_at).toLocaleDateString()}`
+                if (!existingEmails.has(key)) {
+                    combined.push(backup)
+                }
+            }
+
+            combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            setApplications(combined)
+            computeStats(combined)
         } catch (err) {
             console.error('Exception fetching job applications:', err)
         } finally {
