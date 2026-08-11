@@ -45,13 +45,18 @@ export default function JobApplicationsPage() {
 
             if (contactData) {
                 backupApps = contactData
-                    .filter(c => (c.name || '').includes('[JOB APPLICATION]') || (c.message || '').includes('[JOB APPLICATION]'))
+                    .filter(c => {
+                        const text = `${c.name || ''} ${c.message || ''}`.toUpperCase()
+                        return text.includes('JOB APPLICATION') || text.includes('CAREER') || text.includes('APPLICANT')
+                    })
                     .map(c => {
-                        const isJobTitle = (c.name || '').includes('[JOB APPLICATION]')
-                        const cleanName = isJobTitle ? c.name.replace('[JOB APPLICATION]', '').trim() : c.name
+                        const cleanName = (c.name || '')
+                            .replace(/\[JOB APPLICATION\]/gi, '')
+                            .replace(/JOB APPLICATION/gi, '')
+                            .trim() || 'Applicant'
                         return {
                             id: c.id,
-                            full_name: cleanName || 'Applicant',
+                            full_name: cleanName,
                             email: c.email || '',
                             phone: c.phone || '',
                             position: 'General Applicant',

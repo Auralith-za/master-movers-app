@@ -75,29 +75,6 @@ export default function FloatingCareersButton() {
             }
         }
 
-        // 2. Primary insert to job_applications table (isolated try/catch)
-        try {
-            await supabase
-                .from('job_applications')
-                .insert([
-                    {
-                        full_name: formData.full_name,
-                        email: formData.email,
-                        phone: formData.phone,
-                        position: 'General Applicant',
-                        notes: formData.notes,
-                        cv_name: cvFile?.name || null,
-                        cv_url: cvUrl,
-                        // Only save base64 string if reasonably sized (< 300KB) to prevent PostgREST 413 payload rejection
-                        cv_data: (cvFile?.base64 && cvFile.base64.length < 400000) ? cvFile.base64 : null,
-                        status: 'new'
-                    }
-                ])
-        } catch (jobTableErr) {
-            console.warn('job_applications table insert exception (non-fatal):', jobTableErr)
-        }
-
-        // 3. Backup insert to contact_submissions table (isolated try/catch, guaranteed table)
         const appMessage = `[JOB APPLICATION]
 Applicant: ${formData.full_name}
 Phone: ${formData.phone}
@@ -108,23 +85,40 @@ ${cvUrl ? `CV Download Link: ${cvUrl}` : ''}
 Candidate Overview & Notes:
 ${formData.notes || 'No extra notes provided.'}`
 
+        // STEP 1: Save to contact_submissions FIRST (guaranteed table in Supabase)
         try {
             await supabase
                 .from('contact_submissions')
-                .insert([
-                    {
-                        name: `[JOB APPLICATION] ${formData.full_name}`,
-                        email: formData.email,
-                        phone: formData.phone,
-                        message: appMessage,
-                        status: 'new'
-                    }
-                ])
-        } catch (contactTableErr) {
-            console.warn('contact_submissions insert notice:', contactTableErr)
+                .insert({
+                    name: `[JOB APPLICATION] ${formData.full_name}`,
+                    email: formData.email,
+                    phone: formData.phone,
+                    message: appMessage,
+                    status: 'new'
+                })
+        } catch (contactErr) {
+            console.error('contact_submissions insert notice:', contactErr)
         }
 
-        // 4. Send instant admin email alert using contact_message route (isolated try/catch)
+        // STEP 2: Save to job_applications table
+        try {
+            await supabase
+                .from('job_applications')
+                .insert({
+                    full_name: formData.full_name,
+                    email: formData.email,
+                    phone: formData.phone,
+                    position: 'General Applicant',
+                    notes: formData.notes,
+                    cv_name: cvFile?.name || null,
+                    cv_url: cvUrl,
+                    status: 'new'
+                })
+        } catch (jobErr) {
+            console.warn('job_applications insert notice:', jobErr)
+        }
+
+        // STEP 3: Send admin email alert using contact_message route
         try {
             await emailService.sendContactEmail({
                 name: `[JOB APPLICATION] ${formData.full_name}`,
