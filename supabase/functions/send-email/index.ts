@@ -729,6 +729,38 @@ serve(async (req) => {
 
                 <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> to discuss their requirements and prepare a custom quote.</p>
             `
+        } else if (type === 'job_application_alert') {
+            subject = `💼 New Job Application: ${contactData?.name || 'Applicant'} — ${contactData?.position || 'Position'}`
+            recipients = adminEmails
+
+            innerHtml = `
+                <h1 style="color:#e31837;">💼 New Job Application Received</h1>
+                <p>A new job candidate has submitted their application via the Master Movers Careers portal.</p>
+
+                <div class="highlight-box" style="border-left-color:#0f172a; background:#f8fafc;">
+                    <p style="font-weight:900;font-size:18px;color:#0f172a;margin:0 0 4px;">${contactData?.name || 'Candidate'}</p>
+                    <p style="margin:0;font-size:14px;color:#e31837;font-weight:700;">Applied Position: ${contactData?.position || '—'}</p>
+                </div>
+
+                <table class="details-table">
+                    <tr><td class="label">Candidate Name:</td><td class="value"><strong>${contactData?.name || '—'}</strong></td></tr>
+                    <tr><td class="label">Position:</td><td class="value"><strong>${contactData?.position || '—'}</strong></td></tr>
+                    <tr><td class="label">Phone:</td><td class="value"><a href="tel:${contactData?.phone || ''}"><strong>${contactData?.phone || '—'}</strong></a></td></tr>
+                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
+                    <tr><td class="label">Experience:</td><td class="value">${contactData?.experience || 'N/A'}</td></tr>
+                    <tr><td class="label">Driver License:</td><td class="value">${contactData?.license || 'None'}</td></tr>
+                    <tr><td class="label">Start Availability:</td><td class="value"><strong>${contactData?.availability || 'Immediate'}</strong></td></tr>
+                </table>
+
+                ${contactData?.notes ? `
+                <div class="highlight-box" style="margin-top:16px;">
+                    <p style="font-weight:700;color:#0f172a;margin-bottom:6px;">Experience & Qualifications Notes:</p>
+                    <p style="white-space:pre-wrap;margin:0;font-size:13px;color:#334155;">"${contactData.notes}"</p>
+                </div>
+                ` : ''}
+
+                <p style="margin-top:20px;">You can view and manage all applications in the <a href="https://mastermovers.co.za/admin/job-applications" style="color:#e31837;font-weight:bold;">Admin Job Applications Portal</a>.</p>
+            `
         } else if (type === 'location_not_found_alert') {
             subject = `📍 Client cant find address - assist (${contactData?.name || 'Customer'})`
             recipients = adminEmails

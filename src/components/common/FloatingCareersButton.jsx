@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Briefcase, X, CheckCircle, Send, Sparkles, User, Mail, Phone, ShieldCheck, Clock, Award } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { emailService } from '../../services/emailService'
 
 export default function FloatingCareersButton() {
     const [isOpen, setIsOpen] = useState(false)
@@ -54,6 +55,19 @@ export default function FloatingCareersButton() {
             if (error) {
                 console.warn('Supabase job_applications insert error:', error)
             }
+
+            // Send instant admin email notification
+            emailService.sendJobApplicationEmail({
+                name: formData.full_name,
+                email: formData.email,
+                phone: formData.phone,
+                position: formData.position,
+                experience: formData.experience_years,
+                license: formData.license_type,
+                availability: formData.availability,
+                notes: formData.notes
+            }).catch(err => console.error('Non-blocking job email alert error:', err))
+
         } catch (err) {
             console.error('Job application submission exception:', err)
         } finally {

@@ -493,5 +493,29 @@ export const emailService = {
             console.error('sendEmail error:', error)
             return { success: false, error: error.message }
         }
+    },
+
+    sendJobApplicationEmail: async ({ name, email, phone, position, experience, license, availability, notes }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'job_application_alert',
+                    contactData: { name, email, phone, position, experience, license, availability, notes }
+                })
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Job application email failed')
+            console.log('💼 Job application alert email sent to admins')
+            return { success: true }
+        } catch (error) {
+            console.error('sendJobApplicationEmail error:', error)
+            return { success: false, error: error.message }
+        }
     }
 }
