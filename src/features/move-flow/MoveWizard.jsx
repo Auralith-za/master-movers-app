@@ -233,12 +233,13 @@ export default function MoveWizard() {
     const isStep1Ok = useMemo(() => {
         if (isAdmin || isTest) return true
 
-        const hasPickup = !!moveDetails?.pickupAddress
-        const hasDropoff = !!(moveDetails?.dropoffAddress || moveDetails?.storageDestination)
+        const hasPickup = !!(moveDetails?.pickupAddress && moveDetails.pickupAddress.trim().length > 0)
+        const hasDropoff = !!((moveDetails?.dropoffAddress && moveDetails.dropoffAddress.trim().length > 0) || moveDetails?.storageDestination)
         const hasDate = !!moveDetails?.moveDate
-        const hasName = !!(moveDetails?.contactName && (moveDetails?.surname || moveDetails?.contactName.trim().includes(' ')))
-        const hasPhone = !!moveDetails?.contactPhone
-        const hasEmail = !!(moveDetails?.contactEmail && moveDetails.contactEmail.includes('@') && moveDetails.contactEmail.includes('.'))
+        const hasName = !!(moveDetails?.contactName && moveDetails.contactName.trim().length > 0)
+        const hasPhone = !!(moveDetails?.contactPhone && moveDetails.contactPhone.trim().length > 0)
+        const emailTrimmed = (moveDetails?.contactEmail || '').trim()
+        const hasEmail = emailTrimmed.includes('@') && emailTrimmed.includes('.')
 
         return hasPickup && hasDropoff && hasDate && hasName && hasPhone && hasEmail
     }, [moveDetails, isAdmin, isTest])

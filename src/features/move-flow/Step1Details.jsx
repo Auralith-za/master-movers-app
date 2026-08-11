@@ -581,14 +581,12 @@ export default function Step1Details() {
     const handleSubmit = (e) => {
         e.preventDefault()
 
-        // 1. Validate Contact Name & Surname
+        // 1. Validate Contact Name
         const hasFirstName = !!(moveDetails.contactName && moveDetails.contactName.trim().length > 0)
-        const hasSurname = !!(moveDetails.surname && moveDetails.surname.trim().length > 0)
-        const hasFullName = hasFirstName && (hasSurname || moveDetails.contactName.trim().includes(' '))
 
-        if (!hasFullName) {
-            setAddressError("Please enter your First Name and Surname at the top of the form before proceeding.")
-            const nameEl = document.querySelector('input[name="contactName"]') || document.querySelector('input[name="surname"]')
+        if (!hasFirstName) {
+            setAddressError("Please enter your First Name at the top of the form before proceeding.")
+            const nameEl = document.querySelector('input[name="contactName"]')
             if (nameEl) {
                 nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
                 nameEl.focus()
