@@ -54,30 +54,30 @@ export default function FloatingCareersButton() {
         setIsSubmitting(true)
         const ref = 'APP-' + Math.floor(100000 + Math.random() * 900000)
 
-        try {
-            let cvUrl = null
-            // Attempt upload to Supabase storage bucket 'resumes'
-            if (cvFile?.rawFile) {
-                try {
-                    const fileExt = cvFile.name.split('.').pop()
-                    const filePath = `resumes/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-                    const { data: storageData, error: storageErr } = await supabase.storage
+        let cvUrl = null
+        // 1. Upload CV to Supabase storage bucket 'resumes' if file present
+        if (cvFile?.rawFile) {
+            try {
+                const fileExt = cvFile.name.split('.').pop()
+                const filePath = `resumes/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+                const { data: storageData, error: storageErr } = await supabase.storage
+                    .from('resumes')
+                    .upload(filePath, cvFile.rawFile, { cacheControl: '3600', upsert: true })
+
+                if (!storageErr && storageData) {
+                    const { data: publicUrlData } = supabase.storage
                         .from('resumes')
-                        .upload(filePath, cvFile.rawFile, { cacheControl: '3600', upsert: true })
-
-                    if (!storageErr && storageData) {
-                        const { data: publicUrlData } = supabase.storage
-                            .from('resumes')
-                            .getPublicUrl(filePath)
-                        cvUrl = publicUrlData?.publicUrl || null
-                    }
-                } catch (storageException) {
-                    console.warn('Storage bucket upload fallback:', storageException)
+                        .getPublicUrl(filePath)
+                    cvUrl = publicUrlData?.publicUrl || null
                 }
+            } catch (storageException) {
+                console.warn('Storage bucket upload notice:', storageException)
             }
+        }
 
-            // 1. Primary insert to job_applications table
-            const { data, error } = await supabase
+        // 2. Primary insert to job_applications table (isolated try/catch)
+        try {
+            await supabase
                 .from('job_applications')
                 .insert([
                     {
@@ -88,18 +88,17 @@ export default function FloatingCareersButton() {
                         notes: formData.notes,
                         cv_name: cvFile?.name || null,
                         cv_url: cvUrl,
-                        cv_data: cvFile?.base64 || null,
+                        // Only save base64 string if reasonably sized (< 300KB) to prevent PostgREST 413 payload rejection
+                        cv_data: (cvFile?.base64 && cvFile.base64.length < 400000) ? cvFile.base64 : null,
                         status: 'new'
                     }
                 ])
-                .select()
+        } catch (jobTableErr) {
+            console.warn('job_applications table insert exception (non-fatal):', jobTableErr)
+        }
 
-            if (error) {
-                console.warn('Supabase job_applications insert notice:', error)
-            }
-
-            // 2. Fail-safe backup insert to contact_submissions table (ensures it appears on admin dashboard even if job_applications table is missing)
-            const appMessage = `[JOB APPLICATION]
+        // 3. Backup insert to contact_submissions table (isolated try/catch, guaranteed table)
+        const appMessage = `[JOB APPLICATION]
 Applicant: ${formData.full_name}
 Phone: ${formData.phone}
 Email: ${formData.email}
@@ -109,6 +108,7 @@ ${cvUrl ? `CV Download Link: ${cvUrl}` : ''}
 Candidate Overview & Notes:
 ${formData.notes || 'No extra notes provided.'}`
 
+        try {
             await supabase
                 .from('contact_submissions')
                 .insert([
@@ -120,22 +120,25 @@ ${formData.notes || 'No extra notes provided.'}`
                         status: 'new'
                     }
                 ])
+        } catch (contactTableErr) {
+            console.warn('contact_submissions insert notice:', contactTableErr)
+        }
 
-            // 3. Send instant admin email alert using contact_message route (guaranteed to trigger live Supabase edge function)
+        // 4. Send instant admin email alert using contact_message route (isolated try/catch)
+        try {
             await emailService.sendContactEmail({
                 name: `[JOB APPLICATION] ${formData.full_name}`,
                 email: formData.email,
                 phone: formData.phone,
                 message: appMessage
             })
-
-        } catch (err) {
-            console.error('Job application submission exception:', err)
-        } finally {
-            setIsSubmitting(false)
-            setApplicationRef(ref)
-            setIsSubmitted(true)
+        } catch (emailErr) {
+            console.warn('Job application email alert notice:', emailErr)
         }
+
+        setIsSubmitting(false)
+        setApplicationRef(ref)
+        setIsSubmitted(true)
     }
 
     const handleClose = () => {
