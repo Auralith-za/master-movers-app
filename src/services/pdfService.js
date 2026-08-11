@@ -70,6 +70,23 @@ export const generateProfessionalQuote = (data) => {
             const extraColls = data.extraCollections || data.moveDetails?.extraCollections || data.items_json?.extraCollections || data.quote?.items_json?.extraCollections || [];
             const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || data.items_json?.extraDrops || data.quote?.items_json?.extraDrops || [];
 
+            // Calculate total volume / cubes robustly
+            const { breakdown: bd } = data;
+            let displayVolume = Number(totalVolume || bd?.totalVolume || bd?.totalVolumeCuFt || data.total_volume || data.quote?.total_volume || 0);
+            if (!displayVolume && inventory && typeof inventory === 'object') {
+                Object.entries(inventory).forEach(([idKey, qty]) => {
+                    if (!qty || qty <= 0) return;
+                    const cleanId = idKey.split('__room:')[0].split('_')[0];
+                    const item = (inventoryItems || []).find(i => i.id === cleanId);
+                    if (item && item.volume) {
+                        displayVolume += item.volume * qty;
+                    }
+                });
+                const st7Count = st7Boxes || data.st7Boxes || data.moveDetails?.st7Boxes || 0;
+                const linenCount = linenBoxes || data.linenBoxes || data.moveDetails?.linenBoxes || 0;
+                displayVolume += (st7Count * 4.25) + (linenCount * 8);
+            }
+
             // Move Column
             doc.text(`Date: ${moveDate || 'N/A'}`, 110, currentY);
             let moveY = currentY + 6;
@@ -92,7 +109,12 @@ export const generateProfessionalQuote = (data) => {
             const toDim = doc.getTextDimensions(toText, { maxWidth: 80 });
             moveY += (toDim.h || 6) + 4;
 
-            currentY = Math.max(currentY + 30, moveY + 2);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Total Volume / Cubes: ${displayVolume.toFixed(2)} ft³`, 110, moveY);
+            doc.setFont('helvetica', 'normal');
+            moveY += 6;
+
+            currentY = Math.max(currentY + 36, moveY + 2);
 
             // --- Site Access & Logistics Section ---
             doc.setTextColor(...slate900);
@@ -183,6 +205,9 @@ export const generateProfessionalQuote = (data) => {
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
             doc.text('INVENTORY ITEMS', 20, currentY);
+            doc.setFontSize(8.5);
+            doc.setTextColor(...slate500);
+            doc.text(`Total Cubes: ${displayVolume.toFixed(2)} ft³`, 190, currentY, { align: 'right' });
             doc.line(20, currentY + 2, 190, currentY + 2);
             
             currentY += 6;
@@ -246,8 +271,6 @@ export const generateProfessionalQuote = (data) => {
             currentY = doc.lastAutoTable.finalY + 12;
 
             // --- Costs Section & Terms Page Control ---
-            // Cost Summary + Payflex Banner + Terms take up ~100mm. Standard page height is 297mm.
-            // If currentY is past 140mm, push Cost Summary to a clean page to prevent overlapping the footer.
             if (currentY > 140) {
                 doc.addPage();
                 currentY = 20;
@@ -267,14 +290,13 @@ export const generateProfessionalQuote = (data) => {
             
             const serviceFees = numSubTotal || (numTotal / 1.15);
 
-            const { breakdown: bd } = data;
             const costs = [];
 
             // Transport Services line
-            const displayVolume = totalVolume || bd?.totalVolume || 0;
             if (displayVolume > 0 || serviceFees > 0) {
                 let transportCost = (bd?.transport || 0) + (bd?.volume || 0) + (bd?.standardInsurance || 0);
-                costs.push(['Transport Services', `R ${Number(transportCost).toFixed(2)}`]);
+                const volumeLabel = displayVolume > 0 ? ` (${displayVolume.toFixed(2)} ft³ / Cubes)` : '';
+                costs.push([`Transport & Volume Services${volumeLabel}`, `R ${Number(transportCost).toFixed(2)}`]);
             }
 
             if (bd) {

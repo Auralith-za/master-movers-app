@@ -1,6 +1,6 @@
 import React from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, Settings, LogOut, Package, Phone, Tag, MessageSquare, Target } from 'lucide-react'
+import { LayoutDashboard, FileText, Settings, LogOut, Package, Phone, Tag, MessageSquare, Briefcase } from 'lucide-react'
 
 export default function AdminLayout() {
     const navigate = useNavigate()
@@ -15,6 +15,7 @@ export default function AdminLayout() {
         { icon: Phone, label: 'Leads / Call Backs', path: '/admin/leads' },
         { icon: FileText, label: 'Quotes', path: '/admin/quotes' },
         { icon: MessageSquare, label: 'Contact Forms', path: '/admin/contact-submissions' },
+        { icon: Briefcase, label: 'Job Applications', path: '/admin/job-applications' },
         { icon: Tag, label: 'Coupon Codes', path: '/admin/coupons' },
         { icon: Settings, label: 'Settings', path: '/admin/settings' },
     ]

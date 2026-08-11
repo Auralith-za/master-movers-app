@@ -148,6 +148,20 @@ export default function QuoteReviewPage() {
 
     const inventory = quote.items_json?.items || quote.items_json || {};
 
+    // Calculate total volume / cubes
+    let quoteVolume = Number(quote.total_volume || quote.items_json?.total_volume || 0);
+    if (!quoteVolume && inventory && typeof inventory === 'object') {
+        Object.entries(inventory).forEach(([idKey, qty]) => {
+            if (!qty || qty <= 0) return;
+            const cleanId = idKey.split('__room:')[0].split('_')[0];
+            const item = INVENTORY_ITEMS.find(i => i.id === cleanId);
+            if (item && item.volume) quoteVolume += item.volume * qty;
+        });
+        const st7Count = quote.st7_boxes || quote.items_json?.st7Boxes || 0;
+        const linenCount = quote.linen_boxes || quote.items_json?.linenBoxes || 0;
+        quoteVolume += (st7Count * 4.25) + (linenCount * 8);
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
             <div className="bg-slate-900 overflow-hidden relative">
@@ -157,6 +171,9 @@ export default function QuoteReviewPage() {
                             <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block">Official Quote</span>
                             <h1 className="text-4xl font-black tracking-tight">Review Your Move</h1>
                             <p className="text-slate-400 mt-2">Reference: <span className="text-white font-bold tracking-wider">#{quote.id.toString().substring(0, 8).toUpperCase()}</span></p>
+                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-red-600/20 border border-red-500/30 rounded-full text-xs font-black text-red-400 uppercase tracking-wider">
+                                📦 Total Volume / Cubes: {quoteVolume.toFixed(2)} ft³
+                            </div>
                         </div>
                         {appSettings && appSettings.pricing_active === false ? (
                             <div className="text-right max-w-sm">
@@ -193,8 +210,13 @@ export default function QuoteReviewPage() {
                         
                         {/* Route Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-                                <Truck size={20} className="text-red-500" /> Logistics Information
+                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <Truck size={20} className="text-red-500" /> Logistics Information
+                                </span>
+                                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                                    {quoteVolume.toFixed(2)} ft³ Cubes
+                                </span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
                                 <div className="space-y-4">
@@ -305,8 +327,13 @@ export default function QuoteReviewPage() {
 
                         {/* Inventory Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-                                <Package size={20} className="text-red-500" /> Quoted Inventory List
+                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <Package size={20} className="text-red-500" /> Quoted Inventory List
+                                </span>
+                                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                                    Total Cubes: {quoteVolume.toFixed(2)} ft³
+                                </span>
                             </h2>
                             <div className="space-y-3">
                                 {Object.entries(inventory).map(([idKey, qty]) => {

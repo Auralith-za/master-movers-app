@@ -577,7 +577,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 generalNotes: moveDetails.generalNotes || moveDetails.notes || '',
                 extraCollections: moveDetails.extraCollections || [],
                 extraDrops: moveDetails.extraDrops || [],
-                isSharedLoad: breakdown.isSharedLoad
+                isSharedLoad: breakdown.isSharedLoad,
+                totalVolume: totalVolume
             })
         } catch (err) {
             console.error('PDF Generation error:', err)
@@ -737,6 +738,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <div>
                                 <h2 className="text-2xl font-bold">Estimated Quote</h2>
                                 <p className="text-slate-400 text-sm mt-1">Based on provided inventory & distance.</p>
+                                <div className="mt-4 flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg w-fit">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Volume:</span>
+                                    <span className="text-xs font-black text-white">{totalVolume?.toFixed(2)} ft³</span>
+                                </div>
                             </div>
                             <div className="text-right">
                                 {appliedCoupon ? (
@@ -1310,8 +1315,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             <span className="flex items-center gap-2">
                                 <Truck size={18} className="text-red-600" /> Inventory Items by Room
                             </span>
-                            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
-                                {Object.values(inventory || {}).reduce((a, b) => a + b, 0)} Items Total
+                            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                                <span>{Object.values(inventory || {}).reduce((a, b) => a + b, 0)} Items</span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-slate-700 font-black">{totalVolume?.toFixed(2)} ft³ Cubes</span>
                             </span>
                         </h3>
                         {(() => {

@@ -1440,8 +1440,8 @@ export default function QuoteDetailPage() {
                                     <span className="text-emerald-400 font-bold uppercase tracking-wider">{recalculatedData?.breakdown?.vehicleType || 'Standard'}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
-                                    <span>Inventory Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³</span>
+                                    <span>Total Cubes / Volume</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³ (Cubes)</span>
                                 </div>
 
                                 {isEditing && customProductsTotal > 0 && (

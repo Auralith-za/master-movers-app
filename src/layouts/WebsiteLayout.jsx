@@ -3,6 +3,7 @@ import Navbar from '../components/common/Navbar'
 import Footer from '../components/common/Footer'
 import MoveAssistantChat from '../components/common/MoveAssistantChat'
 import FloatingCallButton from '../components/FloatingCallButton'
+import FloatingCareersButton from '../components/common/FloatingCareersButton'
 import { Outlet } from 'react-router-dom'
 
 export default function WebsiteLayout() {
@@ -14,6 +15,7 @@ export default function WebsiteLayout() {
             </main>
             <Footer />
             <FloatingCallButton />
+            <FloatingCareersButton />
         </div>
     )
 }

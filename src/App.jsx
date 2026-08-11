@@ -19,6 +19,7 @@ import LeadsPage from './pages/admin/LeadsPage'
 import AdminCoupons from './pages/admin/AdminCoupons'
 import AdminSettings from './pages/admin/AdminSettings'
 import ContactSubmissionsPage from './pages/admin/ContactSubmissionsPage'
+import JobApplicationsPage from './pages/admin/JobApplicationsPage'
 import CommercialMoversPage from './pages/services/CommercialMoversPage'
 import ResidentialMoversPage from './pages/services/ResidentialMoversPage'
 import InternationalMoversPage from './pages/services/InternationalMoversPage'
@@ -116,6 +117,7 @@ function App() {
           <Route path="coupons" element={<AdminCoupons />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="contact-submissions" element={<ContactSubmissionsPage />} />
+          <Route path="job-applications" element={<JobApplicationsPage />} />
           {/* Add more admin routes here */}
         </Route>
 

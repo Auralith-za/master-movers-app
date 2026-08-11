@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, Users, AlertCircle, FileText, Download, Search, X, Eye, ArrowRight, Calendar, MapPin } from 'lucide-react'
+import { TrendingUp, Users, AlertCircle, FileText, Download, Search, X, Eye, ArrowRight, Calendar, MapPin, Briefcase } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import Button from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ export default function DashboardPage() {
     const navigate = useNavigate()
     const [isLoading, setIsLoading] = useState(true)
     const [quotes, setQuotes] = useState([])
+    const [jobAppCount, setJobAppCount] = useState(0)
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [stats, setStats] = useState({
@@ -40,6 +41,9 @@ export default function DashboardPage() {
                 setQuotes(sorted)
                 calculateStats(sorted)
             }
+
+            const { data: jobApps } = await supabase.from('job_applications').select('id')
+            if (jobApps) setJobAppCount(jobApps.length)
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {
@@ -378,6 +382,16 @@ export default function DashboardPage() {
                     color="text-purple-500"
                     bg="bg-purple-50"
                 />
+                <div onClick={() => navigate('/admin/job-applications')} className="cursor-pointer">
+                    <StatCard
+                        icon={Briefcase}
+                        label="Job Applications"
+                        value={jobAppCount}
+                        subValue="Click to view & manage candidates"
+                        color="text-indigo-500"
+                        bg="bg-indigo-50"
+                    />
+                </div>
             </div>
 
             {/* Sales Performance */}
