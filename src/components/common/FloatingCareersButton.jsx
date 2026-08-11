@@ -85,9 +85,9 @@ ${cvUrl ? `CV Download Link: ${cvUrl}` : ''}
 Candidate Overview & Notes:
 ${formData.notes || 'No extra notes provided.'}`
 
-        // STEP 1: Save to contact_submissions FIRST (guaranteed table in Supabase)
+        // STEP 1: Save to contact_submissions (guaranteed table in Supabase)
         try {
-            await supabase
+            const { data: cData, error: cErr } = await supabase
                 .from('contact_submissions')
                 .insert({
                     name: `[JOB APPLICATION] ${formData.full_name}`,
@@ -96,13 +96,17 @@ ${formData.notes || 'No extra notes provided.'}`
                     message: appMessage,
                     status: 'new'
                 })
+                .select()
+
+            if (cErr) console.error('contact_submissions insert error:', cErr)
+            else console.log('contact_submissions saved:', cData)
         } catch (contactErr) {
             console.error('contact_submissions insert notice:', contactErr)
         }
 
         // STEP 2: Save to job_applications table
         try {
-            await supabase
+            const { data: jData, error: jErr } = await supabase
                 .from('job_applications')
                 .insert({
                     full_name: formData.full_name,
@@ -110,10 +114,12 @@ ${formData.notes || 'No extra notes provided.'}`
                     phone: formData.phone,
                     position: 'General Applicant',
                     notes: formData.notes,
-                    cv_name: cvFile?.name || null,
-                    cv_url: cvUrl,
                     status: 'new'
                 })
+                .select()
+
+            if (jErr) console.warn('job_applications insert error:', jErr)
+            else console.log('job_applications saved:', jData)
         } catch (jobErr) {
             console.warn('job_applications insert notice:', jobErr)
         }
