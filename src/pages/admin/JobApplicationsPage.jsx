@@ -173,6 +173,43 @@ export default function JobApplicationsPage() {
         }
     }
 
+    const handleCreateTestApplication = async () => {
+        try {
+            setIsLoading(true)
+            const testCandidate = {
+                full_name: 'Curt Le Roux (Test)',
+                email: 'curtleroux7785@gmail.com',
+                phone: '+27 72 210 9216',
+                position: 'General Applicant',
+                notes: 'Test application created from admin portal.',
+                status: 'new'
+            }
+
+            // 1. Try insert to job_applications
+            const { error: err1 } = await supabase.from('job_applications').insert([testCandidate])
+            if (err1) {
+                console.warn('job_applications insert notice:', err1)
+            }
+
+            // 2. Backup insert to contact_submissions
+            await supabase.from('contact_submissions').insert({
+                name: '[JOB APPLICATION] Curt Le Roux (Test)',
+                email: 'curtleroux7785@gmail.com',
+                phone: '+27 72 210 9216',
+                message: '[JOB APPLICATION]\nApplicant: Curt Le Roux (Test)\nNotes: Test application created from admin portal.',
+                status: 'new'
+            })
+
+            await fetchApplications()
+            alert('Test candidate application added & synced successfully!')
+        } catch (err) {
+            console.error('Test application creation error:', err)
+            alert('Could not add test application: ' + err.message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     return (
         <div className="space-y-8 animate-in fade-in duration-300 max-w-7xl mx-auto">
             {/* PAGE HEADER */}
@@ -189,6 +226,12 @@ export default function JobApplicationsPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleCreateTestApplication}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all shadow-md"
+                    >
+                        + Add Test Application
+                    </button>
                     <button
                         onClick={fetchApplications}
                         className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all"

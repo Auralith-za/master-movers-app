@@ -1,4 +1,4 @@
--- SQL Script to create job_applications table and resumes storage bucket in Supabase
+-- SQL Script to create job_applications table and resumes storage bucket in Supabase (Idempotent)
 
 -- 1. Job Applications Table
 CREATE TABLE IF NOT EXISTS public.job_applications (
@@ -21,7 +21,13 @@ CREATE TABLE IF NOT EXISTS public.job_applications (
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.job_applications ENABLE ROW LEVEL SECURITY;
 
--- Create policies for public submission and admin management
+-- Safely drop existing policies before re-creating
+DROP POLICY IF EXISTS "Allow public insert to job_applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Allow public select job_applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Allow public update job_applications" ON public.job_applications;
+DROP POLICY IF EXISTS "Allow public delete job_applications" ON public.job_applications;
+
+-- Create policies
 CREATE POLICY "Allow public insert to job_applications" 
     ON public.job_applications FOR INSERT 
     WITH CHECK (true);
@@ -39,12 +45,14 @@ CREATE POLICY "Allow public delete job_applications"
     USING (true);
 
 
--- 2. Optional: Storage Bucket for Resumes / CVs
+-- 2. Storage Bucket for Resumes / CVs
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('resumes', 'resumes', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Bucket Security Policies
+DROP POLICY IF EXISTS "Allow public insert to resumes bucket" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public select from resumes bucket" ON storage.objects;
+
 CREATE POLICY "Allow public insert to resumes bucket" 
     ON storage.objects FOR INSERT 
     WITH CHECK (bucket_id = 'resumes');
