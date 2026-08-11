@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Briefcase, X, CheckCircle, Send, Sparkles, User, Mail, Phone, Upload, FileText, Award } from 'lucide-react'
+import { Briefcase, X, CheckCircle, Send, Sparkles, User, Upload, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { emailService } from '../../services/emailService'
 
@@ -13,10 +13,6 @@ export default function FloatingCareersButton() {
         full_name: '',
         email: '',
         phone: '',
-        position: 'Heavy Vehicle Driver (Code 10/14)',
-        experience_years: '1 - 3 Years',
-        license_type: 'Code 10 (C1)',
-        availability: 'Immediately',
         notes: ''
     })
 
@@ -41,7 +37,8 @@ export default function FloatingCareersButton() {
                 name: file.name,
                 size: (file.size / 1024).toFixed(1) + ' KB',
                 type: file.type,
-                base64: reader.result
+                base64: reader.result,
+                rawFile: file
             })
         }
         reader.readAsDataURL(file)
@@ -58,6 +55,27 @@ export default function FloatingCareersButton() {
         const ref = 'APP-' + Math.floor(100000 + Math.random() * 900000)
 
         try {
+            let cvUrl = null
+            // Attempt upload to Supabase storage bucket 'resumes'
+            if (cvFile?.rawFile) {
+                try {
+                    const fileExt = cvFile.name.split('.').pop()
+                    const filePath = `resumes/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+                    const { data: storageData, error: storageErr } = await supabase.storage
+                        .from('resumes')
+                        .upload(filePath, cvFile.rawFile, { cacheControl: '3600', upsert: true })
+
+                    if (!storageErr && storageData) {
+                        const { data: publicUrlData } = supabase.storage
+                            .from('resumes')
+                            .getPublicUrl(filePath)
+                        cvUrl = publicUrlData?.publicUrl || null
+                    }
+                } catch (storageException) {
+                    console.warn('Storage bucket upload fallback:', storageException)
+                }
+            }
+
             const { data, error } = await supabase
                 .from('job_applications')
                 .insert([
@@ -65,12 +83,10 @@ export default function FloatingCareersButton() {
                         full_name: formData.full_name,
                         email: formData.email,
                         phone: formData.phone,
-                        position: formData.position,
-                        experience_years: formData.experience_years,
-                        license_type: formData.license_type,
-                        availability: formData.availability,
+                        position: 'General Applicant',
                         notes: formData.notes,
                         cv_name: cvFile?.name || null,
+                        cv_url: cvUrl,
                         cv_data: cvFile?.base64 || null,
                         status: 'new'
                     }
@@ -86,12 +102,10 @@ export default function FloatingCareersButton() {
                 name: formData.full_name,
                 email: formData.email,
                 phone: formData.phone,
-                position: formData.position,
-                experience: formData.experience_years,
-                license: formData.license_type,
-                availability: formData.availability,
+                position: 'General Applicant',
                 notes: formData.notes,
                 cvName: cvFile?.name || null,
+                cvUrl: cvUrl,
                 cvData: cvFile?.base64 || null
             }).catch(err => console.error('Non-blocking job email alert error:', err))
 
@@ -113,10 +127,6 @@ export default function FloatingCareersButton() {
                 full_name: '',
                 email: '',
                 phone: '',
-                position: 'Heavy Vehicle Driver (Code 10/14)',
-                experience_years: '1 - 3 Years',
-                license_type: 'Code 10 (C1)',
-                availability: 'Immediately',
                 notes: ''
             })
         }, 300)
@@ -148,7 +158,7 @@ export default function FloatingCareersButton() {
             {/* CAREERS APPLICATION MODAL */}
             {isOpen && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                         
                         {/* MODAL HEADER */}
                         <div className="bg-slate-900 p-6 sm:p-8 text-white relative flex justify-between items-start">
@@ -156,8 +166,8 @@ export default function FloatingCareersButton() {
                                 <div className="inline-flex items-center gap-2 bg-red-600/30 border border-red-500/40 text-red-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3">
                                     <Sparkles size={12} /> Work With Master Movers
                                 </div>
-                                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">Career Opportunities</h2>
-                                <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Join South Africa's premier moving &amp; logistics team.</p>
+                                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">Career Application</h2>
+                                <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Submit your details &amp; CV to join our team.</p>
                             </div>
                             <button
                                 onClick={handleClose}
@@ -176,10 +186,10 @@ export default function FloatingCareersButton() {
                                     </div>
                                     <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Application Received!</h3>
                                     <p className="text-slate-600 text-sm max-w-md mx-auto leading-relaxed font-medium">
-                                        Thank you for applying to Master Movers. Your application has been logged under reference <strong className="text-slate-900">{applicationRef}</strong>.
+                                        Thank you for applying to Master Movers. Your application reference is <strong className="text-slate-900">{applicationRef}</strong>.
                                     </p>
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500 max-w-sm mx-auto">
-                                        Our HR &amp; Operations team reviews applications weekly. Shortlisted candidates will be contacted directly.
+                                        Our recruitment team reviews applications regularly. Shortlisted candidates will be contacted directly.
                                     </div>
                                     <button
                                         onClick={handleClose}
@@ -235,73 +245,6 @@ export default function FloatingCareersButton() {
                                         </div>
                                     </div>
 
-                                    {/* Role & Qualifications Group */}
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                            <Award size={14} className="text-red-600" /> Position &amp; Experience
-                                        </h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Position Applied For</label>
-                                                <select
-                                                    name="position"
-                                                    value={formData.position}
-                                                    onChange={handleChange}
-                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
-                                                >
-                                                    <option value="Heavy Vehicle Driver (Code 10/14)">Heavy Vehicle Driver (Code 10/14)</option>
-                                                    <option value="Furniture Mover & Loader">Furniture Mover & Loader</option>
-                                                    <option value="Logistics & Dispatch Coordinator">Logistics & Dispatch Coordinator</option>
-                                                    <option value="Sales & Customer Service Consultant">Sales & Customer Service Consultant</option>
-                                                    <option value="Fleet Mechanic / Maintenance">Fleet Mechanic / Maintenance</option>
-                                                    <option value="General Operations Worker">General Operations Worker</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Years of Industry Experience</label>
-                                                <select
-                                                    name="experience_years"
-                                                    value={formData.experience_years}
-                                                    onChange={handleChange}
-                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
-                                                >
-                                                    <option value="Less than 1 Year">Less than 1 Year</option>
-                                                    <option value="1 - 3 Years">1 - 3 Years</option>
-                                                    <option value="3 - 5 Years">3 - 5 Years</option>
-                                                    <option value="5+ Years">5+ Years</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Driver's License Type</label>
-                                                <select
-                                                    name="license_type"
-                                                    value={formData.license_type}
-                                                    onChange={handleChange}
-                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
-                                                >
-                                                    <option value="Code 8 (B)">Code 8 (B)</option>
-                                                    <option value="Code 10 (C1)">Code 10 (C1)</option>
-                                                    <option value="Code 14 (EC)">Code 14 (EC)</option>
-                                                    <option value="Code 14 + PDP">Code 14 + PDP</option>
-                                                    <option value="None">None</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Availability / Start Date</label>
-                                                <select
-                                                    name="availability"
-                                                    value={formData.availability}
-                                                    onChange={handleChange}
-                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
-                                                >
-                                                    <option value="Immediately">Immediately</option>
-                                                    <option value="Within 1-2 Weeks">Within 1-2 Weeks</option>
-                                                    <option value="1 Month Notice">1 Month Notice</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     {/* CV UPLOAD FIELD */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -342,12 +285,12 @@ export default function FloatingCareersButton() {
                                     {/* Experience Bio / Notes */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">
-                                            Brief Overview of Qualifications &amp; Experience
+                                            Brief Overview of Experience / Cover Note
                                         </label>
                                         <textarea
                                             name="notes"
                                             rows="3"
-                                            placeholder="Tell us about your previous moving experience or specialized skills..."
+                                            placeholder="Tell us about your previous experience, qualifications, or position interested in..."
                                             value={formData.notes}
                                             onChange={handleChange}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:border-red-600 focus:bg-white transition-all resize-none"

@@ -264,9 +264,11 @@ export default function JobApplicationsPage() {
                                         <td className="px-6 py-4 text-xs font-medium text-slate-600">
                                             <div>Exp: <strong>{app.experience_years || 'N/A'}</strong></div>
                                             <div className="text-slate-400 text-[11px]">License: {app.license_type || 'None'}</div>
-                                            {app.cv_data && (
+                                            {(app.cv_url || app.cv_data) && (
                                                 <a
-                                                    href={app.cv_data}
+                                                    href={app.cv_url || app.cv_data}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
                                                     download={app.cv_name || 'Candidate_CV'}
                                                     className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors"
                                                 >
@@ -371,7 +373,7 @@ export default function JobApplicationsPage() {
                                 </div>
                             </div>
 
-                            {selectedApp.cv_data ? (
+                            {(selectedApp.cv_url || selectedApp.cv_data) ? (
                                 <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-indigo-600 text-white rounded-xl">
@@ -383,11 +385,13 @@ export default function JobApplicationsPage() {
                                         </div>
                                     </div>
                                     <a
-                                        href={selectedApp.cv_data}
+                                        href={selectedApp.cv_url || selectedApp.cv_data}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         download={selectedApp.cv_name || 'Candidate_CV'}
                                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md"
                                     >
-                                        <Download size={14} /> Download
+                                        <Download size={14} /> Download CV
                                     </a>
                                 </div>
                             ) : (
