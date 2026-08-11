@@ -581,10 +581,66 @@ export default function Step1Details() {
     const handleSubmit = (e) => {
         e.preventDefault()
 
-        if (!moveDetails.pickupAddress || !moveDetails.dropoffAddress) {
-            setAddressError("Both pickup and delivery/storage addresses are required.")
+        // 1. Validate Contact Name & Surname
+        const hasFirstName = !!(moveDetails.contactName && moveDetails.contactName.trim().length > 0)
+        const hasSurname = !!(moveDetails.surname && moveDetails.surname.trim().length > 0)
+        const hasFullName = hasFirstName && (hasSurname || moveDetails.contactName.trim().includes(' '))
+
+        if (!hasFullName) {
+            setAddressError("Please enter your First Name and Surname at the top of the form before proceeding.")
+            const nameEl = document.querySelector('input[name="contactName"]') || document.querySelector('input[name="surname"]')
+            if (nameEl) {
+                nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                nameEl.focus()
+            }
             return
         }
+
+        // 2. Validate Contact Phone
+        if (!moveDetails.contactPhone || moveDetails.contactPhone.trim().length === 0) {
+            setAddressError("Please enter your Phone Number at the top of the form before proceeding.")
+            const phoneEl = document.querySelector('input[name="contactPhone"]')
+            if (phoneEl) {
+                phoneEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                phoneEl.focus()
+            }
+            return
+        }
+
+        // 3. Validate Contact Email
+        const emailValid = moveDetails.contactEmail && moveDetails.contactEmail.includes('@') && moveDetails.contactEmail.includes('.')
+        if (!emailValid) {
+            setAddressError("Please enter a valid Email Address at the top of the form before proceeding.")
+            const emailEl = document.querySelector('input[name="contactEmail"]')
+            if (emailEl) {
+                emailEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                emailEl.focus()
+            }
+            return
+        }
+
+        // 4. Validate Pickup and Dropoff addresses
+        if (!moveDetails.pickupAddress || (!moveDetails.dropoffAddress && !moveDetails.storageDestination)) {
+            setAddressError("Both pickup and delivery/storage addresses are required.")
+            const pickupEl = document.querySelector('input[name="pickupAddress"]')
+            if (pickupEl) {
+                pickupEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                pickupEl.focus()
+            }
+            return
+        }
+
+        // 5. Validate Move Date
+        if (!moveDetails.moveDate) {
+            setAddressError("Please select your Preferred Move Date before proceeding.")
+            const dateEl = document.querySelector('input[name="moveDate"]')
+            if (dateEl) {
+                dateEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                dateEl.focus()
+            }
+            return
+        }
+
         if (isValidating) {
             return
         }
@@ -597,8 +653,6 @@ export default function Step1Details() {
         const dropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng)
         const isNational = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode
         const isManual = moveDetails.pickupManualActive || moveDetails.dropoffManualActive
-
-
 
         // For local moves, ensure Google Maps resolved a real distance (unless manual entry or storage is selected)
         if (!isManual && !isNational && !isOutline && !moveDetails.storageDestination && (!moveDetails.distanceKm || moveDetails.distanceKm === 0)) {
