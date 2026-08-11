@@ -1086,20 +1086,20 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </Button>
 
                                 {submissionType !== 'admin' && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                    <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
                                         <button
                                             onClick={handlePayLater}
                                             disabled={isSubmitting}
-                                            className="w-full py-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-widest text-[11px] hover:bg-slate-800 transition-all shadow-lg text-center flex items-center justify-center gap-2 disabled:opacity-50"
+                                            className="w-full py-3.5 sm:py-4 px-2 rounded-xl border-2 border-slate-900 bg-slate-900 text-white font-black uppercase tracking-wider text-[10px] sm:text-[11px] hover:bg-slate-800 transition-all shadow-lg text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
                                         >
-                                            <Clock size={16} /> Pay Later
+                                            <Clock size={15} className="shrink-0" /> <span className="truncate">Pay Later</span>
                                         </button>
                                         <button
                                             onClick={() => setShowRejectModal(true)}
                                             disabled={isSubmitting}
-                                            className="w-full py-4 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 font-black uppercase tracking-widest text-[11px] hover:bg-red-100 hover:border-red-300 transition-all shadow-sm text-center flex items-center justify-center gap-2 disabled:opacity-50"
+                                            className="w-full py-3.5 sm:py-4 px-2 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 font-black uppercase tracking-wider text-[10px] sm:text-[11px] hover:bg-red-100 hover:border-red-300 transition-all shadow-sm text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
                                         >
-                                            <XCircle size={16} /> Reject Payment
+                                            <XCircle size={15} className="shrink-0" /> <span className="truncate">Reject Payment</span>
                                         </button>
                                     </div>
                                 )}
