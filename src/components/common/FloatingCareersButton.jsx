@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Briefcase, X, CheckCircle, Send, Sparkles, User, Mail, Phone, ShieldCheck, Clock, Award } from 'lucide-react'
+import { Briefcase, X, CheckCircle, Send, Sparkles, User, Mail, Phone, Upload, FileText, Award } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { emailService } from '../../services/emailService'
 
@@ -8,6 +8,7 @@ export default function FloatingCareersButton() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSubmitted, setIsSubmitted] = useState(false)
     const [applicationRef, setApplicationRef] = useState('')
+    const [cvFile, setCvFile] = useState(null)
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
@@ -22,6 +23,28 @@ export default function FloatingCareersButton() {
     const handleChange = (e) => {
         const { name, value } = e.target
         setFormData(prev => ({ ...prev, [name]: value }))
+    }
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+
+        // 5MB limit check
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size exceeds 5MB limit. Please select a smaller CV file.')
+            return
+        }
+
+        const reader = new FileReader()
+        reader.onload = () => {
+            setCvFile({
+                name: file.name,
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                type: file.type,
+                base64: reader.result
+            })
+        }
+        reader.readAsDataURL(file)
     }
 
     const handleSubmit = async (e) => {
@@ -47,6 +70,8 @@ export default function FloatingCareersButton() {
                         license_type: formData.license_type,
                         availability: formData.availability,
                         notes: formData.notes,
+                        cv_name: cvFile?.name || null,
+                        cv_data: cvFile?.base64 || null,
                         status: 'new'
                     }
                 ])
@@ -65,7 +90,9 @@ export default function FloatingCareersButton() {
                 experience: formData.experience_years,
                 license: formData.license_type,
                 availability: formData.availability,
-                notes: formData.notes
+                notes: formData.notes,
+                cvName: cvFile?.name || null,
+                cvData: cvFile?.base64 || null
             }).catch(err => console.error('Non-blocking job email alert error:', err))
 
         } catch (err) {
@@ -79,9 +106,9 @@ export default function FloatingCareersButton() {
 
     const handleClose = () => {
         setIsOpen(false)
-        // Reset state after transition
         setTimeout(() => {
             setIsSubmitted(false)
+            setCvFile(null)
             setFormData({
                 full_name: '',
                 email: '',
@@ -130,7 +157,7 @@ export default function FloatingCareersButton() {
                                     <Sparkles size={12} /> Work With Master Movers
                                 </div>
                                 <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">Career Opportunities</h2>
-                                <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Join South Africa's premier moving & logistics team.</p>
+                                <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Join South Africa's premier moving &amp; logistics team.</p>
                             </div>
                             <button
                                 onClick={handleClose}
@@ -149,10 +176,10 @@ export default function FloatingCareersButton() {
                                     </div>
                                     <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Application Received!</h3>
                                     <p className="text-slate-600 text-sm max-w-md mx-auto leading-relaxed font-medium">
-                                        Thank you for applying to Master Movers. Your application has been logged in our recruitment portal under reference <strong className="text-slate-900">{applicationRef}</strong>.
+                                        Thank you for applying to Master Movers. Your application has been logged under reference <strong className="text-slate-900">{applicationRef}</strong>.
                                     </p>
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500 max-w-sm mx-auto">
-                                        Our HR & Operations team reviews applications weekly. Shortlisted candidates will be contacted via phone or email for an interview.
+                                        Our HR &amp; Operations team reviews applications weekly. Shortlisted candidates will be contacted directly.
                                     </div>
                                     <button
                                         onClick={handleClose}
@@ -175,7 +202,7 @@ export default function FloatingCareersButton() {
                                                     type="text"
                                                     name="full_name"
                                                     required
-                                                    placeholder="e.g. Sipho Ndlovu"
+                                                    placeholder="e.g. John Smith"
                                                     value={formData.full_name}
                                                     onChange={handleChange}
                                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
@@ -187,7 +214,7 @@ export default function FloatingCareersButton() {
                                                     type="email"
                                                     name="email"
                                                     required
-                                                    placeholder="e.g. sipho@example.com"
+                                                    placeholder="e.g. john@example.com"
                                                     value={formData.email}
                                                     onChange={handleChange}
                                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
@@ -211,7 +238,7 @@ export default function FloatingCareersButton() {
                                     {/* Role & Qualifications Group */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                            <Award size={14} className="text-red-600" /> Position & Experience
+                                            <Award size={14} className="text-red-600" /> Position &amp; Experience
                                         </h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div>
@@ -227,7 +254,6 @@ export default function FloatingCareersButton() {
                                                     <option value="Logistics & Dispatch Coordinator">Logistics & Dispatch Coordinator</option>
                                                     <option value="Sales & Customer Service Consultant">Sales & Customer Service Consultant</option>
                                                     <option value="Fleet Mechanic / Maintenance">Fleet Mechanic / Maintenance</option>
-                                                    <option value="Administrative Assistant">Administrative Assistant</option>
                                                     <option value="General Operations Worker">General Operations Worker</option>
                                                 </select>
                                             </div>
@@ -276,15 +302,52 @@ export default function FloatingCareersButton() {
                                         </div>
                                     </div>
 
+                                    {/* CV UPLOAD FIELD */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                            <span>Upload CV / Resume (PDF or Word)</span>
+                                            <span className="text-slate-400 font-normal">Max 5MB</span>
+                                        </label>
+                                        {cvFile ? (
+                                            <div className="flex items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
+                                                <div className="flex items-center gap-2 text-emerald-900 font-bold truncate">
+                                                    <FileText size={18} className="text-emerald-600 shrink-0" />
+                                                    <span className="truncate">{cvFile.name}</span>
+                                                    <span className="text-[10px] text-emerald-600 font-normal">({cvFile.size})</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCvFile(null)}
+                                                    className="p-1 text-emerald-700 hover:text-red-600 transition-colors"
+                                                    title="Remove file"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 cursor-pointer transition-all">
+                                                <Upload size={20} className="text-slate-400 mb-1" />
+                                                <span className="text-xs font-bold text-slate-700">Click to upload your CV / Resume</span>
+                                                <span className="text-[10px] text-slate-400">Supports PDF, DOC, DOCX</span>
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                    onChange={handleFileChange}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+
                                     {/* Experience Bio / Notes */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">
-                                            Brief Overview of Qualifications & Experience
+                                            Brief Overview of Qualifications &amp; Experience
                                         </label>
                                         <textarea
                                             name="notes"
                                             rows="3"
-                                            placeholder="Tell us about your previous moving experience, specialized skills (e.g. hoisting, packing, route management), or link to your CV..."
+                                            placeholder="Tell us about your previous moving experience or specialized skills..."
                                             value={formData.notes}
                                             onChange={handleChange}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:border-red-600 focus:bg-white transition-all resize-none"

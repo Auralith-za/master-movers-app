@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Briefcase, Search, Filter, Eye, CheckCircle, XCircle, Clock, Trash2, Phone, Mail, Award, Calendar, RefreshCw, UserCheck } from 'lucide-react'
+import { Briefcase, Search, Filter, Eye, CheckCircle, XCircle, Clock, Trash2, Phone, Mail, Award, Calendar, RefreshCw, UserCheck, Download, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import Button from '../../components/ui/Button'
 
@@ -264,6 +264,15 @@ export default function JobApplicationsPage() {
                                         <td className="px-6 py-4 text-xs font-medium text-slate-600">
                                             <div>Exp: <strong>{app.experience_years || 'N/A'}</strong></div>
                                             <div className="text-slate-400 text-[11px]">License: {app.license_type || 'None'}</div>
+                                            {app.cv_data && (
+                                                <a
+                                                    href={app.cv_data}
+                                                    download={app.cv_name || 'Candidate_CV'}
+                                                    className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors"
+                                                >
+                                                    <Download size={10} /> CV Attached
+                                                </a>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             {getStatusBadge(app.status)}
@@ -361,6 +370,31 @@ export default function JobApplicationsPage() {
                                     <strong className="text-emerald-600">{selectedApp.availability || 'Immediate'}</strong>
                                 </div>
                             </div>
+
+                            {selectedApp.cv_data ? (
+                                <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-600 text-white rounded-xl">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-900 text-xs">{selectedApp.cv_name || 'Candidate_Resume'}</p>
+                                            <p className="text-[10px] text-slate-500">CV Document attached to application</p>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={selectedApp.cv_data}
+                                        download={selectedApp.cv_name || 'Candidate_CV'}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md"
+                                    >
+                                        <Download size={14} /> Download
+                                    </a>
+                                </div>
+                            ) : (
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-400 text-xs text-center font-medium">
+                                    No CV file was uploaded with this application.
+                                </div>
+                            )}
 
                             {selectedApp.notes && (
                                 <div className="space-y-1.5">

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS public.job_applications (
     license_type TEXT,
     availability TEXT,
     notes TEXT,
+    cv_name TEXT,
+    cv_data TEXT,
     status TEXT DEFAULT 'new', -- 'new', 'reviewed', 'shortlisted', 'rejected', 'hired'
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -16,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.job_applications (
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.job_applications ENABLE ROW LEVEL SECURITY;
 
--- Create policies for public insert and select/update access
+-- Create policies for public submission and admin management
 CREATE POLICY "Allow public insert to job_applications" 
     ON public.job_applications FOR INSERT 
     WITH CHECK (true);
