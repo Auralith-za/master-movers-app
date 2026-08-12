@@ -126,15 +126,17 @@ ${formData.notes || 'No extra notes provided.'}`
             console.warn('job_applications insert notice:', jobErr)
         }
 
-        // STEP 3: Send admin email alert using contact_message route
+        // STEP 3: Send job application email alert directly to marketing@mastermoversjhb.co.za
         try {
-            await emailService.sendContactEmail({
-                name: `[JOB APPLICATION] ${formData.full_name}`,
+            await emailService.sendJobApplicationEmail({
+                name: formData.full_name,
                 email: formData.email,
                 phone: formData.phone,
-                message: appMessage
+                position: 'General Applicant',
+                notes: appMessage,
+                to: 'marketing@mastermoversjhb.co.za'
             })
-            console.log('Job application admin email sent successfully')
+            console.log('Job application email sent to marketing@mastermoversjhb.co.za')
         } catch (emailErr) {
             console.warn('Job application email alert notice:', emailErr)
         }
@@ -175,7 +177,6 @@ ${formData.notes || 'No extra notes provided.'}`
                         </span>
                     </div>
                     <div className="flex flex-col text-left">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 group-hover:text-white leading-none">Hiring</span>
                         <span className="text-xs font-black uppercase tracking-wider leading-tight">Careers</span>
                     </div>
                 </button>

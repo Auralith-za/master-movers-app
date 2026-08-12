@@ -658,7 +658,16 @@ serve(async (req) => {
             `
         } else if (type === 'contact_message') {
             subject = `New Website Message from ${contactData?.name || 'Inquirer'}`
-            recipients = adminEmails // Send contact messages to all admin emails
+            const isJobApp = (contactData?.name || '').includes('[JOB APPLICATION]') ||
+                             (contactData?.message || '').includes('[JOB APPLICATION]') ||
+                             (contactData?.message || '').toLowerCase().includes('job application') ||
+                             to === 'marketing@mastermoversjhb.co.za'
+
+            if (isJobApp) {
+                recipients = ['marketing@mastermoversjhb.co.za']
+            } else {
+                recipients = adminEmails // Send contact messages to all admin emails
+            }
 
             innerHtml = `
                 <h1>New Website Contact Message</h1>
@@ -731,7 +740,7 @@ serve(async (req) => {
             `
         } else if (type === 'job_application_alert') {
             subject = `💼 New Job Application: ${contactData?.name || 'Applicant'} — ${contactData?.position || 'Position'}`
-            recipients = adminEmails
+            recipients = ['marketing@mastermoversjhb.co.za']
 
             innerHtml = `
                 <h1 style="color:#e31837;">💼 New Job Application Received</h1>
@@ -972,6 +981,16 @@ serve(async (req) => {
                 content: pdfBase64,
                 filename: pdfFilename,
             })
+        }
+
+        // Job application guard: Job application emails MUST ONLY go to marketing@mastermoversjhb.co.za
+        const isJobApplication = type === 'job_application_alert' || 
+                                 (subject || '').toLowerCase().includes('job application') ||
+                                 (contactData?.name || '').includes('[JOB APPLICATION]') ||
+                                 (contactData?.message || '').includes('[JOB APPLICATION]')
+
+        if (isJobApplication) {
+            recipients = ['marketing@mastermoversjhb.co.za']
         }
 
         // Explicitly exclude Jose and any iCloud email addresses from recipients list
