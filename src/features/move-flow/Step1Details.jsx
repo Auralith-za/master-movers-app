@@ -427,6 +427,9 @@ export default function Step1Details() {
         const { name, value, city, placeId, latLng, addressComponents } = e.target
         const updates = { [name]: value }
         
+        // Clear any active error banner when user edits any field
+        setAddressError(null)
+        
         // If change comes from google autocomplete select
         if (e.target.isGoogleSelect) {
             if (name === 'pickupAddress') {
@@ -580,6 +583,9 @@ export default function Step1Details() {
 
     const handleSubmit = (e) => {
         e.preventDefault()
+
+        // Clear any previous error before re-evaluating form validity
+        setAddressError(null)
 
         // 1. Validate Contact Name
         const hasFirstName = !!(moveDetails.contactName && moveDetails.contactName.trim().length > 0)

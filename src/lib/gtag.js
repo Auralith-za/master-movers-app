@@ -81,7 +81,7 @@ export const trackStep1Complete = () => {
     console.log('[Google Ads] ✅ Step 1 Complete conversion fired')
     // Primary: fire as dedicated Google Ads "Step 1 Complete — Quote Started" conversion
     window.gtag('event', 'conversion', {
-        send_to: 'AW-930634357/WB1qCPHLrc0cEPW04bsD',  // ← Step 1 Complete — Quote Started
+        send_to: 'AW-930634357/WBIqCPHLrc0cEPW04bsD',  // ← Step 1 Complete — Quote Started
         value: 1,
         currency: 'ZAR',
     })

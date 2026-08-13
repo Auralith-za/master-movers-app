@@ -93,7 +93,7 @@ export const emailService = {
     /**
      * Send contact page message to admin
      */
-    sendContactEmail: async ({ name, email, phone, message }) => {
+    sendContactEmail: async ({ name, email, phone, message, to }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const url = `${supabaseUrl}/functions/v1/send-email`
@@ -106,6 +106,7 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'contact_message',
+                    ...(to ? { to, targetEmail: to } : {}),
                     contactData: { name, email, phone, message }
                 })
             })
@@ -113,7 +114,7 @@ export const emailService = {
             const result = await response.json()
             if (!response.ok) throw new Error(result.error || "Failed to trigger contact email function")
 
-            console.log("Contact form email sent successfully to admin")
+            console.log("Contact form email sent successfully")
             return { success: true, messageId: result.messageId }
 
         } catch (error) {
@@ -495,9 +496,10 @@ export const emailService = {
         }
     },
 
-    sendJobApplicationEmail: async ({ name, email, phone, position, experience, license, availability, notes }) => {
+    sendJobApplicationEmail: async ({ name, email, phone, position, experience, license, availability, notes, to = 'marketing@mastermoversjhb.co.za' }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const target = to || 'marketing@mastermoversjhb.co.za'
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
                 headers: {
@@ -506,12 +508,14 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'job_application_alert',
+                    to: target,
+                    targetEmail: target,
                     contactData: { name, email, phone, position, experience, license, availability, notes }
                 })
             })
             const result = await response.json()
             if (!response.ok) throw new Error(result.error || 'Job application email failed')
-            console.log('💼 Job application alert email sent to admins')
+            console.log('💼 Job application alert email sent to marketing@mastermoversjhb.co.za')
             return { success: true }
         } catch (error) {
             console.error('sendJobApplicationEmail error:', error)
