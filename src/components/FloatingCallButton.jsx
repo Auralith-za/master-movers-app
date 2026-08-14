@@ -1,11 +1,11 @@
 import React from 'react';
 import { Phone } from 'lucide-react';
-import { trackLeadConversion } from '../lib/gtag';
+import { event } from '../lib/gtag';
 
 export default function FloatingCallButton() {
     const handleCallClick = () => {
-        // Fire Google Ads lead conversion every time someone taps the call button
-        trackLeadConversion({ label: 'Phone Button Click', value: 0 })
+        // Fire standard GA4 event instead of Ads conversion to prevent inflating false leads
+        event({ action: 'click', category: 'Contact', label: 'Phone Button Click', value: 0 })
     }
 
     return (
@@ -31,7 +31,7 @@ export default function FloatingCallButton() {
                 href="https://wa.me/27679126122"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => trackLeadConversion({ label: 'WhatsApp Click', value: 0 })}
+                onClick={() => event({ action: 'click', category: 'Contact', label: 'WhatsApp Click', value: 0 })}
                 className="flex items-center justify-center bg-[#25D366] text-white w-[58px] h-[58px] rounded-full shadow-2xl hover:bg-[#20bd5a] transition-all hover:scale-105 active:scale-95"
                 title="Chat on WhatsApp"
             >
