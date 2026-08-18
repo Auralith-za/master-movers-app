@@ -360,7 +360,7 @@ export const emailService = {
         }
     },
 
-    sendLocationNotFoundEmail: async ({ name, email, phone, fieldName, enteredValue, comments }) => {
+    sendLocationNotFoundEmail: async ({ name, email, phone, fieldName, enteredValue, comments, referralSource, referral_source, moveDate }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -371,7 +371,16 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'location_not_found_alert',
-                    contactData: { name, email, phone, fieldName, enteredValue, comments }
+                    contactData: {
+                        name,
+                        email,
+                        phone,
+                        fieldName,
+                        enteredValue,
+                        comments,
+                        moveDate,
+                        referral_source: referralSource || referral_source || ''
+                    }
                 })
             })
             const result = await response.json()
@@ -384,7 +393,7 @@ export const emailService = {
         }
     },
 
-    sendOutlineAreaEmail: async ({ name, email, phone, pickup, dropoff }) => {
+    sendOutlineAreaEmail: async ({ name, email, phone, pickup, dropoff, moveDate, referralSource, referral_source, comments, notes }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -395,7 +404,16 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'outline_area_alert',
-                    contactData: { name, email, phone, pickup, dropoff }
+                    contactData: {
+                        name,
+                        email,
+                        phone,
+                        pickup,
+                        dropoff,
+                        moveDate,
+                        referral_source: referralSource || referral_source || '',
+                        notes: comments || notes || ''
+                    }
                 })
             })
             const result = await response.json()

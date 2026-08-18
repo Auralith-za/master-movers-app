@@ -308,6 +308,75 @@ function getBrandedTemplate(title: string, innerHtml: string): string {
     `
 }
 
+function buildStandardDetailsTable({
+    ref,
+    name,
+    phone,
+    email,
+    pickup,
+    dropoff,
+    moveDate,
+    moveType,
+    referralSource,
+    paymentMethod,
+    subtotal,
+    vat,
+    total,
+    step,
+    notes
+}: {
+    ref?: string,
+    name?: string,
+    phone?: string,
+    email?: string,
+    pickup?: string,
+    dropoff?: string,
+    moveDate?: string,
+    moveType?: string,
+    referralSource?: string,
+    paymentMethod?: string,
+    subtotal?: string | number,
+    vat?: string | number,
+    total?: string | number,
+    step?: string,
+    notes?: string
+}) {
+    const cleanRef = ref ? (ref.startsWith('MM-') ? ref : `MM-${ref}`) : '—'
+    const phoneDisplay = phone ? `<a href="tel:${phone}" style="color:#e31837;font-weight:700;">${phone}</a>` : '—'
+    const emailDisplay = email ? `<a href="mailto:${email}">${email}</a>` : '—'
+    
+    const numTotal = Number(total || 0)
+    const subtotalDisplay = (subtotal && Number(subtotal) > 0)
+        ? `R ${Number(subtotal).toFixed(2)}`
+        : (numTotal > 0 ? `R ${(numTotal / 1.15).toFixed(2)}` : '—')
+
+    const vatDisplay = (vat && Number(vat) > 0)
+        ? `R ${Number(vat).toFixed(2)}`
+        : (numTotal > 0 ? `R ${(numTotal - numTotal / 1.15).toFixed(2)}` : '—')
+
+    const totalDisplay = numTotal > 0 ? `R ${numTotal.toFixed(2)} (Incl. VAT)` : '—'
+
+    return `
+    <table class="details-table">
+        <tr><td class="label">Quote / Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">${cleanRef}</td></tr>
+        <tr><td class="label">Customer Name:</td><td class="value"><strong>${name || '—'}</strong></td></tr>
+        <tr><td class="label">Phone Number:</td><td class="value">${phoneDisplay}</td></tr>
+        <tr><td class="label">Email Address:</td><td class="value">${emailDisplay}</td></tr>
+        <tr><td class="label">Collection From:</td><td class="value">${pickup || '—'}</td></tr>
+        <tr><td class="label">Delivery To:</td><td class="value">${dropoff || '—'}</td></tr>
+        <tr><td class="label">Preferred Move Date:</td><td class="value"><strong>${moveDate || '—'}</strong></td></tr>
+        <tr><td class="label">Move Type / Route:</td><td class="value">${moveType || '—'}</td></tr>
+        <tr><td class="label">Heard About Us:</td><td class="value"><strong>${referralSource || '—'}</strong></td></tr>
+        <tr><td class="label">Payment Method:</td><td class="value" style="text-transform:uppercase;">${paymentMethod || '—'}</td></tr>
+        <tr><td class="label">Subtotal (excl. VAT):</td><td class="value">${subtotalDisplay}</td></tr>
+        <tr><td class="label">VAT (15%):</td><td class="value">${vatDisplay}</td></tr>
+        <tr><td class="label" style="font-size:14px;color:#0f172a;">Total Price:</td><td class="value" style="font-size:16px;font-weight:900;color:#059669;">${totalDisplay}</td></tr>
+        <tr><td class="label">Flow Step / Status:</td><td class="value">${step || '—'}</td></tr>
+        <tr><td class="label">Notes / Details:</td><td class="value" style="${notes ? 'font-weight:600;color:#334155;' : ''}">${notes || '—'}</td></tr>
+    </table>
+    `
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
@@ -408,23 +477,21 @@ serve(async (req) => {
                 <h1 style="color:#0f172a;">🔔 New Pending Quote</h1>
                 <p>A customer has completed their inventory and is <strong>viewing their quote on Step 4</strong>. They may need a follow-up call to convert to a booking.</p>
 
-                <div class="highlight-box" style="background:#eff6ff; border-left-color:#2563eb;">
-                    <p style="font-weight:900;font-size:22px;color:#1e40af;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#64748b;">(Incl. VAT)</span></p>
-                    <p style="margin:4px 0 0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Quote Total — Awaiting Payment</p>
-                </div>
-
-                <table class="details-table">
-                    <tr><td class="label">Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
-                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
-                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
-                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
-                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
-                    <tr><td class="label">Move Type:</td><td class="value">${quoteData?.move_type || '—'}</td></tr>
-                    <tr><td class="label">Payment Method:</td><td class="value">${quoteData?.payment_method || 'Not selected'}</td></tr>
-                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    ref: ref,
+                    name: quoteData?.client_name,
+                    phone: quoteData?.client_phone,
+                    email: quoteData?.client_email,
+                    pickup: quoteData?.pickup_address,
+                    dropoff: quoteData?.dropoff_address,
+                    moveDate: quoteData?.move_date,
+                    moveType: quoteData?.move_type,
+                    referralSource: quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource,
+                    paymentMethod: quoteData?.payment_method || 'Awaiting Selection',
+                    total: quoteData?.total_price,
+                    step: 'Step 4 — Quote Summary (Awaiting Payment)',
+                    notes: quoteData?.customer_comments
+                })}
 
                 ${inventoryHtml}
 
@@ -547,25 +614,21 @@ serve(async (req) => {
                 <h1 style="color:#059669;">✅ Booking Confirmed — Payment Received</h1>
                 <p>A customer has successfully paid. The move is officially booked.</p>
 
-                <div class="highlight-box" style="background:#ecfdf5; border-left-color:#059669;">
-                    <p style="font-weight:900;font-size:24px;color:#059669;margin:0;">R ${Number(quoteData?.total_price || 0).toFixed(2)} <span style="font-size:13px;font-weight:500;color:#64748b;">(Incl. VAT)</span></p>
-                    <p style="margin:4px 0 0;font-size:12px;color:#065f46;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Payment Received via ${(quoteData?.payment_method || 'Card').toUpperCase()}</p>
-                </div>
-
-                <table class="details-table">
-                    <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;font-size:16px;">MM-${ref}</td></tr>
-                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
-                    <tr><td class="label">Move Date:</td><td class="value"><strong>${quoteData?.move_date || 'TBD'}</strong></td></tr>
-                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
-                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
-                    <tr><td class="label">Payment Method:</td><td class="value" style="text-transform:uppercase;font-weight:700;">${quoteData?.payment_method || '—'}</td></tr>
-                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
-                    <tr><td class="label">Subtotal (excl. VAT):</td><td class="value">R ${(Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
-                    <tr><td class="label">VAT (15%):</td><td class="value">R ${(Number(quoteData?.total_price || 0) - Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
-                    <tr><td class="label" style="font-size:14px;color:#0f172a;">Total Paid:</td><td class="value" style="font-size:18px;font-weight:900;color:#059669;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    ref: ref,
+                    name: quoteData?.client_name,
+                    phone: quoteData?.client_phone,
+                    email: quoteData?.client_email,
+                    pickup: quoteData?.pickup_address,
+                    dropoff: quoteData?.dropoff_address,
+                    moveDate: quoteData?.move_date,
+                    moveType: quoteData?.move_type,
+                    referralSource: quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource,
+                    paymentMethod: (quoteData?.payment_method || 'Card / EFT').toUpperCase(),
+                    total: quoteData?.total_price,
+                    step: 'Booking Confirmed / Payment Received',
+                    notes: quoteData?.customer_comments
+                })}
 
                 ${inventoryHtml}
 
@@ -675,25 +738,13 @@ serve(async (req) => {
                 <h1>New Website Contact Message</h1>
                 <p>You have received a new message submitted via the contact form on the website.</p>
                 
-                <table class="details-table">
-                    <tr>
-                        <td class="label">From:</td>
-                        <td class="value">${contactData?.name || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Email Address:</td>
-                        <td class="value">${contactData?.email || 'N/A'}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Phone Number:</td>
-                        <td class="value">${contactData?.phone || 'N/A'}</td>
-                    </tr>
-                </table>
-
-                <div class="highlight-box">
-                    <p style="font-weight: 700; color: #0f172a; margin-bottom: 8px;">Message Content:</p>
-                    <p style="white-space: pre-wrap; margin: 0; font-size: 14px; font-style: italic;">"${contactData?.message || ''}"</p>
-                </div>
+                ${buildStandardDetailsTable({
+                    name: contactData?.name,
+                    phone: contactData?.phone,
+                    email: contactData?.email,
+                    step: 'Website Contact Page Form',
+                    notes: contactData?.message
+                })}
                 
                 <p>Please follow up with the customer directly at your earliest convenience.</p>
             `
@@ -710,16 +761,17 @@ serve(async (req) => {
                     <p style="margin:0;font-size:15px;color:#e31837;font-weight:700;">${contactData?.phone || 'No phone provided'}</p>
                 </div>
 
-                <table class="details-table">
-                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong>${contactData?.phone || '—'}</strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value">${contactData?.email || '—'}</td></tr>
-                    <tr><td class="label">Step:</td><td class="value">${contactData?.step || 'Quote Flow'}</td></tr>
-                    <tr><td class="label">From:</td><td class="value">${contactData?.pickup || '—'}</td></tr>
-                    <tr><td class="label">To:</td><td class="value">${contactData?.dropoff || '—'}</td></tr>
-                    <tr><td class="label">Move Date:</td><td class="value">${contactData?.moveDate || 'TBD'}</td></tr>
-                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${contactData?.referral_source || contactData?.referralSource || '—'}</strong></td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    name: contactData?.name,
+                    phone: contactData?.phone,
+                    email: contactData?.email,
+                    pickup: contactData?.pickup,
+                    dropoff: contactData?.dropoff,
+                    moveDate: contactData?.moveDate,
+                    referralSource: contactData?.referral_source || contactData?.referralSource,
+                    step: contactData?.step || 'Quote Flow Callback Request',
+                    notes: contactData?.notes || contactData?.comments
+                })}
 
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
             `
@@ -731,13 +783,15 @@ serve(async (req) => {
                 <h1 style="color:#e31837;">🚛 Outline Area Custom Quote Request</h1>
                 <p>A customer has selected an outline area that our trucks don't regularly service. They have requested a custom quote.</p>
                 
-                <table class="details-table">
-                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${contactData?.phone || ''}">${contactData?.phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
-                    <tr><td class="label">From:</td><td class="value">${contactData?.pickup || '—'}</td></tr>
-                    <tr><td class="label">To:</td><td class="value">${contactData?.dropoff || '—'}</td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    name: contactData?.name,
+                    phone: contactData?.phone,
+                    email: contactData?.email,
+                    pickup: contactData?.pickup,
+                    dropoff: contactData?.dropoff,
+                    step: 'Outlaying Area Custom Quote Request',
+                    notes: contactData?.notes || contactData?.comments
+                })}
 
                 <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> to discuss their requirements and prepare a custom quote.</p>
             `
@@ -781,14 +835,14 @@ serve(async (req) => {
                 <h1 style="color:#e31837;">📍 Location Assistance Lead</h1>
                 <p>A customer could not find their address using the map search and requested assistance.</p>
                 
-                <table class="details-table">
-                    <tr><td class="label">Name:</td><td class="value">${contactData?.name || '—'}</td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${contactData?.phone || ''}">${contactData?.phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
-                    <tr><td class="label">Field:</td><td class="value">${contactData?.fieldName || '—'}</td></tr>
-                    <tr><td class="label">Entered Value:</td><td class="value">${contactData?.enteredValue || '—'}</td></tr>
-                    <tr><td class="label">Comments:</td><td class="value">${contactData?.comments || '—'}</td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    name: contactData?.name,
+                    phone: contactData?.phone,
+                    email: contactData?.email,
+                    pickup: `${contactData?.fieldName || 'Field'}: ${contactData?.enteredValue || '—'}`,
+                    step: `Location Search Assistance (${contactData?.fieldName || 'Address'})`,
+                    notes: contactData?.comments
+                })}
 
                 <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> immediately to assist with their quote.</p>
             `
@@ -874,28 +928,21 @@ serve(async (req) => {
                 </div>
                 `}
 
-                <table class="details-table">
-                    <tr><td class="label">Customer:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
-                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
-                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
-                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
-                    <tr>
-                        <td class="label">Step:</td>
-                        <td class="value" style="font-weight:700;color:${stepColor};">${stepDropped}</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Heard About Us:</td>
-                        <td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td>
-                    </tr>
-                    <tr>
-                        <td class="label">Inventory:</td>
-                        <td class="value" style="${!hasInventory ? 'color:#94a3b8;font-style:italic;' : 'font-weight:700;color:#0f172a;'}">
-                            ${hasInventory ? `${itemEntries.reduce((s, [,q]) => s + Number(q), 0)} items added` : 'Not completed yet'}
-                        </td>
-                    </tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    ref: ref !== 'NEW' ? ref : undefined,
+                    name: quoteData?.client_name,
+                    phone: quoteData?.client_phone,
+                    email: quoteData?.client_email,
+                    pickup: quoteData?.pickup_address,
+                    dropoff: quoteData?.dropoff_address,
+                    moveDate: quoteData?.move_date,
+                    moveType: quoteData?.move_type,
+                    referralSource: quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource,
+                    paymentMethod: quoteData?.payment_method,
+                    total: quoteData?.total_price,
+                    step: stepDropped,
+                    notes: hasInventory ? `${itemEntries.reduce((s, [, q]) => s + Number(q), 0)} items added in inventory` : 'No inventory added yet'
+                })}
 
                 ${inventoryHtml}
 
@@ -955,18 +1002,21 @@ serve(async (req) => {
                     <p style="margin:0; font-size:15px; font-weight:700; color:#0f172a; white-space:pre-wrap;">"${reasonText}"</p>
                 </div>
 
-                <table class="details-table">
-                    <tr><td class="label">Quote Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
-                    <tr><td class="label">Customer Name:</td><td class="value"><strong>${quoteData?.client_name || '—'}</strong></td></tr>
-                    <tr><td class="label">Phone:</td><td class="value"><strong><a href="tel:${quoteData?.client_phone || ''}" style="color:#e31837;">${quoteData?.client_phone || '—'}</a></strong></td></tr>
-                    <tr><td class="label">Email:</td><td class="value"><a href="mailto:${quoteData?.client_email || ''}">${quoteData?.client_email || '—'}</a></td></tr>
-                    <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
-                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
-                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
-                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
-                    <tr><td class="label">Quote Amount:</td><td class="value" style="font-weight:900;color:#e31837;">R ${Number(quoteData?.total_price || 0).toFixed(2)} (Incl. VAT)</td></tr>
-                    <tr><td class="label">Rejection Reason:</td><td class="value" style="font-weight:700;color:#991b1b;">${reasonText}</td></tr>
-                </table>
+                ${buildStandardDetailsTable({
+                    ref: ref,
+                    name: quoteData?.client_name,
+                    phone: quoteData?.client_phone,
+                    email: quoteData?.client_email,
+                    pickup: quoteData?.pickup_address,
+                    dropoff: quoteData?.dropoff_address,
+                    moveDate: quoteData?.move_date,
+                    moveType: quoteData?.move_type,
+                    referralSource: quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource,
+                    paymentMethod: quoteData?.payment_method,
+                    total: quoteData?.total_price,
+                    step: 'Quote Declined / Rejected by Client',
+                    notes: reasonText
+                })}
 
                 <div style="text-align:center;margin:30px 0;">
                     <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#e31837;">
