@@ -284,8 +284,6 @@ export const useMoveStore = create(
                         referral_source: referralSource,
                         ...(state.inventory || {})
                     },
-                    rejection_reason: rejectionReason,
-                    referral_source: referralSource,
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
@@ -303,21 +301,15 @@ export const useMoveStore = create(
 
                 try {
                     let result
-                    const existingId = state.lastSavedQuote?.id
-                    const clientGeneratedId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined
-                    const quoteIdToUse = (existingId && !overrides.forceNew) ? existingId : clientGeneratedId
-
-                    if (existingId && !overrides.forceNew) {
+                    if (state.lastSavedQuote?.id && !overrides.forceNew) {
                         result = await supabase
                             .from('quotes')
                             .update(quotePayload)
-                            .eq('id', existingId)
+                            .eq('id', state.lastSavedQuote.id)
                             .select()
                     } else {
-                        const insertPayload = {
-                            ...(quoteIdToUse ? { id: quoteIdToUse } : {}),
-                            ...quotePayload
-                        }
+                        // For new inserts, strip any id field and let Supabase auto-set timestamps
+                        const { id, ...insertPayload } = quotePayload
                         result = await supabase
                             .from('quotes')
                             .insert([insertPayload])
@@ -327,14 +319,12 @@ export const useMoveStore = create(
                     console.log('SUPABASE RAW RESULT:', result)
                     if (result.error) throw result.error
 
-                    const savedQuote = (result.data && result.data.length > 0)
-                        ? result.data[0]
-                        : {
-                            id: quoteIdToUse || state.lastSavedQuote?.id,
-                            ...quotePayload,
-                            created_at: new Date().toISOString()
-                        }
+                    if (!result.data || result.data.length === 0) {
+                        console.warn('SUPABASE: Record created but no data returned. Check RLS SELECT policy.')
+                        return { success: true, data: null }
+                    }
 
+                    const savedQuote = result.data[0]
                     set({ lastSavedQuote: savedQuote })
 
                     return { success: true, data: savedQuote }
