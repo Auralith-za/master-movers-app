@@ -27,6 +27,7 @@ export const useMoveStore = create(
                 surname: '',
                 contactPhone: '',
                 contactEmail: '',
+                referralSource: '',
                 generalNotes: '',
                 packagingOption: 'none',
                 st7Boxes: 0,
@@ -179,7 +180,7 @@ export const useMoveStore = create(
                     .forEach(k => sessionStorage.removeItem(k))
                 sessionStorage.removeItem('abandoned_lead_sent')
                 set({ 
-                    moveDetails: { packagingOption: 'none', insuranceEnabled: false }, 
+                    moveDetails: { packagingOption: 'none', insuranceEnabled: false, referralSource: '' }, 
                     accessDetails: {}, 
                     inventory: {}, 
                     manualServiceCharges: {},
@@ -264,6 +265,7 @@ export const useMoveStore = create(
                 const targetStatus = dbOverrides.status || overrides.status || 'new'
                 const isWon = ['booked', 'paid', 'booked_paid', 'completed'].includes(targetStatus)
                 const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || null
+                const referralSource = dbOverrides.referral_source || overrides.referralSource || state.moveDetails.referralSource || ''
 
                 const quotePayload = {
                     client_name: cleanClientName(rawName),
@@ -279,9 +281,11 @@ export const useMoveStore = create(
                         extraCollections: state.moveDetails?.extraCollections || [],
                         extraDrops: state.moveDetails?.extraDrops || [],
                         rejection_reason: rejectionReason,
+                        referral_source: referralSource,
                         ...(state.inventory || {})
                     },
                     rejection_reason: rejectionReason,
+                    referral_source: referralSource,
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
@@ -299,15 +303,21 @@ export const useMoveStore = create(
 
                 try {
                     let result
-                    if (state.lastSavedQuote?.id && !overrides.forceNew) {
+                    const existingId = state.lastSavedQuote?.id
+                    const clientGeneratedId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined
+                    const quoteIdToUse = (existingId && !overrides.forceNew) ? existingId : clientGeneratedId
+
+                    if (existingId && !overrides.forceNew) {
                         result = await supabase
                             .from('quotes')
                             .update(quotePayload)
-                            .eq('id', state.lastSavedQuote.id)
+                            .eq('id', existingId)
                             .select()
                     } else {
-                        // For new inserts, strip any id field and let Supabase auto-set timestamps
-                        const { id, ...insertPayload } = quotePayload
+                        const insertPayload = {
+                            ...(quoteIdToUse ? { id: quoteIdToUse } : {}),
+                            ...quotePayload
+                        }
                         result = await supabase
                             .from('quotes')
                             .insert([insertPayload])
@@ -317,12 +327,14 @@ export const useMoveStore = create(
                     console.log('SUPABASE RAW RESULT:', result)
                     if (result.error) throw result.error
 
-                    if (!result.data || result.data.length === 0) {
-                        console.warn('SUPABASE: Record created but no data returned. Check RLS SELECT policy.')
-                        return { success: true, data: null }
-                    }
+                    const savedQuote = (result.data && result.data.length > 0)
+                        ? result.data[0]
+                        : {
+                            id: quoteIdToUse || state.lastSavedQuote?.id,
+                            ...quotePayload,
+                            created_at: new Date().toISOString()
+                        }
 
-                    const savedQuote = result.data[0]
                     set({ lastSavedQuote: savedQuote })
 
                     return { success: true, data: savedQuote }
@@ -759,16 +771,17 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     });
 
     const isNationalMove =
-        !hasOutlineProvince && (
+        sharedLoadPreference === true ||
+        (!hasOutlineProvince && (
             (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
             (isInterProvincial && pickupCityCode !== dropoffCityCode) ||
-            (totalDistance > 250 && pickupCityCode !== dropoffCityCode) ||
+            (totalDistance > 250) ||
             (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
             (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
             (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg')) ||
             hasDifferentCityCode
-        );
+        ));
 
     let nationalDestinationCityCode = dropoffCityCode;
     if (isNationalMove) {
@@ -794,6 +807,15 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const firstDiff = sequence.find(code => code && code !== pickupCityCode);
         if (firstDiff) {
             nationalDestinationCityCode = firstDiff;
+        } else if (pickupCityCode === nationalDestinationCityCode) {
+            // Fallback for long-distance routes where destination city wasn't explicitly parsed
+            if (dropoffAddress.includes('cape town') || dropoffAddress.includes('cpt') || dropoffAddress.includes('western cape')) {
+                nationalDestinationCityCode = CITY_CODES.CPT;
+            } else if (dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu')) {
+                nationalDestinationCityCode = CITY_CODES.DBN;
+            } else if (pickupCityCode === CITY_CODES.JHB) {
+                nationalDestinationCityCode = totalDistance > 1000 ? CITY_CODES.CPT : CITY_CODES.DBN;
+            }
         }
     }
 

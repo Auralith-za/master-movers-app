@@ -62,6 +62,7 @@ export default function QuoteDetailPage() {
     const [selectedCategory, setSelectedCategory] = useState(orderedCategories[0])
     const [showCatalog, setShowCatalog] = useState(false)
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
+    const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
     const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '' })
 
@@ -310,18 +311,37 @@ export default function QuoteDetailPage() {
         setEditForm({ ...editForm, items_json: updatedItems })
     }
 
-    const handleAddItem = (item, variation = null) => {
-        if (item.variationOptions && !variation) {
-            setSelectedItemForVariation(item)
+    const handleAddItem = (item, variation = null, targetRoom = null) => {
+        if (item.variationOptions && item.variationOptions.length > 0 && !variation) {
+            setSelectedItemForVariation({ item, targetRoom: targetRoom || (searchQuery.length >= 2 ? null : selectedCategory) })
             return
         }
 
-        const idKey = variation ? `${item.id}_${variation}` : item.id
+        if (!targetRoom) {
+            setRoomModalItem({ item, variation })
+            return
+        }
+
+        const baseKey = variation ? `${item.id}_${variation}` : item.id
+        const idKey = `${baseKey}__room:${targetRoom}`
         const updatedItems = { ...editForm.items_json }
         updatedItems[idKey] = (updatedItems[idKey] || 0) + 1
         setEditForm({ ...editForm, items_json: updatedItems })
         setSelectedItemForVariation(null)
+        setRoomModalItem(null)
         setSearchQuery('')
+    }
+
+    const handleChangeItemRoom = (oldIdKey, newRoom) => {
+        const parsed = parseInventoryKey(oldIdKey)
+        const baseKey = parsed.variation ? `${parsed.itemId}_${parsed.variation}` : parsed.itemId
+        const newIdKey = `${baseKey}__room:${newRoom}`
+        const updatedItems = { ...editForm.items_json }
+        const qty = updatedItems[oldIdKey] || 1
+        delete updatedItems[oldIdKey]
+        updatedItems[newIdKey] = (updatedItems[newIdKey] || 0) + qty
+        setEditForm({ ...editForm, items_json: updatedItems })
+        setRoomModalItem(null)
     }
 
     const handleAddCustomProduct = () => {
@@ -600,6 +620,7 @@ export default function QuoteDetailPage() {
                 pickupAddress: quote.pickup_address,
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
+                createdAt: quote.created_at,
                 inventory: inventoryForPdf,
                 // Always prefer live recalculated values so PDF matches sidebar
                 total: finalPrice,
@@ -783,6 +804,38 @@ export default function QuoteDetailPage() {
                                             getStatusBadgeClass(quote?.status)
                                         )}>
                                             {quote?.status}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">How They Heard About Us</label>
+                                    {isEditing ? (
+                                        <select 
+                                            className="w-full text-xs border border-gray-200 rounded p-2 bg-white font-medium text-slate-800 focus:border-indigo-500 outline-none"
+                                            value={editForm.referral_source || editForm.items_json?.referral_source || ''}
+                                            onChange={e => setEditForm({
+                                                ...editForm, 
+                                                referral_source: e.target.value,
+                                                items_json: { ...editForm.items_json, referral_source: e.target.value }
+                                            })}
+                                        >
+                                            <option value="">Not Specified</option>
+                                            <option value="Saw our truck">Saw our truck</option>
+                                            <option value="Google search">Google search</option>
+                                            <option value="Google ads">Google ads</option>
+                                            <option value="Facebook">Facebook</option>
+                                            <option value="Instagram">Instagram</option>
+                                            <option value="Used Master Movers before">Used Master Movers before</option>
+                                            <option value="Referred by someone">Referred by someone (Word of Mouth / Family / Friend)</option>
+                                            <option value="Estate Agent / Property Agency">Estate Agent / Property Agency</option>
+                                            <option value="Billboard / Signage">Billboard / Signage</option>
+                                            <option value="TikTok">TikTok</option>
+                                            <option value="Radio / Print">Radio / Print</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-700">
+                                            {quote?.referral_source || quote?.items_json?.referral_source || 'Not Specified'}
                                         </span>
                                     )}
                                 </div>
@@ -1053,7 +1106,18 @@ export default function QuoteDetailPage() {
                                                                         </div>
                                                                         <div>
                                                                             <p className="font-bold text-slate-900">{item?.name || itemId}</p>
-                                                                            <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{category} · Vol: {item?.volume || 0} ft³/unit</p>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{category} · Vol: {item?.volume || 0} ft³/unit</p>
+                                                                                {isEditing && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setRoomModalItem({ item, variation, currentKey: itemId, targetRoom: category, isMoving: true })}
+                                                                                        className="text-[10px] text-primary-600 hover:text-primary-800 font-bold hover:underline"
+                                                                                    >
+                                                                                        Move Room
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     </td>
 
@@ -1658,6 +1722,63 @@ export default function QuoteDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Room Selector Modal for Admin */}
+            {roomModalItem && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-red-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                            <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                                🏠
+                            </div>
+                            <div className="overflow-hidden">
+                                <h3 className="text-base font-bold text-slate-900 leading-tight">
+                                    {roomModalItem.isMoving ? 'Move to Which Room?' : 'Add to Which Room?'}
+                                </h3>
+                                <p className="text-xs font-semibold text-red-600 truncate">{roomModalItem.item?.name || 'Item'}</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">Select the room destination for this item:</p>
+
+                        <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
+                            {orderedCategories.map(cat => {
+                                const isCurrent = (roomModalItem.targetRoom || selectedCategory) === cat;
+                                return (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        className={`w-full py-2.5 px-4 rounded-xl text-xs md:text-sm font-bold flex items-center justify-between transition-all border-2 ${
+                                            isCurrent
+                                                ? 'bg-red-600 border-red-600 text-white shadow-md'
+                                                : 'bg-white border-slate-100 text-slate-700 hover:border-red-200 hover:bg-red-50/50'
+                                        }`}
+                                        onClick={() => {
+                                            if (roomModalItem.isMoving && roomModalItem.currentKey) {
+                                                handleChangeItemRoom(roomModalItem.currentKey, cat);
+                                            } else {
+                                                handleAddItem(roomModalItem.item, roomModalItem.variation || null, cat);
+                                            }
+                                        }}
+                                    >
+                                        <span>{cat}</span>
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isCurrent ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                            {isCurrent ? 'Selected ✓' : 'Select →'}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            type="button"
+                            className="w-full mt-4 text-slate-400 text-xs font-bold outline-none hover:text-slate-600 text-center py-2"
+                            onClick={() => setRoomModalItem(null)}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

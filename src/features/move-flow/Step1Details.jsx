@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2 } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2, ChevronDown } from 'lucide-react'
 import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
@@ -623,7 +623,18 @@ export default function Step1Details() {
             return
         }
 
-        // 4. Validate Pickup and Dropoff addresses
+        // 4. Validate Referral Source ("How did you hear about us?")
+        if (!moveDetails.referralSource || moveDetails.referralSource.trim().length === 0) {
+            setAddressError("Please select how you heard about Master Movers before proceeding.")
+            const refEl = document.querySelector('select[name="referralSource"]')
+            if (refEl) {
+                refEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                refEl.focus()
+            }
+            return
+        }
+
+        // 5. Validate Pickup and Dropoff addresses
         if (!moveDetails.pickupAddress || (!moveDetails.dropoffAddress && !moveDetails.storageDestination)) {
             setAddressError("Both pickup and delivery/storage addresses are required.")
             const pickupEl = document.querySelector('input[name="pickupAddress"]')
@@ -634,7 +645,7 @@ export default function Step1Details() {
             return
         }
 
-        // 5. Validate Move Date
+        // 6. Validate Move Date
         if (!moveDetails.moveDate) {
             setAddressError("Please select your Preferred Move Date before proceeding.")
             const dateEl = document.querySelector('input[name="moveDate"]')
@@ -808,6 +819,37 @@ export default function Step1Details() {
                                 onChange={handleChange}
                                 required
                             />
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-black uppercase tracking-wider text-slate-700 mb-2">
+                                    How did you hear about Master Movers? <span className="text-red-600">*</span>
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        name="referralSource"
+                                        value={moveDetails.referralSource || ''}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full appearance-none bg-slate-50 border-2 border-slate-200 focus:border-red-600 focus:bg-white text-slate-900 font-bold rounded-xl px-5 py-4 text-base md:text-lg transition-all outline-none cursor-pointer pr-12 shadow-sm"
+                                    >
+                                        <option value="" disabled>Select an option...</option>
+                                        <option value="Saw our truck">Saw our truck</option>
+                                        <option value="Google search">Google search</option>
+                                        <option value="Google ads">Google ads</option>
+                                        <option value="Facebook">Facebook</option>
+                                        <option value="Instagram">Instagram</option>
+                                        <option value="Used Master Movers before">Used Master Movers before</option>
+                                        <option value="Referred by someone">Referred by someone (Word of Mouth / Family / Friend)</option>
+                                        <option value="Estate Agent / Property Agency">Estate Agent / Property Agency</option>
+                                        <option value="Billboard / Signage">Billboard / Signage</option>
+                                        <option value="TikTok">TikTok</option>
+                                        <option value="Radio / Print">Radio / Print</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                        <ChevronDown size={22} className="stroke-[2.5]" />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

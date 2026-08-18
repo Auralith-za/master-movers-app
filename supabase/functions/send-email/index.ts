@@ -423,6 +423,7 @@ serve(async (req) => {
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
                     <tr><td class="label">Move Type:</td><td class="value">${quoteData?.move_type || '—'}</td></tr>
                     <tr><td class="label">Payment Method:</td><td class="value">${quoteData?.payment_method || 'Not selected'}</td></tr>
+                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
                 </table>
 
                 ${inventoryHtml}
@@ -560,6 +561,7 @@ serve(async (req) => {
                     <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
                     <tr><td class="label">Payment Method:</td><td class="value" style="text-transform:uppercase;font-weight:700;">${quoteData?.payment_method || '—'}</td></tr>
+                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
                     <tr><td class="label">Subtotal (excl. VAT):</td><td class="value">R ${(Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
                     <tr><td class="label">VAT (15%):</td><td class="value">R ${(Number(quoteData?.total_price || 0) - Number(quoteData?.total_price || 0) / 1.15).toFixed(2)}</td></tr>
                     <tr><td class="label" style="font-size:14px;color:#0f172a;">Total Paid:</td><td class="value" style="font-size:18px;font-weight:900;color:#059669;">R ${Number(quoteData?.total_price || 0).toFixed(2)}</td></tr>
@@ -716,6 +718,7 @@ serve(async (req) => {
                     <tr><td class="label">From:</td><td class="value">${contactData?.pickup || '—'}</td></tr>
                     <tr><td class="label">To:</td><td class="value">${contactData?.dropoff || '—'}</td></tr>
                     <tr><td class="label">Move Date:</td><td class="value">${contactData?.moveDate || 'TBD'}</td></tr>
+                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${contactData?.referral_source || contactData?.referralSource || '—'}</strong></td></tr>
                 </table>
 
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
@@ -883,6 +886,10 @@ serve(async (req) => {
                         <td class="value" style="font-weight:700;color:${stepColor};">${stepDropped}</td>
                     </tr>
                     <tr>
+                        <td class="label">Heard About Us:</td>
+                        <td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td>
+                    </tr>
+                    <tr>
                         <td class="label">Inventory:</td>
                         <td class="value" style="${!hasInventory ? 'color:#94a3b8;font-style:italic;' : 'font-weight:700;color:#0f172a;'}">
                             ${hasInventory ? `${itemEntries.reduce((s, [,q]) => s + Number(q), 0)} items added` : 'Not completed yet'}
@@ -956,6 +963,7 @@ serve(async (req) => {
                     <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
                     <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || '—'}</td></tr>
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || '—'}</td></tr>
+                    <tr><td class="label">Heard About Us:</td><td class="value"><strong>${quoteData?.referral_source || quoteData?.items_json?.referral_source || quoteData?.items_json?.referralSource || '—'}</strong></td></tr>
                     <tr><td class="label">Quote Amount:</td><td class="value" style="font-weight:900;color:#e31837;">R ${Number(quoteData?.total_price || 0).toFixed(2)} (Incl. VAT)</td></tr>
                     <tr><td class="label">Rejection Reason:</td><td class="value" style="font-weight:700;color:#991b1b;">${reasonText}</td></tr>
                 </table>

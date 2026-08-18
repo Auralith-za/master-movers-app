@@ -177,6 +177,7 @@ export default function DashboardPage() {
                 pickupAddress: quote.pickup_address,
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
+                createdAt: quote.created_at,
                 inventory: inventoryForPdf,
                 total: quote.total_price || 0,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,

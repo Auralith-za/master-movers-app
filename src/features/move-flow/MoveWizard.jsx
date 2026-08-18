@@ -240,8 +240,9 @@ export default function MoveWizard() {
         const hasPhone = !!(moveDetails?.contactPhone && moveDetails.contactPhone.trim().length > 0)
         const emailTrimmed = (moveDetails?.contactEmail || '').trim()
         const hasEmail = emailTrimmed.includes('@') && emailTrimmed.includes('.')
+        const hasReferral = !!(moveDetails?.referralSource && moveDetails.referralSource.trim().length > 0)
 
-        return hasPickup && hasDropoff && hasDate && hasName && hasPhone && hasEmail
+        return hasPickup && hasDropoff && hasDate && hasName && hasPhone && hasEmail && hasReferral
     }, [moveDetails, isAdmin, isTest])
 
     const hasInventory = Object.keys(inventory || {}).length > 0

@@ -16,6 +16,8 @@ export const generateProfessionalQuote = (data) => {
             pickupAddress,
             dropoffAddress,
             moveDate,
+            createdAt,
+            created_at,
             inventory = {},
             breakdown = {},
             total = 0,
@@ -453,6 +455,20 @@ export const generateProfessionalQuote = (data) => {
             resolve(doc);
         };
 
+        const rawCreatedDate = createdAt || created_at || data.quote_date || data.quoteDate;
+        let formattedCreatedDate = '';
+        if (rawCreatedDate) {
+            try {
+                const d = new Date(rawCreatedDate);
+                if (!isNaN(d.getTime())) {
+                    formattedCreatedDate = d.toISOString().split('T')[0];
+                }
+            } catch (_) {}
+        }
+        if (!formattedCreatedDate) {
+            formattedCreatedDate = new Date().toISOString().split('T')[0];
+        }
+
         img.onload = () => {
             // Draw Logo on top left in original aspect ratio
             const ratio = img.width / img.height || 1;
@@ -464,12 +480,13 @@ export const generateProfessionalQuote = (data) => {
             doc.setTextColor(...slate900);
             doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
-            doc.text('OFFICIAL QUOTE', 190, 18, { align: 'right' });
+            doc.text('OFFICIAL QUOTE', 190, 16, { align: 'right' });
             
-            doc.setFontSize(9);
+            doc.setFontSize(8.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
-            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 24, { align: 'right' });
+            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 22, { align: 'right' });
+            doc.text(`Date Created: ${formattedCreatedDate}`, 190, 27, { align: 'right' });
 
             renderPdfContent();
         };
@@ -483,12 +500,13 @@ export const generateProfessionalQuote = (data) => {
 
             doc.setTextColor(...slate900);
             doc.setFontSize(14);
-            doc.text('OFFICIAL QUOTE', 190, 20, { align: 'right' });
+            doc.text('OFFICIAL QUOTE', 190, 16, { align: 'right' });
             
-            doc.setFontSize(9);
+            doc.setFontSize(8.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
-            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 26, { align: 'right' });
+            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 22, { align: 'right' });
+            doc.text(`Date Created: ${formattedCreatedDate}`, 190, 27, { align: 'right' });
 
             renderPdfContent();
         };

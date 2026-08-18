@@ -309,8 +309,13 @@ export default function Step3Inventory() {
                                     variant="outline"
                                     className="w-full justify-start text-left font-medium hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                                     onClick={() => {
-                                        addItem(variationModalItem.id, opt, variationModalItem.targetRoom);
-                                        setVariationModalItem(null);
+                                        if (searchTerm) {
+                                            setVariationModalItem(null);
+                                            setRoomModalItem({ ...variationModalItem, variation: opt });
+                                        } else {
+                                            addItem(variationModalItem.id, opt, variationModalItem.targetRoom);
+                                            setVariationModalItem(null);
+                                        }
                                     }}
                                 >
                                     {opt}
@@ -499,7 +504,17 @@ export default function Step3Inventory() {
                 quantity={getQuantity(item.id, targetRoom)}
                 variation={variation}
                 targetRoom={searchTerm ? targetRoom : null}
-                onAdd={(id, varOpt) => handleAddItem(id, varOpt, targetRoom)}
+                onAdd={(id, varOpt) => {
+                    if (searchTerm && getQuantity(item.id, targetRoom) === 0) {
+                        if (item.variationOptions && item.variationOptions.length > 0 && !varOpt) {
+                            setVariationModalItem({ ...item, targetRoom: null });
+                        } else {
+                            setRoomModalItem({ ...item, variation: varOpt });
+                        }
+                    } else {
+                        handleAddItem(id, varOpt, targetRoom);
+                    }
+                }}
                 onRemove={(id, varOpt) => handleRemoveItem(id, varOpt, targetRoom)}
                 onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt, targetRoom)}
                 onToggleModifier={(id, modifier) => handleToggleModifier(id, modifier, targetRoom, variation)}

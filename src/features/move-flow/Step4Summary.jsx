@@ -268,8 +268,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             })
             
             // Use returned data OR fall back to the lastSavedQuote already in store
-            // (Supabase RLS may block SELECT on insert/update, returning success but null data)
-            const savedQuote = result.data?.[0] || lastSavedQuote
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
             if (result.success && savedQuote) {
 
                 if (submissionType !== 'admin') {
@@ -298,7 +297,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
             if (submissionType === 'admin' && result.success) {
                 alert('Manual Quote Created Successfully!')
-                navigate(`/admin/quotes/${result.data?.[0]?.id || ''}`)
+                const quoteId = (result.data && !Array.isArray(result.data)) ? result.data.id : (result.data?.[0]?.id || '')
+                navigate(`/admin/quotes/${quoteId}`)
                 return
             }
 
@@ -342,7 +342,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 forceNew: false
             })
             
-            const savedQuote = result.data?.[0] || lastSavedQuote
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
             if (result.success && savedQuote) {
                 if (submissionType !== 'admin') {
                     emailService.sendPendingQuoteAlert({
@@ -396,7 +396,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 forceNew: false
             })
             
-            const savedQuote = result.data?.[0] || lastSavedQuote
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
             if (result.success && savedQuote) {
                 await emailService.sendCallbackEmail({
                     name: formatClientName(moveDetails.contactName, moveDetails.surname),
@@ -445,8 +445,9 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 })
                 if (result.success) {
                     alert("We have received your request! A consultant will call you shortly.")
-                    if (result.data?.[0]) {
-                        sendProposalEmail(result.data[0])
+                    const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
+                    if (savedQuote) {
+                        sendProposalEmail(savedQuote)
                     }
                 } else {
                     console.warn("Callback update failed:", result.error)
@@ -473,8 +474,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
             setSearchParams({ saved: 'true' })
             alert("Request Sent! We will call you shortly to discuss your move.")
 
-            if (result.success && result.data?.[0]) {
-                const savedQuote = result.data[0]
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
+            if (result.success && savedQuote) {
                 // Send customer proposal email (with PDF)
                 sendProposalEmail(savedQuote)
                 // Send urgent admin callback alert (no PDF, instant)
@@ -514,7 +515,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 ...extraData
             })
 
-            const savedQuote = result.data?.[0] || lastSavedQuote
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
             const quoteId = savedQuote?.id || lastSavedQuote?.id
 
             if (status === 'rejected') {
@@ -535,8 +536,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     inventoryItems: INVENTORY_ITEMS,
                     rejectionReason: reason
                 }).catch(err => console.error('Rejected quote email alert error:', err))
-            } else if (result.success && result.data?.[0]) {
-                sendProposalEmail(result.data[0])
+            } else if (result.success && savedQuote) {
+                sendProposalEmail(savedQuote)
             }
 
             // Non-blocking success
@@ -566,6 +567,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 pickupAddress: moveDetails.pickupAddress,
                 dropoffAddress: moveDetails.dropoffAddress,
                 moveDate: moveDetails.moveDate,
+                createdAt: lastSavedQuote?.created_at || new Date().toISOString(),
                 inventory: inventory,
                 breakdown: breakdown,
                 total: total,

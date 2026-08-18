@@ -1,6 +1,43 @@
 export const getSimpleQuoteNumber = (uuid) => {
-    if (!uuid || uuid === 'new') return 'MM-' + Math.floor(Math.random() * 10000);
-    const num = parseInt(uuid.toString().replace(/-/g, '').substring(0, 8), 16) % 1000000;
+    if (!uuid || uuid === 'new' || uuid === 'undefined' || uuid === 'null') {
+        return 'MM-' + Math.floor(100000 + Math.random() * 900000);
+    }
+
+    // If an object was passed (e.g. quote object)
+    if (typeof uuid === 'object') {
+        const extracted = uuid.id || uuid.quoteId || uuid.quote_id;
+        if (extracted) return getSimpleQuoteNumber(extracted);
+    }
+
+    const str = String(uuid).trim();
+
+    // If it is already a valid MM-XXXXXX reference
+    if (/^MM-\d+$/i.test(str)) {
+        const digits = str.replace(/[^0-9]/g, '');
+        return 'MM-' + digits.padStart(6, '0').slice(-6);
+    }
+
+    // Strip non-hex characters for UUID hex parsing
+    const cleanHex = str.replace(/-/g, '').replace(/[^0-9a-fA-F]/g, '');
+    if (!cleanHex || cleanHex.length < 2) {
+        // Fallback: stable hash from string
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        const safeNum = Math.abs(hash) % 1000000;
+        return 'MM-' + safeNum.toString().padStart(6, '0');
+    }
+
+    const hexPart = cleanHex.substring(0, 8);
+    const parsed = parseInt(hexPart, 16);
+
+    if (isNaN(parsed)) {
+        return 'MM-' + Math.floor(100000 + Math.random() * 900000);
+    }
+
+    const num = parsed % 1000000;
     return 'MM-' + num.toString().padStart(6, '0');
 };
 

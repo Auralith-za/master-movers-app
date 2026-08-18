@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
+import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 
 export default function QuotesPage() {
     const navigate = useNavigate()
@@ -69,6 +70,7 @@ export default function QuotesPage() {
         const clientEmail = (quote.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email || '').toLowerCase()
         const clientPhone = (quote.client_phone || quote.items_json?.contactPhone || quote.items_json?.client_phone || '').toLowerCase()
         const quoteId = (quote.id || '').toString().toLowerCase()
+        const simpleRef = getSimpleQuoteNumber(quote.id).toLowerCase()
         const pickup = (quote.pickup_address || quote.items_json?.pickupAddress || '').toLowerCase()
         const dropoff = (quote.dropoff_address || quote.items_json?.dropoffAddress || '').toLowerCase()
         const moveDate = (quote.move_date || quote.items_json?.moveDate || '').toLowerCase()
@@ -79,6 +81,7 @@ export default function QuotesPage() {
             clientEmail.includes(q) ||
             clientPhone.includes(q) ||
             quoteId.includes(q) ||
+            simpleRef.includes(q) ||
             pickup.includes(q) ||
             dropoff.includes(q) ||
             moveDate.includes(q) ||
@@ -107,6 +110,7 @@ export default function QuotesPage() {
                 pickupAddress: quote.pickup_address,
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
+                createdAt: quote.created_at,
                 inventory: inventoryForPdf,
                 total: quote.total_price,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
@@ -256,7 +260,7 @@ export default function QuotesPage() {
                         ) : (
                             filteredQuotes.map((quote) => (
                                 <tr key={quote.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="px-6 py-4 text-sm font-mono text-slate-400">#{quote.id.toString().substring(0, 6)}</td>
+                                    <td className="px-6 py-4 text-sm font-mono font-bold text-slate-700">{getSimpleQuoteNumber(quote.id)}</td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{quote.client_name}</div>
                                         <div className="text-xs text-slate-500">{quote.client_phone}</div>

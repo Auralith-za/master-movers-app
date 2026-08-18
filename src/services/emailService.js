@@ -7,7 +7,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid' }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid' }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -25,6 +25,7 @@ export const emailService = {
                 pickupAddress,
                 dropoffAddress,
                 moveDate,
+                createdAt: createdAt || created_at,
                 inventory,
                 breakdown,
                 total,
@@ -55,6 +56,7 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 total_price: total,
                 payment_method: paymentMethod,
+                referral_source: moveDetails?.referralSource || '',
                 items_json: inventory || inventoryItems,
                 total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
             }
@@ -127,7 +129,7 @@ export const emailService = {
      * Admin-only booking confirmed alert — no PDF, fires instantly after payment
      * Separate from the customer email so admins always get notified
      */
-    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'card/eft' }) => {
+    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'card/eft' }) => {
         try {
             console.log(`Generating in-memory PDF for booking confirmed alert...`)
 
@@ -162,6 +164,7 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 total_price: total,
                 payment_method: paymentMethod,
+                referral_source: referralSource || referral_source || '',
                 items_json: inventory || inventoryItems,
                 total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
             }
@@ -189,7 +192,7 @@ export const emailService = {
      * Send instant admin-only alert when a customer reaches Step 4 (pending quote)
      * No PDF needed — fires immediately so sales team can follow up
      */
-    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'not selected' }) => {
+    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'not selected' }) => {
         try {
             console.log(`Generating in-memory PDF for pending quote alert...`)
 
@@ -224,7 +227,8 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 total_price: total,
                 move_type: moveType,
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                referral_source: referralSource || referral_source || ''
             }
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -255,7 +259,7 @@ export const emailService = {
      * Send admin alert for an abandoned lead after inactivity
      * Uses whatever data is available from the incomplete form
      */
-    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false }) => {
+    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false }) => {
         try {
             let pdfBase64 = null;
             let pdfFilename = null;
@@ -294,7 +298,8 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 total_price: total || 0,
                 move_type: moveType || 'Unknown',
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                referral_source: referralSource || referral_source || ''
             }
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -331,7 +336,7 @@ export const emailService = {
      * Send urgent callback notification to ALL admins
      * Called from Step 1, 2, 3 and 4 when customer requests a call back
      */
-    sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate }) => {
+    sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate, referralSource, referral_source }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -342,7 +347,7 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'callback_notification',
-                    contactData: { name, email, phone, step, pickup, dropoff, moveDate }
+                    contactData: { name, email, phone, step, pickup, dropoff, moveDate, referral_source: referralSource || referral_source || '' }
                 })
             })
             const result = await response.json()
@@ -406,7 +411,7 @@ export const emailService = {
     /**
      * Send instant admin alert when a client rejects a quote (frontend customer side)
      */
-    sendRejectedQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, rejectionReason }) => {
+    sendRejectedQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, rejectionReason }) => {
         try {
             console.log(`Generating in-memory PDF for rejected quote alert...`)
 
@@ -446,6 +451,7 @@ export const emailService = {
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
                 total_price: total || 0,
+                referral_source: referralSource || referral_source || '',
                 rejection_reason: rejectionReason || 'No reason provided'
             }
 
