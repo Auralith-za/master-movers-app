@@ -393,42 +393,15 @@ serve(async (req) => {
         }
 
         const resendApiKey = Deno.env.get('RESEND_API_KEY')
-        const adminEmailSecret = Deno.env.get('ADMIN_EMAIL') || 'curtleroux7785@gmail.com'
-        let adminEmails = adminEmailSecret.split(',').map(e => e.trim()).filter(Boolean)
         
-        // Remove old incorrect @mastermovers.co.za emails, Jose, and all iCloud email addresses
-        adminEmails = adminEmails.filter(email => {
-            const lower = email.toLowerCase()
-            return !lower.endsWith('@mastermovers.co.za') && !lower.includes('icloud') && !lower.includes('jose')
-        })
-
-        if (!adminEmails.includes('melonie@nova-gg.com')) {
-            adminEmails.push('melonie@nova-gg.com')
-        }
-
-        const additionalEmails = [
-            'sales@mastermoversjhb.co.za',
+        // Designated admin recipients for all internal notifications (new leads, callbacks, outline areas, quotes, bookings, etc.)
+        const adminEmails = [
+            'curtleroux7785@gmail.com',
+            'ray@nova-gg.com',
             'sales1@mastermoversjhb.co.za',
-            'office@mastermoversjhb.co.za',
-            'carla@mastermoversjhb.co.za',
-            'sales3@mastermoversjhb.co.za',
-            'office@mastermoverscpt.co.za',
-            'info@mastermoverscpt.co.za',
-            'sales@mastermoversdbn.co.za',
-            'office@mastermoversdbn.co.za'
-        ];
-
-        for (const email of additionalEmails) {
-            if (!adminEmails.includes(email)) {
-                adminEmails.push(email);
-            }
-        }
-
-        // Ensure Jose / iCloud emails are strictly excluded from admin email list
-        adminEmails = adminEmails.filter(email => {
-            const lower = email.toLowerCase()
-            return !lower.includes('icloud') && !lower.includes('jose')
-        })
+            'melonie@nova-gg.com',
+            'accounts@mastermoversjhb.co.za'
+        ]
         const sender = Deno.env.get('EMAIL_SENDER') || 'Master Movers <onboarding@resend.dev>'
         const originUrl = 'https://mastermovers.co.za'
 
