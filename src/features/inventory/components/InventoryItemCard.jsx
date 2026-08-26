@@ -498,6 +498,11 @@ export default function InventoryItemCard({ item, quantity = 0, variation, targe
                     )}
                     <h4 className="text-xs md:text-base font-bold text-slate-800 leading-tight mb-1 md:mb-2 group-hover:text-red-600 transition-colors line-clamp-2">
                         {item.name}
+                        {variation && (
+                            <span className="text-red-600 font-semibold text-xs ml-1 font-sans">
+                                ({variation.replace(/_?Wrapped/g, '').replace(/_?Plastic Sleeve/g, '')})
+                            </span>
+                        )}
                     </h4>
                     
                     <div className="space-y-1">

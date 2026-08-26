@@ -320,10 +320,38 @@ export default function DashboardPage() {
 
                                         <div className="flex items-center gap-3 justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
                                             <div className="text-right">
-                                                <div className="font-bold text-slate-900 text-base whitespace-nowrap">
-                                                    R {Number(q.total_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400">Incl VAT</div>
+                                                {(() => {
+                                                    const rawItems = q.items_json?.items || (q.items_json && !q.items_json.items ? q.items_json : {})
+                                                    const hasItems = Object.values(rawItems).some(qty => Number(qty) > 0)
+                                                    const comments = (q.customer_comments || '').toLowerCase()
+                                                    const isOutline = comments.includes('outlaying area') || comments.includes('multiple stops') || comments.includes('location search failed')
+                                                    const priceNum = Number(q.total_price || 0)
+
+                                                    if (q.status === 'lead' && (isOutline || priceNum === 0)) {
+                                                        return (
+                                                            <span className="text-xs bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded border border-amber-200 inline-block">
+                                                                Price Pending
+                                                            </span>
+                                                        )
+                                                    }
+
+                                                    if (priceNum === 0) {
+                                                        return (
+                                                            <span className="text-xs bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded border border-amber-200 inline-block">
+                                                                Price Pending
+                                                            </span>
+                                                        )
+                                                    }
+
+                                                    return (
+                                                        <>
+                                                            <div className="font-bold text-slate-900 text-base whitespace-nowrap">
+                                                                R {priceNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400">Incl VAT</div>
+                                                        </>
+                                                    )
+                                                })()}
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button

@@ -17,8 +17,6 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 // ─── Helper: send abandoned lead alert directly (no PDF, safe for tab close) ───
 function sendInstantLeadAlert(quoteData) {
     if (!quoteData) return
-    const { client_name, client_email, client_phone } = quoteData
-    if (!client_email && !client_phone) return
 
     try {
         fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
@@ -57,10 +55,24 @@ export default function MoveWizard() {
         lastSavedQuoteRef.current = lastSavedQuote
     }, [lastSavedQuote])
 
-    // ─── Helper: has enough contact info to send a lead alert ───────────────
-    const hasContactInfo = useCallback(() => {
-        return !!(moveDetails?.contactEmail || moveDetails?.contactPhone)
-    }, [moveDetails?.contactEmail, moveDetails?.contactPhone])
+    // ─── Helper: has any lead progress been entered to trigger auto-save/alert ───────────────
+    const hasLeadProgress = useCallback(() => {
+        return !!(
+            moveDetails?.contactEmail ||
+            moveDetails?.contactPhone ||
+            moveDetails?.contactName ||
+            moveDetails?.pickupAddress ||
+            moveDetails?.dropoffAddress ||
+            moveDetails?.moveDate
+        )
+    }, [
+        moveDetails?.contactEmail,
+        moveDetails?.contactPhone,
+        moveDetails?.contactName,
+        moveDetails?.pickupAddress,
+        moveDetails?.dropoffAddress,
+        moveDetails?.moveDate
+    ])
 
     // ─── Auto-Reset if returning to an already completed quote ──────────────
     useEffect(() => {
@@ -91,8 +103,8 @@ export default function MoveWizard() {
 
     // ─── 1. Debounced Auto-Save to Database ─────────────────────────────────
     useEffect(() => {
-        // Only auto-save once we have at least one contact field
-        if (!moveDetails?.contactEmail && !moveDetails?.contactPhone && !moveDetails?.contactName) return
+        // Auto-save once any lead progress detail is entered
+        if (!hasLeadProgress()) return
 
         const timeoutId = setTimeout(() => {
             // Preserve existing advanced statuses, but always at least 'lead'
@@ -104,14 +116,14 @@ export default function MoveWizard() {
         }, 1500)
 
         return () => clearTimeout(timeoutId)
-    }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status])
+    }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status, hasLeadProgress])
 
     // ─── 2. Inactivity Timer (2 min idle = send lead alert) ─────────────────
     const resetInactivityTimer = useCallback(() => {
         if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
 
         inactivityTimerRef.current = setTimeout(() => {
-            if (!hasContactInfo()) return
+            if (!hasLeadProgress()) return
             if (leadAlertSentRef.current) return
 
             const quote = lastSavedQuoteRef.current
@@ -123,11 +135,11 @@ export default function MoveWizard() {
 
             sendInstantLeadAlert(quote)
         }, 2 * 60 * 1000) // 2 minutes
-    }, [hasContactInfo])
+    }, [hasLeadProgress])
 
     useEffect(() => {
-        // Only watch for inactivity when we have contact info to make it useful
-        if (!hasContactInfo()) return
+        // Only watch for inactivity when we have progress details
+        if (!hasLeadProgress()) return
 
         // Restore dedup guard from sessionStorage
         const savedQuoteId = lastSavedQuote?.id
@@ -144,12 +156,12 @@ export default function MoveWizard() {
             events.forEach(e => window.removeEventListener(e, resetInactivityTimer))
             if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
         }
-    }, [hasContactInfo, resetInactivityTimer, lastSavedQuote?.id])
+    }, [hasLeadProgress, resetInactivityTimer, lastSavedQuote?.id])
 
     // ─── 3. Tab Close / Navigate Away (beforeunload + visibilitychange) ─────
     useEffect(() => {
         const handleBeforeUnload = () => {
-            if (!hasContactInfo()) return
+            if (!hasLeadProgress()) return
             if (leadAlertSentRef.current) return
 
             const quote = lastSavedQuoteRef.current
@@ -162,7 +174,7 @@ export default function MoveWizard() {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
-                if (!hasContactInfo()) return
+                if (!hasLeadProgress()) return
                 if (leadAlertSentRef.current) return
 
                 const quote = lastSavedQuoteRef.current
@@ -182,15 +194,14 @@ export default function MoveWizard() {
             window.removeEventListener('beforeunload', handleBeforeUnload)
             document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
-    }, [hasContactInfo])
+    }, [hasLeadProgress])
 
-    // ─── 4. "New Lead" Instant Email on first contact info capture ──────────
-    //    Fires once as soon as the customer has been auto-saved with contact info
+    // ─── 4. "New Lead" Instant Email on first progress capture ──────────
+    //    Fires once as soon as the customer progress has been auto-saved
     const newLeadAlertSentRef = useRef(false)
     useEffect(() => {
         if (newLeadAlertSentRef.current) return
         if (!lastSavedQuote?.id) return
-        if (!lastSavedQuote?.client_email && !lastSavedQuote?.client_phone) return
 
         // Don't send for admin-created quotes or test flows
         const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
@@ -201,15 +212,15 @@ export default function MoveWizard() {
         const sentKey = `mm_new_lead_${lastSavedQuote.id}`
         if (sessionStorage.getItem(sentKey)) return
 
-        // Don't re-send for quotes that are already past the lead stage
-        if (['lead', 'abandoned', 'booked', 'confirmed'].includes(lastSavedQuote.status)) return
+        // Don't re-send for quotes that are already fully completed or booked
+        if (['booked', 'confirmed', 'paid', 'completed'].includes(lastSavedQuote.status)) return
 
         console.log('⭐ New lead captured — sending instant new-lead alert...')
         newLeadAlertSentRef.current = true
         sessionStorage.setItem(sentKey, '1')
 
         sendInstantLeadAlert(lastSavedQuote)
-    }, [lastSavedQuote?.id, lastSavedQuote?.client_email, lastSavedQuote?.client_phone, lastSavedQuote?.status, location.pathname])
+    }, [lastSavedQuote?.id, lastSavedQuote?.status, location.pathname])
 
     // ─── Determine base path & admin mode ────────────────────────────────────
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' :

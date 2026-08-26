@@ -640,6 +640,15 @@ export default function Step2Access() {
                                 contactPhone: formData.phone,
                                 forceNew: true
                             })
+                            emailService.sendCallbackEmail({
+                                name: fullName,
+                                email: formData.email,
+                                phone: formData.phone,
+                                step: 'Step 2 — Site Access Modal Request',
+                                pickup: moveDetails.pickupAddress || '',
+                                dropoff: moveDetails.dropoffAddress || '',
+                                moveDate: moveDetails.moveDate || ''
+                            })
                             return true
                         } catch (err) {
                             console.error("Lead submission error:", err)

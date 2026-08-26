@@ -22,6 +22,7 @@ serve(async (req) => {
         // we need to handle it differently (use status only approach)
 
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
         // Try fetching with lead_email_sent first
         let abandonedQuotes = null
@@ -48,6 +49,7 @@ serve(async (req) => {
                 .select('*')
                 .in('status', ['new', 'lead'])
                 .lt('created_at', fiveMinutesAgo)
+                .gt('created_at', twentyFourHoursAgo)
 
             abandonedQuotes = result.data
             fetchError = result.error
@@ -59,6 +61,7 @@ serve(async (req) => {
                 .in('status', ['new', 'lead'])
                 .or('lead_email_sent.is.null,lead_email_sent.eq.false')
                 .lt('created_at', fiveMinutesAgo)
+                .gt('created_at', twentyFourHoursAgo)
 
             abandonedQuotes = result.data
             fetchError = result.error
@@ -82,12 +85,6 @@ serve(async (req) => {
         let failedCount = 0
 
         for (const quote of abandonedQuotes) {
-            // Skip if no contact info
-            if (!quote.client_email && !quote.client_phone) {
-                await supabase.from('quotes').update({ status: 'abandoned' }).eq('id', quote.id)
-                continue
-            }
-
             // Skip if already abandoned (guard against double-processing)
             if (quote.status === 'abandoned') continue
 

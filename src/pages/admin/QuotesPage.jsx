@@ -283,7 +283,31 @@ export default function QuotesPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                                        {quote.total_price ? `R ${Number(quote.total_price).toFixed(2)}` : '-'}
+                                        {(() => {
+                                            const rawItems = quote.items_json?.items || (quote.items_json && !quote.items_json.items ? quote.items_json : {})
+                                            const hasItems = Object.values(rawItems).some(qty => Number(qty) > 0)
+                                            const comments = (quote.customer_comments || '').toLowerCase()
+                                            const isOutline = comments.includes('outlaying area') || comments.includes('multiple stops') || comments.includes('location search failed')
+                                            const priceNum = Number(quote.total_price || 0)
+
+                                            if (quote.status === 'lead' && (isOutline || priceNum === 0)) {
+                                                return (
+                                                    <span className="text-xs bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded border border-amber-200 inline-block">
+                                                        Price Pending
+                                                    </span>
+                                                )
+                                            }
+
+                                            if (priceNum === 0) {
+                                                return (
+                                                    <span className="text-xs bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded border border-amber-200 inline-block">
+                                                        Price Pending
+                                                    </span>
+                                                )
+                                            }
+
+                                            return `R ${priceNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        })()}
                                     </td>
                                     {filter === 'rejected' && (
                                         <td className="px-6 py-4 text-sm text-red-600 font-medium italic">

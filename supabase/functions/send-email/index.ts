@@ -54,20 +54,47 @@ function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | str
             let itemKey = key
             let room: string | undefined = undefined
 
-            if (itemKey.includes('__')) {
+            if (itemKey.includes('__room:')) {
+                const parts = itemKey.split('__room:')
+                itemKey = parts[0]
+                room = parts[1]
+            } else if (itemKey.includes('_room:')) {
+                const parts = itemKey.split('_room:')
+                itemKey = parts[0]
+                room = parts[1]
+            } else if (itemKey.includes(' Room:')) {
+                const parts = itemKey.split(' Room:')
+                itemKey = parts[0]
+                room = parts[1]
+            } else if (itemKey.includes(' room:')) {
+                const parts = itemKey.split(' room:')
+                itemKey = parts[0]
+                room = parts[1]
+            } else if (itemKey.includes('__')) {
                 const parts = itemKey.split('__')
                 itemKey = parts[0]
-                room = parts[1] ? parts[1].replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : undefined
+                room = parts[1]
+            }
+
+            if (room) {
+                room = room.replace(/^room:\s*/i, '').replace(/_/g, ' ').trim()
+                if (room) {
+                    room = room.replace(/\b\w/g, (c: string) => c.toUpperCase())
+                } else {
+                    room = undefined
+                }
             }
 
             let cleanName = itemKey
                 .replace(/_/g, ' ')
+                .replace(/-/g, ' ')
                 .replace(/([a-z])([A-Z])/g, '$1 $2')
                 .replace(/\b(\w)/g, (c: string) => c.toUpperCase())
                 .replace(/\b3seater\b/i, '3-Seater')
                 .replace(/\b2seater\b/i, '2-Seater')
                 .replace(/\b1seater\b/i, '1-Seater')
                 .replace(/\b4seater\b/i, '4-Seater')
+                .trim()
 
             itemRows.push({ name: cleanName, qty, room })
         }
@@ -831,34 +858,7 @@ serve(async (req) => {
 
             let inventoryHtml = ''
             if (itemEntries.length > 0) {
-                const totalQty = itemEntries.reduce((sum, [, qty]) => sum + Number(qty), 0)
-                const rows = itemEntries.map(([itemId, qty]) => {
-                    // Clean up the item ID — strip variation suffix (e.g. "sofa_3seater" → "Sofa 3Seater")
-                    const cleanName = itemId
-                        .replace(/_/g, ' ')
-                        .replace(/\b\w/g, (c: string) => c.toUpperCase())
-                    return `<tr>
-                        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#334155;">${cleanName}</td>
-                        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:700;color:#0f172a;text-align:center;">${qty}</td>
-                    </tr>`
-                }).join('')
-
-                inventoryHtml = `
-                <div style="margin-top:24px;">
-                    <p style="font-weight:800;font-size:12px;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin:0 0 10px 0;">
-                        📦 Inventory Added (${totalQty} item${totalQty !== 1 ? 's' : ''})
-                    </p>
-                    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
-                        <thead>
-                            <tr style="background:#0f172a;">
-                                <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Item</th>
-                                <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Qty</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                    ${quoteData?.total_volume ? `<p style="font-size:12px;color:#64748b;margin:8px 0 0;font-weight:600;">Total Volume: <strong style="color:#0f172a;">${Number(quoteData.total_volume).toFixed(1)} cuft</strong></p>` : ''}
-                </div>`
+                inventoryHtml = renderInventoryTableHtml(rawItems, quoteData?.total_volume)
             } else {
                 inventoryHtml = `
                 <div style="margin-top:20px;padding:12px 16px;background:#fefce8;border-left:3px solid #eab308;border-radius:6px;">

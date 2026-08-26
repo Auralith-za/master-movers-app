@@ -685,6 +685,26 @@ export default function Step1Details() {
         submitQuote({ 
             status: 'lead',
             forceNew: !lastSavedQuote?.id
+        }).then(async (res) => {
+            if (res?.data?.id) {
+                try {
+                    await emailService.sendAbandonedLeadAlert({
+                        quoteId: res.data.id,
+                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                        clientEmail: moveDetails.contactEmail,
+                        clientPhone: moveDetails.contactPhone,
+                        moveDate: moveDetails.moveDate,
+                        referralSource: moveDetails.referralSource,
+                        pickupAddress: moveDetails.pickupAddress,
+                        dropoffAddress: moveDetails.dropoffAddress,
+                        moveType: isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move'),
+                        total: 0,
+                        isInstant: true
+                    })
+                } catch (e) {
+                    console.error('Step 1 lead email alert error:', e)
+                }
+            }
         }).catch(err => console.error('Step 1 lead save error:', err))
 
         // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion
@@ -1485,6 +1505,17 @@ export default function Step1Details() {
                                 contactEmail: formData.email,
                                 contactPhone: formData.phone,
                                 forceNew: true
+                            })
+                            // 🔴 Send urgent callback email to admins
+                            trackCallbackRequest({ step: 'Step 1 — Call Back Modal' })
+                            await emailService.sendCallbackEmail({
+                                name: fullName,
+                                email: formData.email,
+                                phone: formData.phone,
+                                step: 'Step 1 — Call Back Modal Request',
+                                pickup: moveDetails.pickupAddress || '',
+                                dropoff: moveDetails.dropoffAddress || '',
+                                moveDate: moveDetails.moveDate || ''
                             })
                             return true
                         } catch (err) {

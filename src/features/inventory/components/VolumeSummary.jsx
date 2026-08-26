@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Truck } from 'lucide-react'
 import TruckVisual from './TruckVisual'
-import { useMoveStore, getWrappingFlag, getPlasticSleevesCount } from '../store/moveStore'
+import { useMoveStore, getWrappingFlag, getPlasticSleevesCount, parseInventoryKey } from '../store/moveStore'
 
 export default function VolumeSummary({ items, inventory, breakdown = {}, children }) {
     const { moveDetails } = useMoveStore()
@@ -97,16 +97,17 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
             {/* Item list — scrolls independently if it overflows */}
             <div className="flex-1 overflow-y-auto min-h-0 border-t border-slate-700 px-6 py-3 space-y-2 custom-scrollbar">
                 {Object.entries(inventory).map(([idKey, qty]) => {
-                    const [itemId, variation] = idKey.split('_')
+                    const { itemId, variation } = parseInventoryKey(idKey)
                     const item = items.find(i => i.id === itemId)
                     if (!item) return null
                     const isWrapped = getWrappingFlag(item, variation)
                     const isSleeved = getPlasticSleevesCount(item, idKey) > 0
+                    const cleanVar = variation ? variation.replace(/_?Wrapped/g, '').replace(/_?Plastic Sleeve/g, '') : null
                     return (
                         <div key={idKey} className="flex justify-between text-sm items-center py-1">
                             <span className="text-slate-300 truncate pr-2 font-medium">
                                 {qty}x {item.name}
-                                {variation && <span className="text-slate-500 text-[10px] ml-1 uppercase">({variation})</span>}
+                                {cleanVar && <span className="text-slate-500 text-[10px] ml-1 uppercase">({cleanVar})</span>}
                             </span>
                             <span className="text-[10px] font-black uppercase tracking-tighter">
                                 {isWrapped ? <span className="text-blue-400">Wrapping ✓</span> : 

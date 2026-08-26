@@ -404,27 +404,41 @@ export default function QuoteDetailPage() {
         if (quote && recalculatedData && !recalculatedData.error && !hasCalculatedOffset && !isEditing && !isMapsRunning) {
             const dbPrice = Number(quote.total_price || 0);
             const recalcPrice = Number((recalculatedData.total || 0) + customProductsTotal);
-            if (dbPrice > 0 && recalcPrice > 0) {
+            if (recalcPrice === 0) {
+                setPriceOffset(0);
+                setHasCalculatedOffset(true);
+            } else if (dbPrice > 0 && recalcPrice > 0 && quote.is_manual_price) {
                 const offset = dbPrice - recalcPrice;
                 if (Math.abs(offset) > 0.01) {
                     setPriceOffset(offset);
                 }
                 setHasCalculatedOffset(true);
+            } else {
+                setPriceOffset(0);
+                setHasCalculatedOffset(true);
             }
         }
     }, [quote, recalculatedData, hasCalculatedOffset, isEditing, customProductsTotal, editForm.trip_breakdown, mapsStatus])
 
-    const finalPrice = (isEditing || !quote?.total_price)
-        ? (((recalculatedData?.total || 0) + customProductsTotal) + priceOffset)
-        : (Number(quote?.total_price) || 0);
+    const hasNoItemsOrCustomQuote = (recalculatedData?.total === 0 && customProductsTotal === 0);
 
-    const finalVat = (isEditing || !quote?.total_price)
-        ? ((recalculatedData?.vat || 0) + (priceOffset * 0.15 / 1.15))
-        : ((Number(quote?.total_price) || 0) * 0.15 / 1.15);
+    const finalPrice = hasNoItemsOrCustomQuote
+        ? 0
+        : ((isEditing || !quote?.total_price)
+            ? (((recalculatedData?.total || 0) + customProductsTotal) + priceOffset)
+            : (Number(quote?.total_price) || 0));
 
-    const finalSubTotal = (isEditing || !quote?.total_price)
-        ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
-        : ((Number(quote?.total_price) || 0) / 1.15);
+    const finalVat = hasNoItemsOrCustomQuote
+        ? 0
+        : ((isEditing || !quote?.total_price)
+            ? ((recalculatedData?.vat || 0) + (priceOffset * 0.15 / 1.15))
+            : ((Number(quote?.total_price) || 0) * 0.15 / 1.15));
+
+    const finalSubTotal = hasNoItemsOrCustomQuote
+        ? 0
+        : ((isEditing || !quote?.total_price)
+            ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
+            : ((Number(quote?.total_price) || 0) / 1.15));
 
     const handleSave = async () => {
         try {

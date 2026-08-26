@@ -98,7 +98,7 @@ export default function Step3Inventory() {
         const roomToAssign = targetRoom || item.category;
         const currentQty = getQuantity(itemId, roomToAssign);
 
-        if (item.variationOptions && item.variationOptions.length > 0) {
+        if (item.variationOptions && item.variationOptions.length > 0 && !existingVariation) {
             setVariationModalItem({ ...item, targetRoom: roomToAssign });
             return;
         }
@@ -106,12 +106,12 @@ export default function Step3Inventory() {
         if (currentQty === 0) {
             // Items with both wrapping + crate get the crate choice modal
             if (item.requiresCrate && item.autoPackagingType) {
-                setCrateModalItem({ ...item, targetRoom: roomToAssign });
+                setCrateModalItem({ ...item, variation: existingVariation, targetRoom: roomToAssign });
                 return;
             }
             // Crate-only items just show the crate callback modal directly
             if (item.requiresCrate && !item.autoPackagingType) {
-                setCrateModalItem({ ...item, targetRoom: roomToAssign });
+                setCrateModalItem({ ...item, variation: existingVariation, targetRoom: roomToAssign });
                 return;
             }
             if (item.requiresPhoto) {
@@ -303,7 +303,7 @@ export default function Step3Inventory() {
                         <p className="text-sm text-slate-500 mb-6">Choose the type of material for {variationModalItem.name}.</p>
 
                         <div className="flex flex-col gap-3">
-                            {variationModalItem.variationOptions.map(opt => (
+                            {(variationModalItem.variationOptions || []).map(opt => (
                                 <Button
                                     key={opt}
                                     variant="outline"
@@ -486,40 +486,58 @@ export default function Step3Inventory() {
                         {/* Items Grid - 2 columns on mobile */}
                         <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-6 mt-2">
                             {filteredItems.map(item => {
-        const targetRoom = activeCategory
-        const idKeys = Object.keys(inventory).filter(k => {
-            const parsed = parseInventoryKey(k)
-            if (parsed.itemId !== item.id) return false
-            const itemRoom = parsed.room || item.category
-            return itemRoom === targetRoom
-        })
-        const firstKey = idKeys[0] || '';
-        const parsedKey = parseInventoryKey(firstKey)
-        const variation = parsedKey.variation
+                                const itemKeys = Object.keys(inventory).filter(k => parseInventoryKey(k).itemId === item.id)
 
-        return (
-            <InventoryItemCard
-                key={item.id}
-                item={item}
-                quantity={getQuantity(item.id, targetRoom)}
-                variation={variation}
-                targetRoom={searchTerm ? targetRoom : null}
-                onAdd={(id, varOpt) => {
-                    if (searchTerm && getQuantity(item.id, targetRoom) === 0) {
-                        if (item.variationOptions && item.variationOptions.length > 0 && !varOpt) {
-                            setVariationModalItem({ ...item, targetRoom: null });
-                        } else {
-                            setRoomModalItem({ ...item, variation: varOpt });
-                        }
-                    } else {
-                        handleAddItem(id, varOpt, targetRoom);
-                    }
-                }}
-                onRemove={(id, varOpt) => handleRemoveItem(id, varOpt, targetRoom)}
-                onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt, targetRoom)}
-                onToggleModifier={(id, modifier) => handleToggleModifier(id, modifier, targetRoom, variation)}
-                onChangeRoom={(itemToChange) => setRoomModalItem({ ...itemToChange, targetRoom: targetRoom, variation })}
-            />
+                                let quantity = 0
+                                let variation = null
+                                let cardRoom = null
+
+                                if (searchTerm.trim()) {
+                                    // In search mode, aggregate across all rooms so the user immediately sees the added quantity
+                                    quantity = itemKeys.reduce((sum, k) => sum + (inventory[k] || 0), 0)
+                                    const activeKey = itemKeys[0] || ''
+                                    const parsedKey = parseInventoryKey(activeKey)
+                                    variation = parsedKey.variation
+                                    cardRoom = parsedKey.room || (quantity > 0 ? item.category : activeCategory)
+                                } else {
+                                    // In category mode, focus on the current category tab
+                                    const roomKeys = itemKeys.filter(k => {
+                                        const parsed = parseInventoryKey(k)
+                                        const itemRoom = parsed.room || item.category
+                                        return itemRoom === activeCategory
+                                    })
+                                    quantity = roomKeys.reduce((sum, k) => sum + (inventory[k] || 0), 0)
+                                    const activeKey = roomKeys[0] || ''
+                                    const parsedKey = parseInventoryKey(activeKey)
+                                    variation = parsedKey.variation
+                                    cardRoom = null
+                                }
+
+                                const currentTargetRoom = cardRoom || activeCategory
+
+                                return (
+                                    <InventoryItemCard
+                                        key={item.id}
+                                        item={item}
+                                        quantity={quantity}
+                                        variation={variation}
+                                        targetRoom={searchTerm.trim() ? cardRoom : null}
+                                        onAdd={(id, varOpt) => {
+                                            if (searchTerm.trim() && quantity === 0) {
+                                                if (item.variationOptions && item.variationOptions.length > 0 && !varOpt) {
+                                                    setVariationModalItem({ ...item, targetRoom: null });
+                                                } else {
+                                                    setRoomModalItem({ ...item, variation: varOpt });
+                                                }
+                                            } else {
+                                                handleAddItem(id, varOpt || variation, currentTargetRoom);
+                                            }
+                                        }}
+                                        onRemove={(id, varOpt) => handleRemoveItem(id, varOpt || variation, currentTargetRoom)}
+                                        onSetQuantity={(id, qty, varOpt) => handleSetQuantity(id, qty, varOpt || variation, currentTargetRoom)}
+                                        onToggleModifier={(id, modifier) => handleToggleModifier(id, modifier, currentTargetRoom, variation)}
+                                        onChangeRoom={(itemToChange) => setRoomModalItem({ ...itemToChange, targetRoom: currentTargetRoom, variation })}
+                                    />
                                 );
                             })}
                             {filteredItems.length === 0 && (
@@ -623,6 +641,15 @@ export default function Step3Inventory() {
                             contactEmail: formData.email,
                             contactPhone: formData.phone,
                             forceNew: true
+                        })
+                        emailService.sendCallbackEmail({
+                            name: fullName,
+                            email: formData.email,
+                            phone: formData.phone,
+                            step: 'Step 3 — Inventory Modal Request',
+                            pickup: moveDetails.pickupAddress || '',
+                            dropoff: moveDetails.dropoffAddress || '',
+                            moveDate: moveDetails.moveDate || ''
                         })
                         return true
                     } catch (err) {

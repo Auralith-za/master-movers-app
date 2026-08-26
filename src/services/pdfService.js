@@ -221,6 +221,21 @@ export const generateProfessionalQuote = (data) => {
                     const parts = key.split('__room:')
                     key = parts[0]
                     room = parts[1]
+                } else if (key.includes('_room:')) {
+                    const parts = key.split('_room:')
+                    key = parts[0]
+                    room = parts[1]
+                } else if (key.includes(' Room:')) {
+                    const parts = key.split(' Room:')
+                    key = parts[0]
+                    room = parts[1]
+                } else if (key.includes(' room:')) {
+                    const parts = key.split(' room:')
+                    key = parts[0]
+                    room = parts[1]
+                }
+                if (room) {
+                    room = room.replace(/^room:\s*/i, '').trim()
                 }
                 let variation = null
                 if (key.includes('_')) {
@@ -236,11 +251,11 @@ export const generateProfessionalQuote = (data) => {
                 if (!qty || qty <= 0) return
                 const { itemId, variation, room } = parseKey(idKey)
                 const item = inventoryItems.find(i => i.id === itemId)
-                if (!item) return
-                const categoryName = (room || item.category || 'General Furniture').toUpperCase()
+                const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                const categoryName = (room || item?.category || 'General Furniture').toUpperCase()
                 if (!groupedPdfItems[categoryName]) groupedPdfItems[categoryName] = []
                 const varLabel = variation ? ` (${variation})` : ''
-                groupedPdfItems[categoryName].push([`${item.name}${varLabel}`, qty])
+                groupedPdfItems[categoryName].push([`${itemName}${varLabel}`, qty])
             })
 
             const tableRows = []

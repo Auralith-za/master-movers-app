@@ -395,6 +395,21 @@ export const parseInventoryKey = (idKey) => {
         const parts = key.split('__room:')
         key = parts[0]
         room = parts[1] || null
+    } else if (key.includes('_room:')) {
+        const parts = key.split('_room:')
+        key = parts[0]
+        room = parts[1] || null
+    } else if (key.includes(' Room:')) {
+        const parts = key.split(' Room:')
+        key = parts[0]
+        room = parts[1] || null
+    } else if (key.includes(' room:')) {
+        const parts = key.split(' room:')
+        key = parts[0]
+        room = parts[1] || null
+    }
+    if (room) {
+        room = room.replace(/^room:\s*/i, '').trim() || null
     }
     let variation = null
     if (key.includes('_')) {
@@ -762,16 +777,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     const isNationalMove =
         sharedLoadPreference === true ||
-        (!hasOutlineProvince && (
-            (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
-            (isInterProvincial && pickupCityCode !== dropoffCityCode) ||
-            (totalDistance > 250) ||
-            (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
-            (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
-            (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
-            (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg')) ||
-            hasDifferentCityCode
-        ));
+        (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) ||
+        (isInterProvincial) ||
+        (totalDistance > 250) ||
+        (pickupAddress.includes('johannesburg') && dropoffAddress.includes('cape town')) ||
+        (pickupAddress.includes('joburg') && dropoffAddress.includes('cape town')) ||
+        (pickupAddress.includes('durban') && dropoffAddress.includes('johannesburg')) ||
+        (pickupAddress.includes('cape town') && dropoffAddress.includes('johannesburg')) ||
+        hasDifferentCityCode;
 
     let nationalDestinationCityCode = dropoffCityCode;
     if (isNationalMove) {
@@ -843,16 +856,24 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     const needsQuoteRequest = hasOutlineProvince || (!isNationalMove && isDepotOver80)
 
-    const moveProtectionCost = totalVolumeCuFt <= 500 ? 250 : 450
+    const moveProtectionCost = needsQuoteRequest ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
 
     let transportCost = 0
     let volumeCost = 0
     let vehicleName = ''
     let transportRate = 0
     let volumeRate = 0
-    let routeMinCharge = PRICING_CONSTANTS.minOrder || 2600
+    let routeMinCharge = 0
 
-    if (isNationalMove) {
+    if (needsQuoteRequest) {
+        transportCost = 0
+        volumeCost = 0
+        routeMinCharge = 0
+        transportRate = 0
+        volumeRate = 0
+        vehicleName = 'Custom Route (Requires Manual Quote)'
+    } else if (isNationalMove) {
+        routeMinCharge = PRICING_CONSTANTS.minOrder || 5000
         // Jose's National logic: Volume-based calculation (volume * ratePerCuFt)
         const routeKey = `${pickupCityCode}-${nationalDestinationCityCode}`
         const nationalRate = NATIONAL_RATES[routeKey]
@@ -886,6 +907,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         transportRate = 0
         vehicleName = 'Standard National Link'
     } else {
+        routeMinCharge = PRICING_CONSTANTS.minOrder || 2600
         // Local logic: Vehicle selection by volume + ft3 charge
         const cityRates = LOCAL_VEHICLE_RATES[pickupCityCode] || LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
         const vehicleList = Array.isArray(cityRates) ? cityRates : LOCAL_VEHICLE_RATES[CITY_CODES.JHB]
@@ -1062,7 +1084,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
     const VAT_RATE = 0.15
-    const documentationFee = PRICING_CONSTANTS.documentationFee || 175
+    const documentationFee = needsQuoteRequest ? 0 : (PRICING_CONSTANTS.documentationFee || 175)
     const autoPackagingCost = plasticSleeveCost + wrappingCost
 
     // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs)

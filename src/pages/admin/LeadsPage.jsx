@@ -107,9 +107,22 @@ export default function LeadsPage() {
                                     <Mail size={14} className="text-slate-400" />
                                     {lead.client_email}
                                 </div>
-                                <div className="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded">
-                                    Moving from <strong>{lead.pickup_address?.split(',')[0]}</strong> <br />
-                                    to <strong>{lead.dropoff_address?.split(',')[0]}</strong>
+                                <div className="text-xs text-slate-500 mt-2 bg-slate-50 p-2.5 rounded flex justify-between items-center gap-2">
+                                    <div>
+                                        Moving from <strong>{lead.pickup_address?.split(',')[0]}</strong> <br />
+                                        to <strong>{lead.dropoff_address?.split(',')[0]}</strong>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        {Number(lead.total_price || 0) > 0 ? (
+                                            <span className="font-extrabold text-sm text-emerald-600">
+                                                R {Number(lead.total_price).toFixed(2)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded border border-amber-200 block">
+                                                Pending Inventory
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {lead.customer_comments && (
