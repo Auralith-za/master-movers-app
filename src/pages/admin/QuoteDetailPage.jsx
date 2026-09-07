@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { 
     ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, 
-    Building, Package, Download, Save, X, Edit2, AlertCircle, 
+    Building, Package, Download, Save, X, Edit2, AlertCircle, RefreshCw,
     Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -101,42 +101,80 @@ export default function QuoteDetailPage() {
         }
     }, [id])
 
-    // Auto-calculate distance when addresses change OR when trip breakdown is missing
+    const lastCalcInputsRef = useRef('');
+
+    // Helper function to handle distance calculation
+    const performDistanceCalculation = async (pickup, dropoff, silent = true, customExtraColls = null, customExtraDrops = null) => {
+        if (!pickup || !dropoff || pickup.trim().length < 5 || dropoff.trim().length < 5) return;
+
+        setMapsStatus("Calculating distance matrix via Google Maps...");
+        try {
+            const cityCode = detectCityCode(pickup) || detectCityCode(dropoff) || 'JHB';
+            const extraColls = customExtraColls !== null ? customExtraColls : (editForm.extraCollections || editForm.extra_collections || []);
+            const extraDrops = customExtraDrops !== null ? customExtraDrops : (editForm.extraDrops || editForm.extra_drops || []);
+            const { totalDistance, breakdown } = await calculateTripDistances(
+                pickup, 
+                dropoff, 
+                cityCode, 
+                null, 
+                null, 
+                extraColls, 
+                extraDrops
+            );
+            setMapsStatus(`Success: ${totalDistance}km`);
+            const pickupCity = detectCityCode(pickup);
+            const dropoffCity = detectCityCode(dropoff);
+            const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || ((breakdown.pickupToDropoff || 0) > 250);
+            setEditForm(prev => ({ 
+                ...prev, 
+                distance_km: isNational ? (breakdown.pickupToDropoff || 0) : totalDistance,
+                trip_breakdown: breakdown
+            }));
+            return true;
+        } catch (err) {
+            console.error("Admin auto-dist error:", err);
+            setMapsStatus(`Failed: ${err.message}`);
+            if (!silent) {
+                alert("Google Maps could not process these addresses. Please fix the addresses or manually enter the correct Billable Distance (km) below.");
+            }
+            return false;
+        }
+    };
+
+    // Auto-calculate distance with debounce when addresses or extra locations change
+    const extraCollsStr = JSON.stringify(editForm.extraCollections || editForm.extra_collections || []);
+    const extraDropsStr = JSON.stringify(editForm.extraDrops || editForm.extra_drops || []);
+    const quoteExtraCollsStr = JSON.stringify(quote?.items_json?.extraCollections || quote?.extra_collections || []);
+    const quoteExtraDropsStr = JSON.stringify(quote?.items_json?.extraDrops || quote?.extra_drops || []);
+
     useEffect(() => {
         if (editForm.pickup_address && editForm.dropoff_address) {
+            const currentInputs = `${editForm.pickup_address}|${editForm.dropoff_address}|${extraCollsStr}|${extraDropsStr}`;
             const hasValidBreakdown = editForm.trip_breakdown && 
                                       typeof editForm.trip_breakdown === 'object' &&
                                       editForm.trip_breakdown.depotToPickup !== undefined;
 
             const needsCalculation = isEditing 
-                ? (editForm.pickup_address !== quote?.pickup_address || editForm.dropoff_address !== quote?.dropoff_address || !hasValidBreakdown)
+                ? (
+                    editForm.pickup_address !== quote?.pickup_address || 
+                    editForm.dropoff_address !== quote?.dropoff_address || 
+                    extraCollsStr !== quoteExtraCollsStr || 
+                    extraDropsStr !== quoteExtraDropsStr || 
+                    !hasValidBreakdown
+                  )
                 : (!hasValidBreakdown && editForm.pickup_address && editForm.dropoff_address);
 
-            if (needsCalculation) {
-                setMapsStatus("Calculating distance matrix via Google Maps...");
-                const cityCode = detectCityCode(editForm.pickup_address) || detectCityCode(editForm.dropoff_address) || 'JHB';
-                calculateTripDistances(editForm.pickup_address, editForm.dropoff_address, cityCode)
-                    .then(({ totalDistance, breakdown }) => {
-                        setMapsStatus(`Success: ${totalDistance}km (Breakdown: ${JSON.stringify(breakdown)})`);
-                        const pickupCity = detectCityCode(editForm.pickup_address);
-                        const dropoffCity = detectCityCode(editForm.dropoff_address);
-                        const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || ((breakdown.pickupToDropoff || 0) > 250);
-                        setEditForm(prev => ({ 
-                            ...prev, 
-                            distance_km: isNational ? (breakdown.pickupToDropoff || 0) : totalDistance,
-                            trip_breakdown: breakdown
-                        }))
-                    })
-                    .catch(err => {
-                        console.error("Admin auto-dist error:", err);
-                        setMapsStatus(`Failed: ${err.message}`);
-                        if (isEditing) {
-                            alert("Google Maps could not process these addresses. Please fix the addresses or manually enter the correct Billable Distance (km) below.");
-                        }
-                    })
+            if (needsCalculation && currentInputs !== lastCalcInputsRef.current) {
+                const timer = setTimeout(() => {
+                    lastCalcInputsRef.current = currentInputs;
+                    const currentExtraColls = editForm.extraCollections || editForm.extra_collections || [];
+                    const currentExtraDrops = editForm.extraDrops || editForm.extra_drops || [];
+                    performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, true, currentExtraColls, currentExtraDrops);
+                }, 1000);
+                return () => clearTimeout(timer);
             }
         }
-    }, [editForm.pickup_address, editForm.dropoff_address, isEditing, quote?.pickup_address, quote?.dropoff_address, editForm.trip_breakdown])
+    }, [editForm.pickup_address, editForm.dropoff_address, extraCollsStr, extraDropsStr, isEditing, quote?.pickup_address, quote?.dropoff_address, editForm.trip_breakdown]);
 
     const fetchQuote = async () => {
         try {
@@ -154,6 +192,8 @@ export default function QuoteDetailPage() {
             // Fix items_json if it's nested or legacy
             const rawItems = data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {})
             const rawSpecialWrapping = data.items_json?.special_wrapping || {}
+            const extraColls = data.items_json?.extraCollections || data.extra_collections || []
+            const extraDrops = data.items_json?.extraDrops || data.extra_drops || []
             
             // If the quote already has a trip breakdown, ensure distance_km represents the full billable circuit (depot legs included) for local moves
             let initialDistance = Number(data.distance_km || 0);
@@ -178,7 +218,9 @@ export default function QuoteDetailPage() {
                 distance_km: initialDistance,
                 items_json: rawItems,
                 special_wrapping: rawSpecialWrapping,
-                custom_products: data.custom_products || []
+                custom_products: data.custom_products || [],
+                extraCollections: extraColls,
+                extraDrops: extraDrops
             })
         } catch (error) {
             console.error('Error fetching quote:', error)
@@ -255,9 +297,14 @@ export default function QuoteDetailPage() {
         const srcLinen   = editForm.linen_boxes     || 0
         const srcAccess  = editForm.access_details  || {}
 
+        const srcExtraColls = editForm.extraCollections || editForm.extra_collections || []
+        const srcExtraDrops = editForm.extraDrops || editForm.extra_drops || []
+
         const moveDetails = {
             pickupAddress: srcPickup,
             dropoffAddress: srcDropoff,
+            extraCollections: srcExtraColls,
+            extraDrops: srcExtraDrops,
             pickupCity: srcPickup,
             dropoffCity: srcDropoff,
             distanceKm: srcDist,
@@ -286,6 +333,8 @@ export default function QuoteDetailPage() {
         editForm.items_json,
         editForm.pickup_address,
         editForm.dropoff_address,
+        extraCollsStr,
+        extraDropsStr,
         editForm.distance_km,
         editForm.trip_breakdown,
         editForm.move_date,
@@ -349,20 +398,12 @@ export default function QuoteDetailPage() {
         const cubes = parseFloat(customProductForm.cubes) || 0
         const price = parseFloat(customProductForm.price) || 0
         if (!name) return
-        if (recalculatedData?.isMinQuote && price < 0) {
-            alert('Minimum Quotes Policy: Discounts cannot be applied to minimum-rate quotes.')
-            return
-        }
         const newProduct = { id: Date.now(), name, cubes, price }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
         setCustomProductForm({ name: '', cubes: '', price: '' })
     }
 
     const handleApplyCoupon = (coupon) => {
-        if (recalculatedData?.isMinQuote) {
-            alert('Minimum Quotes Policy: Discounts cannot be applied to minimum-rate quotes.')
-            return
-        }
         const basePrice = recalculatedData?.total || editForm.total_price || 0
         const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
         
@@ -453,6 +494,8 @@ export default function QuoteDetailPage() {
                 client_email: editForm.client_email,
                 pickup_address: editForm.pickup_address,
                 dropoff_address: editForm.dropoff_address,
+                extra_collections: editForm.extraCollections || editForm.extra_collections || [],
+                extra_drops: editForm.extraDrops || editForm.extra_drops || [],
                 distance_km: Number(editForm.distance_km || 0),
                 trip_breakdown: editForm.trip_breakdown || null,
                 move_date: editForm.move_date,
@@ -461,7 +504,9 @@ export default function QuoteDetailPage() {
                 team_notes: editForm.team_notes,
                 items_json: {
                     items: editForm.items_json,
-                    special_wrapping: editForm.special_wrapping || {}
+                    special_wrapping: editForm.special_wrapping || {},
+                    extraCollections: editForm.extraCollections || editForm.extra_collections || [],
+                    extraDrops: editForm.extraDrops || editForm.extra_drops || []
                 },
                 total_price: finalPrice,
                 total_volume: finalVolume,
@@ -501,9 +546,13 @@ export default function QuoteDetailPage() {
             } else {
                 setQuote({ 
                     ...editForm, 
+                    extra_collections: editForm.extraCollections || editForm.extra_collections || [],
+                    extra_drops: editForm.extraDrops || editForm.extra_drops || [],
                     items_json: {
                         items: editForm.items_json,
-                        special_wrapping: editForm.special_wrapping || {}
+                        special_wrapping: editForm.special_wrapping || {},
+                        extraCollections: editForm.extraCollections || editForm.extra_collections || [],
+                        extraDrops: editForm.extraDrops || editForm.extra_drops || []
                     },
                     total_price: finalPrice, 
                     total_volume: finalVolume 
@@ -550,7 +599,10 @@ export default function QuoteDetailPage() {
                 vat: finalVat,
                 subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
+                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
+                extraCollections: extraCollections || quote.items_json?.extraCollections || [],
+                extraDrops: extraDrops || quote.items_json?.extraDrops || [],
+                accessDetails: accessDetails || quote.access_details || {}
             })
             
             if (result.success) {
@@ -595,7 +647,10 @@ export default function QuoteDetailPage() {
                 vat: finalVat,
                 subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null
+                breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
+                extraCollections: extraCollections || quote.items_json?.extraCollections || [],
+                extraDrops: extraDrops || quote.items_json?.extraDrops || [],
+                accessDetails: accessDetails || quote.access_details || {}
             });
 
             if (result.success) {
@@ -1250,16 +1305,29 @@ export default function QuoteDetailPage() {
 
                     {/* SECTION 2: ADDRESSES & TRIP */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">2</div>
-                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                <MapPin size={20} className="text-primary-600" /> Route & Logistics
-                            </h3>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">2</div>
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <MapPin size={20} className="text-primary-600" /> Route & Logistics
+                                </h3>
+                            </div>
+                            {isEditing && (
+                                <button
+                                    type="button"
+                                    onClick={() => performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, false)}
+                                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
+                                    title="Recalculate distance via Google Maps"
+                                >
+                                    <RefreshCw size={12} /> Recalculate Route
+                                </button>
+                            )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Pickup Group */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pickup Address</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Primary Pickup Address</label>
                                     {isEditing ? (
                                         <AddressAutocomplete 
                                             placeholder="Start typing pickup address..."
@@ -1270,6 +1338,68 @@ export default function QuoteDetailPage() {
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.pickup_address}</p>
                                     )}
                                 </div>
+
+                                {/* Extra Collections / 2nd Location */}
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold text-red-600 uppercase tracking-widest">Additional Collection / 2nd Location</label>
+                                        {isEditing && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const list = editForm.extraCollections || editForm.extra_collections || [];
+                                                    const newList = [...list, { id: 'coll_' + Date.now(), address: '' }];
+                                                    setEditForm({ ...editForm, extraCollections: newList });
+                                                }}
+                                                className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                                            >
+                                                <Plus size={14} /> Add 2nd Collection
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {(editForm.extraCollections || editForm.extra_collections || []).map((coll, idx) => (
+                                        <div key={coll.id || idx} className="p-3 bg-red-50/50 border border-red-100 rounded-xl space-y-2 relative">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-red-700 uppercase tracking-widest">Collection #{idx + 2}</span>
+                                                {isEditing && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const list = [...(editForm.extraCollections || editForm.extra_collections || [])];
+                                                            list.splice(idx, 1);
+                                                            setEditForm({ ...editForm, extraCollections: list });
+                                                        }}
+                                                        className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {isEditing ? (
+                                                <AddressAutocomplete
+                                                    placeholder="Enter 2nd collection address..."
+                                                    value={coll.address || ''}
+                                                    onChange={e => {
+                                                        const { value, placeId, latLng, addressComponents } = e.target;
+                                                        const list = [...(editForm.extraCollections || editForm.extra_collections || [])];
+                                                        list[idx] = { 
+                                                            ...list[idx], 
+                                                            address: value,
+                                                            placeId: placeId || list[idx]?.placeId || null,
+                                                            latLng: latLng || list[idx]?.latLng || null,
+                                                            addressComponents: addressComponents || list[idx]?.addressComponents || null
+                                                        };
+                                                        setEditForm({ ...editForm, extraCollections: list });
+                                                    }}
+                                                />
+                                            ) : (
+                                                <p className="text-xs font-medium text-slate-800">{coll.address}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
                                     <Calendar size={14} className="text-slate-400" />
                                     {isEditing ? (
@@ -1287,9 +1417,11 @@ export default function QuoteDetailPage() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Dropoff Group */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Dropoff Address</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Primary Dropoff Address</label>
                                     {isEditing ? (
                                         <AddressAutocomplete 
                                             placeholder="Start typing dropoff address..."
@@ -1300,23 +1432,96 @@ export default function QuoteDetailPage() {
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.dropoff_address}</p>
                                     )}
                                 </div>
+
+                                {/* Extra Drops / 2nd Location */}
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">Additional Drop-off / 2nd Location</label>
+                                        {isEditing && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const list = editForm.extraDrops || editForm.extra_drops || [];
+                                                    const newList = [...list, { id: 'drop_' + Date.now(), address: '' }];
+                                                    setEditForm({ ...editForm, extraDrops: newList });
+                                                }}
+                                                className="text-xs text-slate-700 hover:text-slate-900 font-bold flex items-center gap-1 cursor-pointer"
+                                            >
+                                                <Plus size={14} /> Add 2nd Drop-off
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {(editForm.extraDrops || editForm.extra_drops || []).map((drop, idx) => (
+                                        <div key={drop.id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 relative">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Drop-off #{idx + 2}</span>
+                                                {isEditing && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const list = [...(editForm.extraDrops || editForm.extra_drops || [])];
+                                                            list.splice(idx, 1);
+                                                            setEditForm({ ...editForm, extraDrops: list });
+                                                        }}
+                                                        className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {isEditing ? (
+                                                <AddressAutocomplete
+                                                    placeholder="Enter 2nd dropoff address..."
+                                                    value={drop.address || ''}
+                                                    onChange={e => {
+                                                        const { value, placeId, latLng, addressComponents } = e.target;
+                                                        const list = [...(editForm.extraDrops || editForm.extra_drops || [])];
+                                                        list[idx] = { 
+                                                            ...list[idx], 
+                                                            address: value,
+                                                            placeId: placeId || list[idx]?.placeId || null,
+                                                            latLng: latLng || list[idx]?.latLng || null,
+                                                            addressComponents: addressComponents || list[idx]?.addressComponents || null
+                                                        };
+                                                        setEditForm({ ...editForm, extraDrops: list });
+                                                    }}
+                                                />
+                                            ) : (
+                                                <p className="text-xs font-medium text-slate-800">{drop.address}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
                                 <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
                                     <Truck size={14} className="text-slate-400" />
                                     <div>
                                         <label className="text-[9px] uppercase font-bold text-slate-400">Billable Distance</label>
-                                        <div className="flex items-center gap-1">
-                                            <input 
-                                                type="number"
-                                                className="w-16 font-bold text-slate-800 text-sm border-none bg-transparent p-0 outline-none"
-                                                value={Number(isEditing ? editForm.distance_km : (quote?.distance_km || 0)).toFixed(1)}
-                                                onChange={e => setEditForm({...editForm, distance_km: parseFloat(e.target.value) || 0})}
-                                            />
-                                            <span className="text-sm text-slate-400">km</span>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            {isEditing ? (
+                                                <input 
+                                                    type="number"
+                                                    step="any"
+                                                    className="w-24 font-bold text-slate-800 text-sm border border-gray-300 rounded px-2 py-1 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 bg-white"
+                                                    value={editForm.distance_km ?? ''}
+                                                    onChange={e => setEditForm({...editForm, distance_km: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0)})}
+                                                />
+                                            ) : (
+                                                <span className="font-bold text-slate-800 text-sm">{Number(quote?.distance_km || 0).toFixed(1)}</span>
+                                            )}
+                                            <span className="text-sm text-slate-400 font-medium">km</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        {isEditing && mapsStatus && mapsStatus.startsWith('Failed') && (
+                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+                                <AlertCircle size={15} className="text-amber-600 shrink-0" />
+                                <span>Google Maps couldn't resolve the route for these custom addresses automatically. You can manually enter the correct <strong>Billable Distance (km)</strong> above or click <strong>Recalculate Route</strong>.</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* SECTION 3: SITE ACCESS DETAILS */}

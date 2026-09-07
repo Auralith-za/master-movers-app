@@ -100,29 +100,71 @@ const ROAD_FACTOR = 1.40;
  * 
  * Route: Depot → Pickup → Dropoff → Depot
  */
-function calculateFromCoords(pickupCoords, dropoffCoords, cityCode = 'JHB') {
+function calculateFromCoords(pickupCoords, dropoffCoords, cityCode = 'JHB', extraCollections = [], extraDrops = []) {
     const depotCoords = DEPOT_COORDS[cityCode] || DEPOT_COORDS.JHB;
 
-    const depotToPickupStraight = haversineKm(
-        depotCoords.lat, depotCoords.lng,
-        pickupCoords.lat, pickupCoords.lng
-    );
-    const pickupToDropoffStraight = haversineKm(
-        pickupCoords.lat, pickupCoords.lng,
-        dropoffCoords.lat, dropoffCoords.lng
-    );
-    const dropoffToDepotStraight = haversineKm(
-        dropoffCoords.lat, dropoffCoords.lng,
-        depotCoords.lat, depotCoords.lng
-    );
+    const detailedLegs = [];
+    let prevCoords = depotCoords;
+    let prevLabel = 'Depot';
+
+    // Leg 1: Depot -> Pickup
+    const d1 = haversineKm(prevCoords.lat, prevCoords.lng, pickupCoords.lat, pickupCoords.lng);
+    const km1 = Math.round(d1 * ROAD_FACTOR);
+    detailedLegs.push({ from: prevLabel, to: 'Pickup', label: `${prevLabel} → Pickup`, km: km1 });
+    prevCoords = pickupCoords;
+    prevLabel = 'Pickup';
+
+    // Extra Collections
+    if (Array.isArray(extraCollections)) {
+        extraCollections.forEach((coll, idx) => {
+            const coords = coll?.latLng;
+            if (!coords?.lat || !coords?.lng) return;
+            const d = haversineKm(prevCoords.lat, prevCoords.lng, coords.lat, coords.lng);
+            const km = Math.round(d * ROAD_FACTOR);
+            const label = `Collection #${idx + 2}`;
+            detailedLegs.push({ from: prevLabel, to: label, label: `${prevLabel} → ${label}`, km });
+            prevCoords = coords;
+            prevLabel = label;
+        });
+    }
+
+    // Primary Dropoff
+    const dDrop = haversineKm(prevCoords.lat, prevCoords.lng, dropoffCoords.lat, dropoffCoords.lng);
+    const kmDrop = Math.round(dDrop * ROAD_FACTOR);
+    detailedLegs.push({ from: prevLabel, to: 'Dropoff', label: `${prevLabel} → Dropoff`, km: kmDrop });
+    prevCoords = dropoffCoords;
+    prevLabel = 'Dropoff';
+
+    // Extra Drops
+    if (Array.isArray(extraDrops)) {
+        extraDrops.forEach((drop, idx) => {
+            const coords = drop?.latLng;
+            if (!coords?.lat || !coords?.lng) return;
+            const d = haversineKm(prevCoords.lat, prevCoords.lng, coords.lat, coords.lng);
+            const km = Math.round(d * ROAD_FACTOR);
+            const label = `Drop-off #${idx + 2}`;
+            detailedLegs.push({ from: prevLabel, to: label, label: `${prevLabel} → ${label}`, km });
+            prevCoords = coords;
+            prevLabel = label;
+        });
+    }
+
+    // Final Leg: Last Drop -> Depot
+    const dDepot = haversineKm(prevCoords.lat, prevCoords.lng, depotCoords.lat, depotCoords.lng);
+    const kmDepot = Math.round(dDepot * ROAD_FACTOR);
+    detailedLegs.push({ from: prevLabel, to: 'Depot', label: `${prevLabel} → Depot`, km: kmDepot });
+
+    const depotToPickup = detailedLegs[0]?.km || 0;
+    const dropoffToDepot = detailedLegs[detailedLegs.length - 1]?.km || 0;
+    const pickupToDropoff = detailedLegs.slice(1, -1).reduce((sum, leg) => sum + leg.km, 0);
+    const totalDistance = detailedLegs.reduce((sum, leg) => sum + leg.km, 0);
 
     const breakdown = {
-        depotToPickup: Math.round(depotToPickupStraight * ROAD_FACTOR),
-        pickupToDropoff: Math.round(pickupToDropoffStraight * ROAD_FACTOR),
-        dropoffToDepot: Math.round(dropoffToDepotStraight * ROAD_FACTOR),
+        depotToPickup,
+        pickupToDropoff,
+        dropoffToDepot,
+        detailedLegs
     };
-
-    const totalDistance = breakdown.depotToPickup + breakdown.pickupToDropoff + breakdown.dropoffToDepot;
 
     return {
         totalDistance,
@@ -192,8 +234,9 @@ const calculateFromDistanceMatrix = async (
         // Extra Collections
         if (Array.isArray(extraCollections)) {
             extraCollections.forEach((coll, idx) => {
-                if (!coll?.address) return;
-                const collRef = buildRef(coll, coll.address);
+                const addr = typeof coll === 'string' ? coll : coll?.address;
+                if (!addr || !addr.trim()) return;
+                const collRef = buildRef(coll, addr);
                 origins.push(prevRef);
                 destinations.push(collRef);
                 const label = `Collection #${idx + 2}`;
@@ -214,8 +257,9 @@ const calculateFromDistanceMatrix = async (
         // Extra Drops
         if (Array.isArray(extraDrops)) {
             extraDrops.forEach((drop, idx) => {
-                if (!drop?.address) return;
-                const dropRef = buildRef(drop, drop.address);
+                const addr = typeof drop === 'string' ? drop : drop?.address;
+                if (!addr || !addr.trim()) return;
+                const dropRef = buildRef(drop, addr);
                 origins.push(prevRef);
                 destinations.push(dropRef);
                 const label = `Drop-off #${idx + 2}`;
@@ -330,7 +374,7 @@ export const calculateTripDistances = async (
 
         if (pickupCoords && dropoffCoords) {
             console.log("[Distance] Using Haversine fallback (straight-line × 1.40).");
-            return calculateFromCoords(pickupCoords, dropoffCoords, cityCode);
+            return calculateFromCoords(pickupCoords, dropoffCoords, cityCode, extraCollections, extraDrops);
         }
 
         // No coordinates available at all — re-throw the original API error

@@ -31,7 +31,7 @@ export const generateProfessionalQuote = (data) => {
             linenBoxes = 0
         } = data;
 
-        const doc = new jsPDF();
+        const doc = new jsPDF({ compress: true });
         const slate900 = [15, 23, 42]; // Premium Slate
         const slate500 = [100, 116, 139]; // Muted Slate
         const borderCol = [226, 232, 240]; // Light gray border
@@ -489,7 +489,7 @@ export const generateProfessionalQuote = (data) => {
             const ratio = img.width / img.height || 1;
             const targetHeight = 12;
             const targetWidth = targetHeight * ratio;
-            doc.addImage(img, 'PNG', 20, 12, targetWidth, targetHeight);
+            doc.addImage(img, 'PNG', 20, 12, targetWidth, targetHeight, undefined, 'FAST');
 
             // Draw header text on top right
             doc.setTextColor(...slate900);

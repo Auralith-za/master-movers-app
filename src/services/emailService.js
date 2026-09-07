@@ -54,6 +54,8 @@ export const emailService = {
                 move_date: moveDate,
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
+                extra_collections: extraCollections || moveDetails?.extraCollections || [],
+                extra_drops: extraDrops || moveDetails?.extraDrops || [],
                 total_price: total,
                 payment_method: paymentMethod,
                 referral_source: moveDetails?.referralSource || '',
@@ -129,7 +131,7 @@ export const emailService = {
      * Admin-only booking confirmed alert — no PDF, fires instantly after payment
      * Separate from the customer email so admins always get notified
      */
-    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'card/eft' }) => {
+    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'card/eft' }) => {
         try {
             console.log(`Generating in-memory PDF for booking confirmed alert...`)
 
@@ -147,6 +149,9 @@ export const emailService = {
                 vat,
                 subTotal,
                 inventoryItems,
+                extraCollections,
+                extraDrops,
+                accessDetails,
                 isSharedLoad: breakdown?.isSharedLoad || false,
                 shouldSave: false
             })
@@ -162,6 +167,8 @@ export const emailService = {
                 move_date: moveDate,
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
+                extra_collections: extraCollections,
+                extra_drops: extraDrops,
                 total_price: total,
                 payment_method: paymentMethod,
                 referral_source: referralSource || referral_source || '',
@@ -192,7 +199,7 @@ export const emailService = {
      * Send instant admin-only alert when a customer reaches Step 4 (pending quote)
      * No PDF needed — fires immediately so sales team can follow up
      */
-    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'not selected' }) => {
+    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'not selected' }) => {
         try {
             console.log(`Generating in-memory PDF for pending quote alert...`)
 
@@ -210,6 +217,9 @@ export const emailService = {
                 vat,
                 subTotal,
                 inventoryItems,
+                extraCollections,
+                extraDrops,
+                accessDetails,
                 isSharedLoad: breakdown?.isSharedLoad || false,
                 shouldSave: false
             })
@@ -225,6 +235,8 @@ export const emailService = {
                 move_date: moveDate,
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
+                extra_collections: extraCollections,
+                extra_drops: extraDrops,
                 total_price: total,
                 move_type: moveType,
                 payment_method: paymentMethod,

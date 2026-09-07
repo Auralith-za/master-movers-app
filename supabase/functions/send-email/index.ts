@@ -342,6 +342,8 @@ function buildStandardDetailsTable({
     email,
     pickup,
     dropoff,
+    extraCollections,
+    extraDrops,
     moveDate,
     moveType,
     referralSource,
@@ -358,6 +360,8 @@ function buildStandardDetailsTable({
     email?: string,
     pickup?: string,
     dropoff?: string,
+    extraCollections?: any[],
+    extraDrops?: any[],
     moveDate?: string,
     moveType?: string,
     referralSource?: string,
@@ -383,6 +387,24 @@ function buildStandardDetailsTable({
 
     const totalDisplay = numTotal > 0 ? `R ${numTotal.toFixed(2)} (Incl. VAT)` : '—'
 
+    let extraCollsRows = ''
+    if (Array.isArray(extraCollections)) {
+        extraCollections.forEach((c: any, idx: number) => {
+            if (c && c.address) {
+                extraCollsRows += `<tr><td class="label">Collection #${idx + 2}:</td><td class="value">${c.address}</td></tr>`
+            }
+        })
+    }
+
+    let extraDropsRows = ''
+    if (Array.isArray(extraDrops)) {
+        extraDrops.forEach((d: any, idx: number) => {
+            if (d && d.address) {
+                extraDropsRows += `<tr><td class="label">Drop-off #${idx + 2}:</td><td class="value">${d.address}</td></tr>`
+            }
+        })
+    }
+
     return `
     <table class="details-table">
         <tr><td class="label">Quote / Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">${cleanRef}</td></tr>
@@ -390,7 +412,9 @@ function buildStandardDetailsTable({
         <tr><td class="label">Phone Number:</td><td class="value">${phoneDisplay}</td></tr>
         <tr><td class="label">Email Address:</td><td class="value">${emailDisplay}</td></tr>
         <tr><td class="label">Collection From:</td><td class="value">${pickup || '—'}</td></tr>
+        ${extraCollsRows}
         <tr><td class="label">Delivery To:</td><td class="value">${dropoff || '—'}</td></tr>
+        ${extraDropsRows}
         <tr><td class="label">Preferred Move Date:</td><td class="value"><strong>${moveDate || '—'}</strong></td></tr>
         <tr><td class="label">Move Type / Route:</td><td class="value">${moveType || '—'}</td></tr>
         <tr><td class="label">Heard About Us:</td><td class="value"><strong>${referralSource || '—'}</strong></td></tr>

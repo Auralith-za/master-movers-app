@@ -230,13 +230,20 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         const postalMatch = name.match(/\b(\d{4})\s*(?:,\s*south\s+africa)?\s*$/);
         if (postalMatch) {
             const code = parseInt(postalMatch[1], 10);
-            if (code >= 7000 && code <= 8299) {
+            if (code >= 6500 && code <= 8299) {
+                // Check if specific to Garden Route towns
+                if (name.includes('george') || name.includes('knysna') || name.includes('mossel bay') || name.includes('mosselbay') || name.includes('plettenberg') || name.includes('plett') || name.includes('sedgefield') || name.includes('wilderness')) {
+                    return CITY_CODES.GR;
+                }
                 return CITY_CODES.CPT;
+            }
+            if (code >= 5000 && code <= 6499) {
+                return CITY_CODES.GR;
             }
             if (code >= 2900 && code <= 4799) {
                 return CITY_CODES.DBN;
             }
-            if (code >= 1 && code <= 2899) {
+            if ((code >= 1 && code <= 2899) || (code >= 8300 && code <= 9999)) {
                 return CITY_CODES.JHB;
             }
         }
@@ -244,13 +251,16 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         // Check Cape Town / Western Cape
         if (
             name.includes('cape town') || name.includes('capetown') || name.includes('western cape') || name.includes('cpt') ||
+            name.includes('worcester') || name.includes('paarl') || name.includes('wellington') || name.includes('hermanus') ||
+            name.includes('robertson') || name.includes('ceres') || name.includes('malmesbury') || name.includes('langebaan') ||
+            name.includes('saldanha') || name.includes('bredasdorp') || name.includes('swellendam') || name.includes('beaufort west') ||
+            name.includes('overberg') || name.includes('winelands') || name.includes('breede river') || name.includes('franschhoek') ||
             name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') ||
-            name.includes('paarl') || name.includes('milnerton') || name.includes('tableview') ||
-            name.includes('blouberg') || name.includes('durbanville') || name.includes('brackenfell') ||
-            name.includes('parow') || name.includes('goodwood') || name.includes('constantia') ||
-            name.includes('houte bay') || name.includes('hout bay') || name.includes('sea point') ||
-            name.includes('green point') || name.includes('wynberg') || name.includes('claremont') ||
-            name.includes('rondebosch')
+            name.includes('milnerton') || name.includes('tableview') || name.includes('blouberg') ||
+            name.includes('durbanville') || name.includes('brackenfell') || name.includes('parow') ||
+            name.includes('goodwood') || name.includes('constantia') || name.includes('houte bay') ||
+            name.includes('hout bay') || name.includes('sea point') || name.includes('green point') ||
+            name.includes('wynberg') || name.includes('claremont') || name.includes('rondebosch')
         ) {
             return CITY_CODES.CPT;
         }
@@ -262,12 +272,13 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') ||
             name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') ||
             name.includes('kloof') || name.includes('pietermaritzburg') || name.includes('westville') ||
-            name.includes('kwamashu') || name.includes('emgidweni')
+            name.includes('kwamashu') || name.includes('emgidweni') || name.includes('richards bay') ||
+            name.includes('empangeni') || name.includes('margate') || name.includes('port shepstone')
         ) {
             return CITY_CODES.DBN;
         }
 
-        // Check Johannesburg / Gauteng
+        // Check Johannesburg / Gauteng / Inland
         if (
             name.includes('johannesburg') || name.includes('joburg') || name.includes('gauteng') || name.includes('jhb') ||
             name.includes('sandton') || name.includes('midrand') || name.includes('pretoria') ||
@@ -276,7 +287,10 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('morningside') || name.includes('melrose') || name.includes('rosebank') ||
             name.includes('germiston') || name.includes('edenvale') || name.includes('kempton park') ||
             name.includes('alberton') || name.includes('boksburg') || name.includes('benoni') ||
-            name.includes('krugersdorp') || name.includes('heidelberg') && !name.includes('western cape')
+            name.includes('krugersdorp') || name.includes('bloemfontein') || name.includes('polokwane') ||
+            name.includes('nelspruit') || name.includes('mbombela') || name.includes('potchefstroom') ||
+            name.includes('klerksdorp') || name.includes('rustenburg') || name.includes('kimberley') ||
+            (name.includes('heidelberg') && !name.includes('western cape'))
         ) {
             return CITY_CODES.JHB;
         }

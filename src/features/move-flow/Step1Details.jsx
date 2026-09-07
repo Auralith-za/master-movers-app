@@ -134,7 +134,6 @@ export default function Step1Details() {
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
     const [showOutlineModal, setShowOutlineModal] = React.useState(false)
-    const [showMultipleStopsWarning, setShowMultipleStopsWarning] = React.useState(false)
     const [addressError, setAddressError] = React.useState(null)
     const [isValidating, setIsValidating] = React.useState(false)
     const [pickupHelpSent, setPickupHelpSent] = React.useState(false)
@@ -210,8 +209,8 @@ export default function Step1Details() {
     };
 
     const handleOutlineCallbackSubmit = async () => {
-        if (!moveDetails.contactName || !moveDetails.contactEmail || !moveDetails.contactPhone) {
-            alert("Please enter your Name, Email, and Phone Number at the top of the form first so we know who to contact.");
+        if (!moveDetails.contactName || !moveDetails.surname || !moveDetails.contactEmail || !moveDetails.contactPhone) {
+            alert("Please enter your First Name, Surname, Email, and Phone Number at the top of the form first so we know who to contact.");
             const nameInput = document.getElementsByName('contactName')[0] || document.querySelector('input[name="contactName"]');
             if (nameInput) {
                 nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -246,52 +245,6 @@ export default function Step1Details() {
             setIsSubmittingLead(false)
         }
     };
-
-    const handleMultipleLocationsCallback = async () => {
-        if (!moveDetails.contactName || !moveDetails.contactEmail || !moveDetails.contactPhone) {
-            alert("Please enter your Name, Email, and Phone Number at the top of the form first so we know who to contact.");
-            const nameInput = document.getElementsByName('contactName')[0] || document.querySelector('input[name="contactName"]');
-            if (nameInput) {
-                nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                nameInput.focus();
-            }
-            return;
-        }
-
-        setIsSubmittingLead(true)
-        try {
-            await submitQuote({ 
-                status: 'lead', 
-                request_call_back: true,
-                customer_comments: '[MULTIPLE STOPS] User requested callback for a move with multiple collections & drops.',
-                forceNew: true
-            })
-            // 🔴 Google Ads: Lead conversion
-            trackCallbackRequest({ step: 'Step 1 — Multiple Stops' })
-            await emailService.sendCallbackEmail({
-                name: moveDetails.contactName,
-                email: moveDetails.contactEmail,
-                phone: moveDetails.contactPhone,
-                step: 'Step 1 — Multiple Collection Quote',
-                pickup: moveDetails.pickupAddress || '',
-                dropoff: moveDetails.dropoffAddress || '',
-                moveDate: moveDetails.moveDate || ''
-            })
-            alert("Request Sent! One of our consultants will contact you shortly to coordinate your Multiple Collection Quote. 📞")
-        } catch (err) {
-            console.error("Multi-stop lead error:", err)
-            alert("Request Sent! (Note: Offline mode) We will contact you shortly.")
-        }
-    };
-
-    React.useEffect(() => {
-        if (moveDetails.locationMode === 'multiple') {
-            setMoveDetails({ locationMode: 'single', extraCollections: [], extraDrops: [] })
-            setShowMultipleStopsWarning(true)
-        }
-    }, [moveDetails.locationMode, setMoveDetails]);
-
-
 
     const pickupIsOutline = isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
     const dropoffIsOutline = isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
@@ -587,7 +540,7 @@ export default function Step1Details() {
         // Clear any previous error before re-evaluating form validity
         setAddressError(null)
 
-        // 1. Validate Contact Name
+        // 1. Validate First Name
         const hasFirstName = !!(moveDetails.contactName && moveDetails.contactName.trim().length > 0)
 
         if (!hasFirstName) {
@@ -600,7 +553,20 @@ export default function Step1Details() {
             return
         }
 
-        // 2. Validate Contact Phone
+        // 2. Validate Surname
+        const hasSurname = !!(moveDetails.surname && moveDetails.surname.trim().length > 0)
+
+        if (!hasSurname) {
+            setAddressError("Please enter your Surname at the top of the form before proceeding.")
+            const surnameEl = document.querySelector('input[name="surname"]')
+            if (surnameEl) {
+                surnameEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                surnameEl.focus()
+            }
+            return
+        }
+
+        // 3. Validate Contact Phone
         if (!moveDetails.contactPhone || moveDetails.contactPhone.trim().length === 0) {
             setAddressError("Please enter your Phone Number at the top of the form before proceeding.")
             const phoneEl = document.querySelector('input[name="contactPhone"]')
@@ -611,7 +577,7 @@ export default function Step1Details() {
             return
         }
 
-        // 3. Validate Contact Email
+        // 4. Validate Contact Email
         const emailValid = moveDetails.contactEmail && moveDetails.contactEmail.includes('@') && moveDetails.contactEmail.includes('.')
         if (!emailValid) {
             setAddressError("Please enter a valid Email Address at the top of the form before proceeding.")
@@ -803,39 +769,39 @@ export default function Step1Details() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <Input
-                                label="First Name"
+                                label={<span>First Name <span className="text-red-600">*</span></span>}
                                 name="contactName"
                                 placeholder="John"
                                 className="text-lg py-6"
-                                value={moveDetails.contactName}
+                                value={moveDetails.contactName || ''}
                                 onChange={handleChange}
                                 required
                             />
                             <Input
-                                label="Surname"
+                                label={<span>Surname <span className="text-red-600">*</span></span>}
                                 name="surname"
                                 placeholder="Doe"
                                 className="text-lg py-6"
-                                value={moveDetails.surname}
+                                value={moveDetails.surname || ''}
                                 onChange={handleChange}
                                 required
                             />
                             <Input
-                                label="Phone Number"
+                                label={<span>Phone Number <span className="text-red-600">*</span></span>}
                                 name="contactPhone"
                                 placeholder="+27 82 123 4567"
                                 className="text-lg py-6"
-                                value={moveDetails.contactPhone}
+                                value={moveDetails.contactPhone || ''}
                                 onChange={handleChange}
                                 required
                             />
                             <Input
-                                label="Email Address"
+                                label={<span>Email Address <span className="text-red-600">*</span></span>}
                                 name="contactEmail"
                                 type="email"
                                 placeholder="john@example.com"
                                 className="text-lg py-6"
-                                value={moveDetails.contactEmail}
+                                value={moveDetails.contactEmail || ''}
                                 onChange={handleChange}
                                 required
                             />
@@ -888,10 +854,9 @@ export default function Step1Details() {
                                     type="button"
                                     onClick={() => {
                                         setMoveDetails({ locationMode: 'single' })
-                                        setShowMultipleStopsWarning(false)
                                     }}
                                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                        (moveDetails.locationMode || 'single') === 'single' && !showMultipleStopsWarning
+                                        (moveDetails.locationMode || 'single') === 'single'
                                             ? 'bg-white text-slate-900 shadow-sm'
                                             : 'text-slate-500 hover:text-slate-900'
                                     }`}
@@ -901,35 +866,22 @@ export default function Step1Details() {
                                  <button
                                      type="button"
                                      onClick={() => {
-                                         setShowMultipleStopsWarning(true)
-                                         setMoveDetails({ locationMode: 'single', extraCollections: [], extraDrops: [] })
+                                         const currentColls = moveDetails.extraCollections || []
+                                         setMoveDetails({ 
+                                             locationMode: 'multiple',
+                                             extraCollections: currentColls.length > 0 ? currentColls : [{ id: 'coll_' + Date.now(), address: '', unitComplex: '' }]
+                                         })
                                      }}
                                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                                         showMultipleStopsWarning
+                                         moveDetails.locationMode === 'multiple'
                                              ? 'bg-red-600 text-white shadow-md'
                                              : 'text-slate-500 hover:text-slate-900'
                                      }`}
                                  >
-                                     <Sparkles size={13} /> Multiple Collections & Drops
+                                     <Sparkles size={13} /> 2nd Location / Extra Stops
                                  </button>
                             </div>
                         </div>
-
-                        {showMultipleStopsWarning && (
-                            <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold animate-in fade-in space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <span>⚠️ Multiple Collections & Drops: Additional stops require manual routing and coordination. We will request a callback to quote you manually.</span>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleMultipleLocationsCallback}
-                                    disabled={isSubmittingLead}
-                                    className="w-full md:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md shadow-red-600/15 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                >
-                                    {isSubmittingLead ? <Loader2 className="animate-spin" size={12} /> : <Phone size={12} />} Request a Call Back
-                                </button>
-                            </div>
-                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Pickup Group */}
@@ -1015,7 +967,7 @@ export default function Step1Details() {
                                 />
 
                                 {/* Multiple Collections Section */}
-                                {(moveDetails.locationMode === 'multiple' && !showMultipleStopsWarning) && (
+                                {(moveDetails.locationMode === 'multiple') && (
                                     <div className="space-y-4 pt-4 border-t border-slate-100">
                                         <h4 className="text-xs font-black text-red-600 uppercase tracking-wider">Additional Collection Addresses</h4>
                                         {(moveDetails.extraCollections || []).map((coll, idx) => (
@@ -1260,7 +1212,7 @@ export default function Step1Details() {
                                 )}
 
                                 {/* Multiple Drop-offs Section */}
-                                {(moveDetails.locationMode === 'multiple' && !showMultipleStopsWarning) && (
+                                {(moveDetails.locationMode === 'multiple') && (
                                     <div className="space-y-4 pt-4 border-t border-slate-100">
                                         <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Additional Drop-off Addresses</h4>
                                         {(moveDetails.extraDrops || []).map((drop, idx) => (
@@ -1471,14 +1423,14 @@ export default function Step1Details() {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
                     <Button 
-                        type={isOutline || showMultipleStopsWarning ? "button" : "submit"}
-                        onClick={isOutline || showMultipleStopsWarning ? (isOutline ? handleOutlineCallbackSubmit : handleMultipleLocationsCallback) : undefined}
+                        type={isOutline ? "button" : "submit"}
+                        onClick={isOutline ? handleOutlineCallbackSubmit : undefined}
                         size="lg" 
-                        disabled={(!!addressError && !isOutline && !showMultipleStopsWarning) || isValidating || isSubmittingLead}
+                        disabled={(!!addressError && !isOutline) || isValidating || isSubmittingLead}
                         className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isValidating ? 'Verifying...' : (isOutline || showMultipleStopsWarning) ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
-                        {(isOutline || showMultipleStopsWarning) ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
+                        {isValidating ? 'Verifying...' : isOutline ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
+                        {isOutline ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
                     </Button>
                 </div>
 

@@ -218,12 +218,18 @@ export default function QuoteReviewPage() {
                                     {quoteVolume.toFixed(2)} ft³ Cubes
                                 </span>
                             </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pickup Address</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Pickup Address</label>
                                         <p className="text-slate-900 font-bold leading-snug mt-1">{quote.pickup_address}</p>
                                     </div>
+                                    {(quote.items_json?.extraCollections || quote.extra_collections || []).map((coll, idx) => (
+                                        <div key={idx} className="p-3 bg-red-50/50 border border-red-100 rounded-xl space-y-1">
+                                            <label className="text-[9px] font-black text-red-600 uppercase tracking-widest block">Collection #{idx + 2}</label>
+                                            <p className="text-xs font-bold text-slate-800">{coll.address}</p>
+                                        </div>
+                                    ))}
                                     <div className="flex items-center gap-2 text-slate-500 text-sm">
                                         <Calendar size={16} />
                                         <span>Scheduled for: <strong className="text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</strong></span>
@@ -231,9 +237,15 @@ export default function QuoteReviewPage() {
                                 </div>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dropoff Address</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Dropoff Address</label>
                                         <p className="text-slate-900 font-bold leading-snug mt-1">{quote.dropoff_address}</p>
                                     </div>
+                                    {(quote.items_json?.extraDrops || quote.extra_drops || []).map((drop, idx) => (
+                                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                                            <label className="text-[9px] font-black text-slate-700 uppercase tracking-widest block">Drop-off #{idx + 2}</label>
+                                            <p className="text-xs font-bold text-slate-800">{drop.address}</p>
+                                        </div>
+                                    ))}
                                     <div className="flex items-center gap-2 text-slate-500 text-sm">
                                         <Truck size={16} />
                                         <span>Distance: <strong className="text-slate-800">{quote.distance_km} km</strong> {quote.is_shared_load && <span className="ml-2 text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Shared Load</span>}</span>
@@ -265,6 +277,21 @@ export default function QuoteReviewPage() {
                                         )}
                                     </div>
 
+                                    {(quote.items_json?.extraCollections || quote.extra_collections || []).map((coll, idx) => {
+                                        const acc = quote.access_details[`extra_coll_${idx}`] || {};
+                                        return (
+                                            <div key={`extra_coll_${idx}`} className="p-4 bg-red-50/50 rounded-xl space-y-1">
+                                                <p className="font-black text-red-700 uppercase tracking-widest text-[10px]">Collection #{idx + 2} Access</p>
+                                                <p className="text-slate-700 font-bold">
+                                                    {(acc.type || 'HOUSE').toUpperCase()} • Floor {acc.floorLevel || 0}
+                                                </p>
+                                                <p className="text-slate-500">
+                                                    Elevator: {acc.elevator ? 'Yes' : 'No'} • Stairs: {acc.stairs ? 'Yes' : 'No'}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+
                                     <div className="p-4 bg-slate-50 rounded-xl space-y-1">
                                         <p className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Dropoff Access</p>
                                         <p className="text-slate-700 font-bold">
@@ -280,6 +307,21 @@ export default function QuoteReviewPage() {
                                             <p className="text-slate-500 italic mt-1">"{quote.access_details.destination.notes}"</p>
                                         )}
                                     </div>
+
+                                    {(quote.items_json?.extraDrops || quote.extra_drops || []).map((drop, idx) => {
+                                        const acc = quote.access_details[`extra_drop_${idx}`] || {};
+                                        return (
+                                            <div key={`extra_drop_${idx}`} className="p-4 bg-slate-100 rounded-xl space-y-1">
+                                                <p className="font-black text-slate-700 uppercase tracking-widest text-[10px]">Drop-off #{idx + 2} Access</p>
+                                                <p className="text-slate-700 font-bold">
+                                                    {(acc.type || 'HOUSE').toUpperCase()} • Floor {acc.floorLevel || 0}
+                                                </p>
+                                                <p className="text-slate-500">
+                                                    Elevator: {acc.elevator ? 'Yes' : 'No'} • Stairs: {acc.stairs ? 'Yes' : 'No'}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

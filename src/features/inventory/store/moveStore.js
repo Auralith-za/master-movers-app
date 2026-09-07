@@ -273,6 +273,8 @@ export const useMoveStore = create(
                     client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
                     pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
+                    extra_collections: state.moveDetails?.extraCollections || [],
+                    extra_drops: state.moveDetails?.extraDrops || [],
                     distance_km: Number(dbOverrides.distance_km || state.moveDetails.totalBillableDistance || state.moveDetails.distanceKm || 0),
                     trip_breakdown: dbOverrides.trip_breakdown || state.moveDetails.tripBreakdown || null,
                     move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
@@ -731,7 +733,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             if (loc.latLng?.lat) {
                 if (isGPSOutline(loc.latLng)) return true;
             } else {
-                return true; // No GPS coords and not resolved -> treat as outline
+                // If no GPS coords are attached and it wasn't matched in outlineProvinces list,
+                // do not falsely flag it as outline. Let city/national routing handle it.
+                return false;
             }
         }
 
@@ -812,7 +816,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             nationalDestinationCityCode = firstDiff;
         } else if (pickupCityCode === nationalDestinationCityCode) {
             // Fallback for long-distance routes where destination city wasn't explicitly parsed
-            if (dropoffAddress.includes('cape town') || dropoffAddress.includes('cpt') || dropoffAddress.includes('western cape')) {
+            if (dropoffAddress.includes('cape town') || dropoffAddress.includes('cpt') || dropoffAddress.includes('western cape') || dropoffAddress.includes('worcester')) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
             } else if (dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu')) {
                 nationalDestinationCityCode = CITY_CODES.DBN;
@@ -854,7 +858,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         }
     }
 
-    const needsQuoteRequest = hasOutlineProvince || (!isNationalMove && isDepotOver80)
+    const needsQuoteRequest = (!isNationalMove && hasOutlineProvince) || (!isNationalMove && isDepotOver80)
 
     const moveProtectionCost = needsQuoteRequest ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
 
@@ -1118,30 +1122,33 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const isMonthEnd = !isMidMonthDate;
 
     // Check if raw unpadded move transport/volume cost was at or below minimum threshold
-    const unpaddedMoveCost = isNationalMove
-        ? ((totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25)) + moveProtectionCost)
-        : ((totalDistance * transportRate) + moveProtectionCost + (totalVolumeCuFt * volumeRate));
+    const rawMoveCost = isNationalMove
+        ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25))
+        : ((totalDistance * transportRate) + (totalVolumeCuFt * volumeRate));
 
-    let isMinQuote = (unpaddedMoveCost <= routeMinCharge);
+    let isMinQuote = (rawMoveCost <= routeMinCharge);
 
     // MID-MONTH DISCOUNT (10%): Apply ONLY if NOT month-end AND NOT a minimum quote.
-    // Minimum quotes get ZERO discount!
+    // Minimum quotes get ZERO automatic discount!
     const moveBaseCost = transportCost + volumeCost;
     let exclVatDiscount = 0;
 
     if (!isMonthEnd && !isMinQuote) {
         exclVatDiscount = moveBaseCost * 0.10;
-        // Clamp discount so that moveBaseCost after discount NEVER drops below routeMinCharge
-        if ((moveBaseCost - exclVatDiscount) < routeMinCharge) {
-            exclVatDiscount = Math.max(0, moveBaseCost - routeMinCharge);
+        // Clamp discount so that moveBaseCost after discount NEVER drops below (routeMinCharge + moveProtectionCost)
+        const minAllowedBaseCost = routeMinCharge + moveProtectionCost;
+        if ((moveBaseCost - exclVatDiscount) < minAllowedBaseCost) {
+            exclVatDiscount = Math.max(0, moveBaseCost - minAllowedBaseCost);
             if (exclVatDiscount === 0) {
                 isMinQuote = true;
             }
         }
     } else {
-        // Strict enforcement: ZERO discount on minimum quotes
+        // Strict enforcement: ZERO automatic discount on month-end or minimum quotes
         exclVatDiscount = 0;
-        isMinQuote = true;
+        if (rawMoveCost <= routeMinCharge) {
+            isMinQuote = true;
+        }
     }
 
     let baseAfterDiscount = baseCost - exclVatDiscount;
