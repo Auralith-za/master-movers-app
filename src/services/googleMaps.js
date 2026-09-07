@@ -281,7 +281,7 @@ const calculateFromDistanceMatrix = async (
             unitSystem: window.google.maps.UnitSystem.METRIC,
             avoidHighways: false,
             avoidTolls: false,
-        }, (response, status) => {
+        }, async (response, status) => {
             if (status !== 'OK') {
                 console.warn(`[Distance Matrix] API failed with status: ${status}`);
                 reject(new Error(`Distance Matrix API returned status: ${status}`));
@@ -290,28 +290,61 @@ const calculateFromDistanceMatrix = async (
 
             const detailedLegs = [];
             let totalDistance = 0;
-            let legFailed = false;
 
-            origins.forEach((_, idx) => {
-                const element = response.rows[idx]?.elements[idx];
-                if (!element || element.status !== 'OK') {
-                    legFailed = true;
-                } else {
-                    const km = Math.round(element.distance.value / 1000);
-                    totalDistance += km;
-                    detailedLegs.push({
-                        from: legLabels[idx].from,
-                        to: legLabels[idx].to,
-                        label: `${legLabels[idx].from} → ${legLabels[idx].to}`,
-                        km
-                    });
+            const extractCoords = (ref) => {
+                if (!ref) return null;
+                if (typeof ref === 'object' && typeof ref.lat === 'function' && typeof ref.lng === 'function') {
+                    return { lat: ref.lat(), lng: ref.lng() };
                 }
-            });
+                if (typeof ref === 'object' && ref.lat !== undefined && ref.lng !== undefined) {
+                    return { lat: parseFloat(ref.lat), lng: parseFloat(ref.lng) };
+                }
+                return null;
+            };
 
-            if (legFailed || detailedLegs.length === 0) {
-                console.warn("[Distance Matrix] One or more route legs failed");
-                reject(new Error("Google Maps could not find a driving route for one or more legs of this trip."));
-                return;
+            const geocodeAddress = async (ref) => {
+                const coords = extractCoords(ref);
+                if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) return coords;
+                if (typeof ref === 'string' && ref.trim()) {
+                    try {
+                        const geocoder = new window.google.maps.Geocoder();
+                        const res = await geocoder.geocode({ address: ref });
+                        if (res.results && res.results[0]?.geometry?.location) {
+                            const loc = res.results[0].geometry.location;
+                            return { lat: loc.lat(), lng: loc.lng() };
+                        }
+                    } catch (e) {
+                        console.warn("[Geocoder] Geocode failed for:", ref, e);
+                    }
+                }
+                return null;
+            };
+
+            for (let idx = 0; idx < origins.length; idx++) {
+                const element = response.rows[idx]?.elements[idx];
+                let km = 0;
+
+                if (element && element.status === 'OK' && element.distance?.value !== undefined) {
+                    km = Math.round(element.distance.value / 1000);
+                } else {
+                    console.warn(`[Distance Matrix] Leg ${idx} (${legLabels[idx]?.from} -> ${legLabels[idx]?.to}) status not OK (${element?.status}). Using fallback...`);
+                    const fromCoords = await geocodeAddress(origins[idx]);
+                    const toCoords = await geocodeAddress(destinations[idx]);
+                    if (fromCoords && toCoords) {
+                        const dist = haversineKm(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
+                        km = Math.max(5, Math.round(dist * ROAD_FACTOR));
+                    } else {
+                        km = 20; // Default estimate for unresolvable stop leg
+                    }
+                }
+
+                totalDistance += km;
+                detailedLegs.push({
+                    from: legLabels[idx]?.from || 'Stop',
+                    to: legLabels[idx]?.to || 'Stop',
+                    label: `${legLabels[idx]?.from || 'Stop'} → ${legLabels[idx]?.to || 'Stop'}`,
+                    km
+                });
             }
 
             const depotToPickup = detailedLegs[0]?.km || 0;

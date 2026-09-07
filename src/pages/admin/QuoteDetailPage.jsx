@@ -127,7 +127,7 @@ export default function QuoteDetailPage() {
             const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || ((breakdown.pickupToDropoff || 0) > 250);
             setEditForm(prev => ({ 
                 ...prev, 
-                distance_km: isNational ? (breakdown.pickupToDropoff || 0) : totalDistance,
+                distance_km: totalDistance,
                 trip_breakdown: breakdown
             }));
             return true;
