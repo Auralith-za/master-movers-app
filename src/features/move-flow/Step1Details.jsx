@@ -224,6 +224,11 @@ export default function Step1Details() {
             await submitQuote({ 
                 status: 'lead', 
                 request_call_back: true,
+                client_name: moveDetails.contactName || 'Valued Client',
+                client_email: moveDetails.contactEmail || '',
+                client_phone: moveDetails.contactPhone || '',
+                pickup_address: moveDetails.pickupAddress || 'Outlaying Area',
+                dropoff_address: moveDetails.dropoffAddress || 'Outlaying Area',
                 customer_comments: '[OUTLAYING AREA] User requested custom quote from callback button.',
                 forceNew: true
             })
@@ -1511,6 +1516,11 @@ export default function Step1Details() {
                                                 await submitQuote({ 
                                                     status: 'lead', 
                                                     request_call_back: true,
+                                                    client_name: moveDetails.contactName || 'Valued Client',
+                                                    client_email: moveDetails.contactEmail || '',
+                                                    client_phone: moveDetails.contactPhone || '',
+                                                    pickup_address: moveDetails.pickupAddress || 'Outlaying Area',
+                                                    dropoff_address: moveDetails.dropoffAddress || 'Outlaying Area',
                                                     customer_comments: '[OUTLAYING AREA] User requested a custom quote for an outlaying area.',
                                                     forceNew: true
                                                 })
