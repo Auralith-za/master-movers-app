@@ -1067,6 +1067,33 @@ serve(async (req) => {
             const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
             if (supabaseUrl && serviceKey) {
                 const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                
+                // 1. Auto-save to quotes table for all moving lead alerts
+                if (['outline_area_alert', 'callback_notification', 'location_not_found_alert', 'abandoned_lead_alert'].includes(type)) {
+                    const clientName = cleanClientName(contactData?.name || quoteData?.client_name || 'Valued Client')
+                    const clientEmail = contactData?.email || quoteData?.client_email || ''
+                    const clientPhone = contactData?.phone || quoteData?.client_phone || ''
+                    const pickup = contactData?.pickup || quoteData?.pickup_address || 'Outlaying Area'
+                    const dropoff = contactData?.dropoff || quoteData?.dropoff_address || 'Outlaying Area'
+                    const moveDate = contactData?.moveDate || quoteData?.move_date || null
+                    const comments = `[${type.toUpperCase()}] ${contactData?.notes || contactData?.comments || quoteData?.customer_comments || 'Custom quote requested via website'}`
+
+                    await supabaseAdmin.from('quotes').insert([{
+                        client_name: clientName,
+                        client_email: clientEmail,
+                        client_phone: clientPhone,
+                        pickup_address: pickup,
+                        dropoff_address: dropoff,
+                        move_date: moveDate,
+                        status: 'lead',
+                        customer_comments: comments,
+                        request_call_back: true,
+                        total_price: quoteData?.total_price || 0,
+                        total_volume: quoteData?.total_volume || 0
+                    }])
+                }
+
+                // 2. Auto-save to contact_submissions table for all website inquiries
                 if (['contact_message', 'callback_notification', 'outline_area_alert', 'location_not_found_alert'].includes(type)) {
                     await supabaseAdmin.from('contact_submissions').insert([{
                         name: contactData?.name || 'Website Inquirer',
