@@ -1315,7 +1315,13 @@ export default function QuoteDetailPage() {
                             {isEditing && (
                                 <button
                                     type="button"
-                                    onClick={() => performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, false)}
+                                    onClick={() => performDistanceCalculation(
+                                        editForm.pickup_address, 
+                                        editForm.dropoff_address, 
+                                        false, 
+                                        editForm.extraCollections || editForm.extra_collections || [], 
+                                        editForm.extraDrops || editForm.extra_drops || []
+                                    )}
                                     className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-slate-200"
                                     title="Recalculate distance via Google Maps"
                                 >
@@ -1332,7 +1338,16 @@ export default function QuoteDetailPage() {
                                         <AddressAutocomplete 
                                             placeholder="Start typing pickup address..."
                                             value={editForm.pickup_address || ''}
-                                            onChange={e => setEditForm({...editForm, pickup_address: e.target.value, pickup_city: e.target.city})}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const city = e.target.city;
+                                                const currentExtraColls = editForm.extraCollections || editForm.extra_collections || [];
+                                                const currentExtraDrops = editForm.extraDrops || editForm.extra_drops || [];
+                                                setEditForm(prev => ({ ...prev, pickup_address: val, pickup_city: city }));
+                                                if (e.target.isGoogleSelect) {
+                                                    performDistanceCalculation(val, editForm.dropoff_address, true, currentExtraColls, currentExtraDrops);
+                                                }
+                                            }}
                                         />
                                     ) : (
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.pickup_address}</p>
@@ -1349,7 +1364,7 @@ export default function QuoteDetailPage() {
                                                 onClick={() => {
                                                     const list = editForm.extraCollections || editForm.extra_collections || [];
                                                     const newList = [...list, { id: 'coll_' + Date.now(), address: '' }];
-                                                    setEditForm({ ...editForm, extraCollections: newList });
+                                                    setEditForm(prev => ({ ...prev, extraCollections: newList, extra_collections: newList }));
                                                 }}
                                                 className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
                                             >
@@ -1368,7 +1383,9 @@ export default function QuoteDetailPage() {
                                                         onClick={() => {
                                                             const list = [...(editForm.extraCollections || editForm.extra_collections || [])];
                                                             list.splice(idx, 1);
-                                                            setEditForm({ ...editForm, extraCollections: list });
+                                                            const currentExtraDrops = editForm.extraDrops || editForm.extra_drops || [];
+                                                            setEditForm(prev => ({ ...prev, extraCollections: list, extra_collections: list }));
+                                                            performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, true, list, currentExtraDrops);
                                                         }}
                                                         className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
                                                     >
@@ -1381,7 +1398,7 @@ export default function QuoteDetailPage() {
                                                     placeholder="Enter 2nd collection address..."
                                                     value={coll.address || ''}
                                                     onChange={e => {
-                                                        const { value, placeId, latLng, addressComponents } = e.target;
+                                                        const { value, placeId, latLng, addressComponents, isGoogleSelect } = e.target;
                                                         const list = [...(editForm.extraCollections || editForm.extra_collections || [])];
                                                         list[idx] = { 
                                                             ...list[idx], 
@@ -1390,7 +1407,11 @@ export default function QuoteDetailPage() {
                                                             latLng: latLng || list[idx]?.latLng || null,
                                                             addressComponents: addressComponents || list[idx]?.addressComponents || null
                                                         };
-                                                        setEditForm({ ...editForm, extraCollections: list });
+                                                        const currentExtraDrops = editForm.extraDrops || editForm.extra_drops || [];
+                                                        setEditForm(prev => ({ ...prev, extraCollections: list, extra_collections: list }));
+                                                        if (isGoogleSelect) {
+                                                            performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, true, list, currentExtraDrops);
+                                                        }
                                                     }}
                                                 />
                                             ) : (
@@ -1426,7 +1447,16 @@ export default function QuoteDetailPage() {
                                         <AddressAutocomplete 
                                             placeholder="Start typing dropoff address..."
                                             value={editForm.dropoff_address || ''}
-                                            onChange={e => setEditForm({...editForm, dropoff_address: e.target.value, dropoff_city: e.target.city})}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const city = e.target.city;
+                                                const currentExtraColls = editForm.extraCollections || editForm.extra_collections || [];
+                                                const currentExtraDrops = editForm.extraDrops || editForm.extra_drops || [];
+                                                setEditForm(prev => ({ ...prev, dropoff_address: val, dropoff_city: city }));
+                                                if (e.target.isGoogleSelect) {
+                                                    performDistanceCalculation(editForm.pickup_address, val, true, currentExtraColls, currentExtraDrops);
+                                                }
+                                            }}
                                         />
                                     ) : (
                                         <p className="text-sm font-medium text-slate-900 leading-snug">{quote?.dropoff_address}</p>
@@ -1443,7 +1473,7 @@ export default function QuoteDetailPage() {
                                                 onClick={() => {
                                                     const list = editForm.extraDrops || editForm.extra_drops || [];
                                                     const newList = [...list, { id: 'drop_' + Date.now(), address: '' }];
-                                                    setEditForm({ ...editForm, extraDrops: newList });
+                                                    setEditForm(prev => ({ ...prev, extraDrops: newList, extra_drops: newList }));
                                                 }}
                                                 className="text-xs text-slate-700 hover:text-slate-900 font-bold flex items-center gap-1 cursor-pointer"
                                             >
@@ -1462,7 +1492,9 @@ export default function QuoteDetailPage() {
                                                         onClick={() => {
                                                             const list = [...(editForm.extraDrops || editForm.extra_drops || [])];
                                                             list.splice(idx, 1);
-                                                            setEditForm({ ...editForm, extraDrops: list });
+                                                            const currentExtraColls = editForm.extraCollections || editForm.extra_collections || [];
+                                                            setEditForm(prev => ({ ...prev, extraDrops: list, extra_drops: list }));
+                                                            performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, true, currentExtraColls, list);
                                                         }}
                                                         className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
                                                     >
@@ -1475,7 +1507,7 @@ export default function QuoteDetailPage() {
                                                     placeholder="Enter 2nd dropoff address..."
                                                     value={drop.address || ''}
                                                     onChange={e => {
-                                                        const { value, placeId, latLng, addressComponents } = e.target;
+                                                        const { value, placeId, latLng, addressComponents, isGoogleSelect } = e.target;
                                                         const list = [...(editForm.extraDrops || editForm.extra_drops || [])];
                                                         list[idx] = { 
                                                             ...list[idx], 
@@ -1484,7 +1516,11 @@ export default function QuoteDetailPage() {
                                                             latLng: latLng || list[idx]?.latLng || null,
                                                             addressComponents: addressComponents || list[idx]?.addressComponents || null
                                                         };
-                                                        setEditForm({ ...editForm, extraDrops: list });
+                                                        const currentExtraColls = editForm.extraCollections || editForm.extra_collections || [];
+                                                        setEditForm(prev => ({ ...prev, extraDrops: list, extra_drops: list }));
+                                                        if (isGoogleSelect) {
+                                                            performDistanceCalculation(editForm.pickup_address, editForm.dropoff_address, true, currentExtraColls, list);
+                                                        }
                                                     }}
                                                 />
                                             ) : (
