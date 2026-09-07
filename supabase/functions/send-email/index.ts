@@ -1061,12 +1061,24 @@ serve(async (req) => {
             recipients = isJoseOrIcloud(recipients) ? [] : [recipients]
         }
 
-        if (!recipients || recipients.length === 0) {
-            console.warn("No valid recipients remaining after filtering out Jose/iCloud emails. Skipping send.")
-            return new Response(
-                JSON.stringify({ success: true, message: "No recipients to send to after filtering." }),
-                { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            )
+        // Fail-safe auto-save to Database using Service Role key
+        try {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+            if (supabaseUrl && serviceKey) {
+                const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                if (['contact_message', 'callback_notification', 'outline_area_alert', 'location_not_found_alert'].includes(type)) {
+                    await supabaseAdmin.from('contact_submissions').insert([{
+                        name: contactData?.name || 'Website Inquirer',
+                        email: contactData?.email || '',
+                        phone: contactData?.phone || '',
+                        message: contactData?.message || contactData?.notes || contactData?.comments || `[${type}] Inquiry submitted via website`,
+                        status: 'new'
+                    }])
+                }
+            }
+        } catch (dbErr) {
+            console.warn('Auto-save database notice in send-email:', dbErr)
         }
 
         // Call Resend

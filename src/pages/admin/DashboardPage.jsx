@@ -11,6 +11,8 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [quotes, setQuotes] = useState([])
     const [jobAppCount, setJobAppCount] = useState(0)
+    const [jobApplications, setJobApplications] = useState([])
+    const [contactSubmissions, setContactSubmissions] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [stats, setStats] = useState({
@@ -42,8 +44,11 @@ export default function DashboardPage() {
                 calculateStats(sorted)
             }
 
-            const { data: jobApps } = await supabase.from('job_applications').select('id')
-            const { data: contactApps } = await supabase.from('contact_submissions').select('id, name, message')
+            const { data: jobApps } = await supabase.from('job_applications').select('*').order('created_at', { ascending: false })
+            const { data: contactApps } = await supabase.from('contact_submissions').select('*').order('created_at', { ascending: false })
+
+            if (jobApps) setJobApplications(jobApps)
+            if (contactApps) setContactSubmissions(contactApps)
 
             const count1 = jobApps ? jobApps.length : 0
             const count2 = contactApps ? contactApps.filter(c => (c.name || '').includes('[JOB APPLICATION]') || (c.message || '').includes('[JOB APPLICATION]')).length : 0
@@ -165,6 +170,29 @@ export default function DashboardPage() {
         )
     })
 
+    const filteredJobApps = searchQuery.trim() ? jobApplications.filter(app => {
+        const q = searchQuery.toLowerCase().trim()
+        return (
+            (app.full_name || '').toLowerCase().includes(q) ||
+            (app.email || '').toLowerCase().includes(q) ||
+            (app.phone || '').toLowerCase().includes(q) ||
+            (app.position || '').toLowerCase().includes(q) ||
+            (app.notes || '').toLowerCase().includes(q)
+        )
+    }) : []
+
+    const filteredContactApps = searchQuery.trim() ? contactSubmissions.filter(sub => {
+        const q = searchQuery.toLowerCase().trim()
+        return (
+            (sub.name || '').toLowerCase().includes(q) ||
+            (sub.email || '').toLowerCase().includes(q) ||
+            (sub.phone || '').toLowerCase().includes(q) ||
+            (sub.message || '').toLowerCase().includes(q)
+        )
+    }) : []
+
+    const totalResultsCount = filteredQuotes.length + filteredJobApps.length + filteredContactApps.length
+
     const handleDownloadPDF = async (e, quote) => {
         e.stopPropagation()
         try {
@@ -234,7 +262,7 @@ export default function DashboardPage() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search quotes by client name, email, phone, ref #, or address..."
+                            placeholder="Search quotes, applicants & messages by name, email, phone, or address..."
                             className="w-full pl-12 pr-10 py-3 rounded-xl border border-slate-200 focus:border-red-600 focus:ring-2 focus:ring-red-600/10 text-sm font-semibold placeholder:font-normal placeholder:text-slate-400 focus:outline-none transition-all"
                         />
                         {searchQuery && (
@@ -268,7 +296,7 @@ export default function DashboardPage() {
                     <div className="pt-3 border-t border-slate-100">
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                Search Results ({filteredQuotes.length} quote{filteredQuotes.length !== 1 ? 's' : ''} found)
+                                Search Results ({totalResultsCount} match{totalResultsCount !== 1 ? 'es' : ''} found)
                             </span>
                             {(searchQuery || statusFilter !== 'all') && (
                                 <button 
@@ -280,12 +308,74 @@ export default function DashboardPage() {
                             )}
                         </div>
 
-                        {filteredQuotes.length === 0 ? (
+                        {totalResultsCount === 0 ? (
                             <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm">
-                                No client quotes match "{searchQuery}".
+                                No quotes, contact forms, or job applications match "{searchQuery}".
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto rounded-xl border border-slate-100">
+                                {/* Job Application matches */}
+                                {filteredJobApps.map((j) => (
+                                    <div 
+                                        key={j.id}
+                                        onClick={() => navigate('/admin/job-applications')}
+                                        className="p-4 bg-indigo-50/40 hover:bg-indigo-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2.5 bg-indigo-100 text-indigo-700 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                <Briefcase size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-900 text-sm">{j.full_name}</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-indigo-100 text-indigo-800">
+                                                        JOB APPLICATION
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                    {j.email && <span>📧 {j.email}</span>}
+                                                    {j.phone && <span>📞 {j.phone}</span>}
+                                                    <span className="text-slate-400">Position: {j.position}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-indigo-600">View Candidate →</span>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Contact Submission matches */}
+                                {filteredContactApps.map((c) => (
+                                    <div 
+                                        key={c.id}
+                                        onClick={() => navigate('/admin/contact-submissions')}
+                                        className="p-4 bg-emerald-50/40 hover:bg-emerald-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer group"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                <FileText size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-900 text-sm">{c.name || 'Website Inquirer'}</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-emerald-100 text-emerald-800">
+                                                        CONTACT FORM
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                    {c.email && <span>📧 {c.email}</span>}
+                                                    {c.phone && <span>📞 {c.phone}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-emerald-600">View Message →</span>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Moving Quote matches */}
                                 {filteredQuotes.slice(0, 15).map((q) => (
                                     <div 
                                         key={q.id}

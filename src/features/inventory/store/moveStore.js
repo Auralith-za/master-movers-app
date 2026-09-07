@@ -269,8 +269,8 @@ export const useMoveStore = create(
 
                 const quotePayload = {
                     client_name: cleanClientName(rawName),
-                    client_email: dbOverrides.client_email || overrides.contactEmail || state.moveDetails.contactEmail || '',
-                    client_phone: dbOverrides.client_phone || overrides.contactPhone || state.moveDetails.contactPhone || '',
+                    client_email: dbOverrides.client_email || contactEmail || overrides.contactEmail || state.moveDetails.contactEmail || '',
+                    client_phone: dbOverrides.client_phone || contactPhone || overrides.contactPhone || state.moveDetails.contactPhone || '',
                     pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
                     dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
                     extra_collections: state.moveDetails?.extraCollections || [],
