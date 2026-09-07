@@ -538,6 +538,28 @@ export default function QuoteDetailPage() {
                 error = err
             }
 
+            // Fallback: If DB table is missing extra_collections or extra_drops columns, retry without top-level keys (data is preserved in items_json)
+            if (error && (error.code === 'PGRST204' || error.message?.includes('extra_collections') || error.message?.includes('extra_drops'))) {
+                console.warn('Supabase DB missing extra_collections/extra_drops columns. Retrying with fallback payload...')
+                const safePayload = { ...payload }
+                delete safePayload.extra_collections
+                delete safePayload.extra_drops
+                if (id === 'new') {
+                    const { data, error: err } = await supabase
+                        .from('quotes')
+                        .insert([safePayload])
+                        .select()
+                    error = err
+                    if (data?.[0]) newId = data[0].id
+                } else {
+                    const { error: err } = await supabase
+                        .from('quotes')
+                        .update(safePayload)
+                        .eq('id', id)
+                    error = err
+                }
+            }
+
             if (error) throw error
 
             if (id === 'new') {

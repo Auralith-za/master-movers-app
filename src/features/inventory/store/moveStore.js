@@ -318,6 +318,27 @@ export const useMoveStore = create(
                             .select()
                     }
 
+                    // Fallback: If DB table is missing extra_collections or extra_drops columns, retry without top-level keys (data is preserved in items_json)
+                    if (result.error && (result.error.code === 'PGRST204' || result.error.message?.includes('extra_collections') || result.error.message?.includes('extra_drops'))) {
+                        console.warn('Supabase DB missing extra_collections/extra_drops columns. Retrying moveStore with fallback payload...')
+                        const safePayload = { ...quotePayload }
+                        delete safePayload.extra_collections
+                        delete safePayload.extra_drops
+                        if (state.lastSavedQuote?.id && !overrides.forceNew) {
+                            result = await supabase
+                                .from('quotes')
+                                .update(safePayload)
+                                .eq('id', state.lastSavedQuote.id)
+                                .select()
+                        } else {
+                            const { id, ...insertPayload } = safePayload
+                            result = await supabase
+                                .from('quotes')
+                                .insert([insertPayload])
+                                .select()
+                        }
+                    }
+
                     console.log('SUPABASE RAW RESULT:', result)
                     if (result.error) throw result.error
 
