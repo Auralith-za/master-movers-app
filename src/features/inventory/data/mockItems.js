@@ -1124,11 +1124,11 @@ export const INVENTORY_ITEMS = [
 },
 {
     "id": "stationery-cupboard",
-    "name": "STATIONERY CUPBOARD",
+    "name": "STATIONERY CABINET",
     "category": "Office / Study",
     "volume": 51,
     "image": "/inventory/stationery-cupboard.png",
-    "aliases": ["stationery cabinet", "stationary cabinet", "stationary cupboard", "office cabinet"],
+    "aliases": ["stationery cupboard", "stationery cabinet", "stationary cabinet", "stationary cupboard", "office cabinet"],
     "requiresPhoto": false,
     "requiresCrate": false,
     "autoPackagingType": null,
