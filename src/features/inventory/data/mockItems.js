@@ -1134,6 +1134,17 @@ export const INVENTORY_ITEMS = [
     "variationOptions": null
 },
 {
+    "id": "stationery-cabinet",
+    "name": "STATIONERY CABINET",
+    "category": "Office / Study",
+    "volume": 51,
+    "image": "/inventory/stationery-cupboard.png",
+    "requiresPhoto": false,
+    "requiresCrate": false,
+    "autoPackagingType": null,
+    "variationOptions": null
+},
+{
     "id": "white-board",
     "name": "WHITE BOARD",
     "category": "Office / Study",

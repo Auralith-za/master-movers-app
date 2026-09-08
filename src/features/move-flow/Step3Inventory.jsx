@@ -167,7 +167,31 @@ export default function Step3Inventory() {
 
     const filteredItems = React.useMemo(() => {
         if (searchTerm.trim()) {
-            return INVENTORY_ITEMS.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+            const rawQuery = searchTerm.toLowerCase().trim()
+            // Normalize query to handle common spelling variants (stationary -> stationery, cabinet <-> cupboard)
+            const normalizedQuery = rawQuery.replace(/stationary/g, 'stationery')
+            const words = normalizedQuery.split(/\s+/).filter(Boolean)
+
+            return INVENTORY_ITEMS.filter(item => {
+                const nameLower = item.name.toLowerCase()
+                const idLower = item.id.toLowerCase()
+                const aliases = (item.aliases || []).map(a => a.toLowerCase())
+
+                // Direct match
+                if (nameLower.includes(rawQuery) || nameLower.includes(normalizedQuery) || idLower.includes(normalizedQuery)) return true
+                if (aliases.some(a => a.includes(rawQuery) || a.includes(normalizedQuery))) return true
+
+                // Cross-synonym check (cabinet <-> cupboard)
+                const nameSynonym = nameLower.replace(/cupboard/g, 'cabinet').replace(/stationary/g, 'stationery')
+                const querySynonym = rawQuery.replace(/cabinet/g, 'cupboard').replace(/stationary/g, 'stationery')
+                if (nameSynonym.includes(querySynonym) || nameLower.includes(querySynonym)) return true
+
+                // Multi-word match where every search word (or its synonym) is found in the item name/ID/aliases
+                return words.every(word => {
+                    const altWord = word === 'stationary' ? 'stationery' : word === 'cabinet' ? 'cupboard' : word === 'cupboard' ? 'cabinet' : word
+                    return nameLower.includes(word) || nameLower.includes(altWord) || idLower.includes(word) || idLower.includes(altWord) || aliases.some(a => a.includes(word) || a.includes(altWord))
+                })
+            })
         }
         const catalogItems = INVENTORY_ITEMS.filter(item => item.category === activeCategory)
         const customRoomItemIds = Object.keys(inventory)

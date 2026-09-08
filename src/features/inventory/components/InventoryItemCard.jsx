@@ -100,6 +100,7 @@ const REAL_RENDERS = {
     '2-drawer-fil-cabinet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/2025-07-29_8a611858-4bdb-463d-ac39-265f68066899.png.webp',
     '4-drawer-fil-cabinet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/4_20drawer_White_20Satin_20copy_5121aa62-4e8c-4f9d-b377-3d2432478716.jpg.webp',
     'stationery-cupboard': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/0010249_as-c3tg-image-3-stationery-cupboard-grey.png',
+    'stationery-cabinet': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/0010249_as-c3tg-image-3-stationery-cupboard-grey.png',
     'white-board': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-927784174-612x612-1.jpg',
     'lockers': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/images-4.jpeg',
     'standing-shelf-unit': 'https://cloudsplash.co.za/wp/wp-content/uploads/2026/04/istockphoto-1163508815-612x612-1.jpg',
@@ -278,7 +279,7 @@ export const getInventoryImage = (item) => {
     if (id.includes('office-chair') || id.includes('office chair')) return REAL_RENDERS['office-chair'];
     if (id.includes('2-drawer-fil-cabinet') || (id.includes('2 drawer') && id.includes('cabinet'))) return REAL_RENDERS['2-drawer-fil-cabinet'];
     if (id.includes('4-drawer-fil-cabinet') || id.includes('4-drawer-fil-unit') || (id.includes('4 drawer') && id.includes('cabinet'))) return REAL_RENDERS['4-drawer-fil-cabinet'];
-    if (id.includes('stationery-cupboard') || id.includes('stationery cupboard')) return REAL_RENDERS['stationery-cupboard'];
+    if (id.includes('stationery-cupboard') || id.includes('stationery-cabinet') || id.includes('stationery') || id.includes('stationary')) return REAL_RENDERS['stationery-cupboard'];
     if (id.includes('white-board') || id.includes('white board')) return REAL_RENDERS['white-board'];
     if (id.includes('lockers')) return REAL_RENDERS['lockers'];
     if (id.includes('standing-shelf-unit') || id.includes('standing shelf')) return REAL_RENDERS['standing-shelf-unit'];
