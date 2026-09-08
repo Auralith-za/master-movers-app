@@ -1,4 +1,5 @@
 import { generateProfessionalQuote } from './pdfService'
+import { hasCompletedEmailAndPhone } from '../lib/utils'
 
 /**
  * Service to handle triggering emails from the frontend via Supabase Edge Functions
@@ -99,6 +100,11 @@ export const emailService = {
      */
     sendContactEmail: async ({ name, email, phone, message, to }) => {
         try {
+            if (!hasCompletedEmailAndPhone(email, phone)) {
+                console.warn("Skipping contact email: both email and phone number are required.")
+                return { success: false, error: "Both email address and phone number are required." }
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const url = `${supabaseUrl}/functions/v1/send-email`
 
@@ -273,6 +279,11 @@ export const emailService = {
      */
     sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false }) => {
         try {
+            if (!hasCompletedEmailAndPhone(clientEmail, clientPhone)) {
+                console.warn("Skipping abandoned lead alert: both email and phone number are required.")
+                return { success: false, error: "Both email address and phone number are required." }
+            }
+
             let pdfBase64 = null;
             let pdfFilename = null;
 
@@ -350,6 +361,11 @@ export const emailService = {
      */
     sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate, referralSource, referral_source }) => {
         try {
+            if (!hasCompletedEmailAndPhone(email, phone)) {
+                console.warn("Skipping callback email: both email and phone number are required.")
+                return { success: false, error: "Both email address and phone number are required." }
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
@@ -374,6 +390,11 @@ export const emailService = {
 
     sendLocationNotFoundEmail: async ({ name, email, phone, fieldName, enteredValue, comments, referralSource, referral_source, moveDate }) => {
         try {
+            if (!hasCompletedEmailAndPhone(email, phone)) {
+                console.warn("Skipping location search lead alert: both email and phone number are required.")
+                return { success: false, error: "Both email address and phone number are required." }
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',
@@ -407,6 +428,11 @@ export const emailService = {
 
     sendOutlineAreaEmail: async ({ name, email, phone, pickup, dropoff, moveDate, referralSource, referral_source, comments, notes }) => {
         try {
+            if (!hasCompletedEmailAndPhone(email, phone)) {
+                console.warn("Skipping outline area lead alert: both email and phone number are required.")
+                return { success: false, error: "Both email address and phone number are required." }
+            }
+
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
                 method: 'POST',

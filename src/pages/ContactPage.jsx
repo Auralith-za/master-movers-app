@@ -6,6 +6,7 @@ import Label from '../components/ui/Label'
 import { emailService } from '../services/emailService'
 import { trackLeadConversion } from '../lib/gtag'
 import { supabase } from '../lib/supabaseClient'
+import { hasCompletedEmailAndPhone } from '../lib/utils'
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -26,8 +27,8 @@ export default function ContactPage() {
 
     const handleFormSubmit = async (e) => {
         e.preventDefault()
-        if (!formData.firstName || !formData.email || !formData.message) {
-            alert("Please fill in all required fields (First Name, Email, and Message).")
+        if (!formData.firstName || !formData.message || !hasCompletedEmailAndPhone(formData.email, formData.phone)) {
+            alert("Please fill in all required fields (First Name, valid Email Address, Phone Number, and Message).")
             return
         }
         setIsSubmitting(true)
@@ -222,6 +223,7 @@ export default function ContactPage() {
                                     placeholder="+27 ..."
                                     value={formData.phone}
                                     onChange={handleChange}
+                                    required
                                 />
                             </div>
                             <div>

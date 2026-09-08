@@ -16,6 +16,22 @@ function cleanClientName(name?: string): string {
     return cleaned
 }
 
+function isEmailValid(email?: string): boolean {
+    if (!email || typeof email !== 'string') return false
+    const trimmed = email.trim()
+    return trimmed.length > 3 && trimmed.includes('@') && trimmed.includes('.')
+}
+
+function isPhoneValid(phone?: string): boolean {
+    if (!phone || typeof phone !== 'string') return false
+    const cleaned = phone.replace(/[^0-9+]/g, '')
+    return cleaned.length >= 5
+}
+
+function hasCompletedEmailAndPhone(email?: string, phone?: string): boolean {
+    return isEmailValid(email) && isPhoneValid(phone)
+}
+
 // Helper to format inventory list as clean HTML table for email templates
 function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | string): string {
     if (!rawItemsInput) return ''
@@ -435,6 +451,19 @@ serve(async (req) => {
 
     try {
         const { type, to, quoteData, contactData, pdfBase64, pdfFilename, paymentLink } = await req.json()
+
+        // Strict Lead Validation: For lead notifications, require both email and phone number
+        if (['outline_area_alert', 'callback_notification', 'location_not_found_alert', 'abandoned_lead_alert', 'contact_message'].includes(type)) {
+            const leadEmail = contactData?.email || quoteData?.client_email
+            const leadPhone = contactData?.phone || quoteData?.client_phone
+            if (!hasCompletedEmailAndPhone(leadEmail, leadPhone)) {
+                console.warn(`[Lead Validation Rejected] Lead email type '${type}' requires both email and phone number. Received email: '${leadEmail}', phone: '${leadPhone}'`)
+                return new Response(
+                    JSON.stringify({ error: "Both a valid email address and phone number are required to capture an email lead." }),
+                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                )
+            }
+        }
 
         if (quoteData && quoteData.client_name) {
             quoteData.client_name = cleanClientName(quoteData.client_name)

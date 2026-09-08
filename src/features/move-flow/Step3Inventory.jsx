@@ -13,6 +13,7 @@ import { LOCAL_VEHICLE_RATES, CITY_CODES } from '../inventory/data/pricingRates'
 import { LeadCaptureModal } from './Step1Details'
 import { trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
+import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
 const categoryEmojis = {
     "Special Handling Items": "🎹",
@@ -570,7 +571,7 @@ export default function Step3Inventory() {
                             <button
                                 type="button"
                                 onClick={async () => {
-                                    if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                                    if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
                                         setIsSubmittingLead(true)
                                         try {
                                             await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })

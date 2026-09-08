@@ -10,6 +10,7 @@ import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle
 import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
+import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
@@ -31,11 +32,16 @@ export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initial
     
     const handleLocalSubmit = async (e) => {
         e.preventDefault()
+        if (!hasCompletedEmailAndPhone(form.email, form.phone)) {
+            alert("Please fill in both a valid Email Address and Cell Number.")
+            return
+        }
         const success = await onSubmit(form)
         if (success) {
             setIsSuccess(true)
         }
     }
+
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -209,14 +215,9 @@ export default function Step1Details() {
     };
 
     const handleOutlineCallbackSubmit = async () => {
-        if (!moveDetails.contactName || !moveDetails.surname || !moveDetails.contactEmail || !moveDetails.contactPhone) {
-            alert("Please enter your First Name, Surname, Email, and Phone Number at the top of the form first so we know who to contact.");
-            const nameInput = document.getElementsByName('contactName')[0] || document.querySelector('input[name="contactName"]');
-            if (nameInput) {
-                nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                nameInput.focus();
-            }
-            return;
+        if (!hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+            setShowLeadModal(true)
+            return
         }
 
         setIsSubmittingLead(true)
@@ -354,6 +355,11 @@ export default function Step1Details() {
             })
         }
 
+        if (!hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+            setShowLeadModal(true)
+            return
+        }
+
         // Auto submit lead
         try {
             await submitQuote({
@@ -367,8 +373,8 @@ export default function Step1Details() {
             // Send notification email
             await emailService.sendLocationNotFoundEmail({
                 name: moveDetails.contactName || 'Valued Client',
-                email: moveDetails.contactEmail || 'No Email Provided',
-                phone: moveDetails.contactPhone || 'No Phone Provided',
+                email: moveDetails.contactEmail,
+                phone: moveDetails.contactPhone,
                 fieldName: isPickup ? 'Pickup Address' : 'Dropoff Address',
                 enteredValue: isPickup ? moveDetails.pickupAddress : moveDetails.dropoffAddress,
                 comments: `User requested manual address verification. Custom Suburb Requested on ${isPickup ? 'Pickup' : 'Dropoff'} input.`
@@ -651,32 +657,33 @@ export default function Step1Details() {
             return
         }
 
-        // 🔴 Save/confirm lead in Supabase — auto-save has already created/updated the record
-        // Just ensure the status is set to 'lead' (update if exists, insert if somehow not yet saved)
-        submitQuote({ 
-            status: 'lead',
-            forceNew: !lastSavedQuote?.id
-        }).then(async (res) => {
-            if (res?.data?.id) {
-                try {
-                    await emailService.sendAbandonedLeadAlert({
-                        quoteId: res.data.id,
-                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
-                        clientEmail: moveDetails.contactEmail,
-                        clientPhone: moveDetails.contactPhone,
-                        moveDate: moveDetails.moveDate,
-                        referralSource: moveDetails.referralSource,
-                        pickupAddress: moveDetails.pickupAddress,
-                        dropoffAddress: moveDetails.dropoffAddress,
-                        moveType: isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move'),
-                        total: 0,
-                        isInstant: true
-                    })
-                } catch (e) {
-                    console.error('Step 1 lead email alert error:', e)
+        // 🔴 Save/confirm lead in Supabase if both email and number are completed
+        if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+            submitQuote({ 
+                status: 'lead',
+                forceNew: !lastSavedQuote?.id
+            }).then(async (res) => {
+                if (res?.data?.id) {
+                    try {
+                        await emailService.sendAbandonedLeadAlert({
+                            quoteId: res.data.id,
+                            clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                            clientEmail: moveDetails.contactEmail,
+                            clientPhone: moveDetails.contactPhone,
+                            moveDate: moveDetails.moveDate,
+                            referralSource: moveDetails.referralSource,
+                            pickupAddress: moveDetails.pickupAddress,
+                            dropoffAddress: moveDetails.dropoffAddress,
+                            moveType: isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move'),
+                            total: 0,
+                            isInstant: true
+                        })
+                    } catch (e) {
+                        console.error('Step 1 lead email alert error:', e)
+                    }
                 }
-            }
-        }).catch(err => console.error('Step 1 lead save error:', err))
+            }).catch(err => console.error('Step 1 lead save error:', err))
+        }
 
         // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion
         trackStep1Complete()
@@ -1391,7 +1398,7 @@ export default function Step1Details() {
                     <button
                         type="button"
                         onClick={async () => {
-                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                            if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
                                 setIsSubmittingLead(true)
                                 try {
                                     const result = await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
@@ -1511,6 +1518,11 @@ export default function Step1Details() {
                                     <button
                                         type="button"
                                         onClick={async () => {
+                                            if (!hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+                                                setShowOutlineModal(false)
+                                                setShowLeadModal(true)
+                                                return
+                                            }
                                             setIsSubmittingLead(true)
                                             try {
                                                 await submitQuote({ 

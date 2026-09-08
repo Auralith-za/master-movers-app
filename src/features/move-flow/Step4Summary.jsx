@@ -15,6 +15,7 @@ import clsx from 'clsx'
 import { LeadCaptureModal } from './Step1Details'
 import { supabase } from '../../lib/supabaseClient'
 import { formatClientName, cleanClientName } from '../../utils/quoteHelpers'
+import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -398,6 +399,10 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }
 
     const handleCustomQuoteRequest = async () => {
+        if (!hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+            setShowLeadModal(true)
+            return
+        }
         setIsSubmitting(true)
         try {
             const result = await submitQuote({
@@ -437,8 +442,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     }, [searchParams])
 
     const handleCallBackRequest = async () => {
-        // If contact info is missing, show the modal instead of submitting
-        if (!moveDetails.contactName || !moveDetails.contactEmail) {
+        // If contact info or phone/email is missing, show the modal instead of submitting
+        if (!hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
             setShowLeadModal(true)
             return
         }

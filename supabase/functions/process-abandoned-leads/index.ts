@@ -1,6 +1,22 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
+function isEmailValid(email?: string): boolean {
+    if (!email || typeof email !== 'string') return false
+    const trimmed = email.trim()
+    return trimmed.length > 3 && trimmed.includes('@') && trimmed.includes('.')
+}
+
+function isPhoneValid(phone?: string): boolean {
+    if (!phone || typeof phone !== 'string') return false
+    const cleaned = phone.replace(/[^0-9+]/g, '')
+    return cleaned.length >= 5
+}
+
+function hasCompletedEmailAndPhone(email?: string, phone?: string): boolean {
+    return isEmailValid(email) && isPhoneValid(phone)
+}
+
 console.log("process-abandoned-leads cron job starting...")
 
 serve(async (req) => {
@@ -87,6 +103,12 @@ serve(async (req) => {
         for (const quote of abandonedQuotes) {
             // Skip if already abandoned (guard against double-processing)
             if (quote.status === 'abandoned') continue
+
+            // Skip if both email and phone number are not completed yet
+            if (!hasCompletedEmailAndPhone(quote.client_email, quote.client_phone)) {
+                console.log(`Skipping quote ${quote.id}: missing completed email and phone number.`)
+                continue
+            }
 
             try {
                 const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {

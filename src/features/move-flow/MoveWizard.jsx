@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { useMoveStore } from '../inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
+import { hasCompletedEmailAndPhone } from '../../lib/utils'
 import Step1Details from './Step1Details'
 import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
@@ -17,6 +18,12 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 // ─── Helper: send abandoned lead alert directly (no PDF, safe for tab close) ───
 function sendInstantLeadAlert(quoteData) {
     if (!quoteData) return
+    const email = quoteData.client_email || quoteData.contactEmail
+    const phone = quoteData.client_phone || quoteData.contactPhone
+    if (!hasCompletedEmailAndPhone(email, phone)) {
+        console.log('Skipping instant lead alert: email and number not completed yet.')
+        return
+    }
 
     try {
         fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
@@ -55,24 +62,14 @@ export default function MoveWizard() {
         lastSavedQuoteRef.current = lastSavedQuote
     }, [lastSavedQuote])
 
-    // ─── Helper: has any lead progress been entered to trigger auto-save/alert ───────────────
+    // ─── Helper: has completed email AND phone number to trigger auto-save/alert ───────────────
     const hasLeadProgress = useCallback(() => {
-        return !!(
-            moveDetails?.contactEmail ||
-            moveDetails?.contactPhone ||
-            moveDetails?.contactName ||
-            moveDetails?.pickupAddress ||
-            moveDetails?.dropoffAddress ||
-            moveDetails?.moveDate
-        )
+        return hasCompletedEmailAndPhone(moveDetails?.contactEmail, moveDetails?.contactPhone)
     }, [
         moveDetails?.contactEmail,
-        moveDetails?.contactPhone,
-        moveDetails?.contactName,
-        moveDetails?.pickupAddress,
-        moveDetails?.dropoffAddress,
-        moveDetails?.moveDate
+        moveDetails?.contactPhone
     ])
+
 
     // ─── Auto-Reset if returning to an already completed quote ──────────────
     useEffect(() => {

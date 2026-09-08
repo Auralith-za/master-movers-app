@@ -11,6 +11,7 @@ import clsx from 'clsx'
 import { PACKAGING_RATES } from '../inventory/data/pricingRates'
 import { trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
+import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
 const PROPERTY_TYPES = [
     { id: 'house', label: 'House', icon: Home },
@@ -574,7 +575,7 @@ export default function Step2Access() {
                     <button
                         type="button"
                         onClick={async () => {
-                            if (moveDetails.contactName && moveDetails.contactEmail && moveDetails.contactPhone) {
+                            if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
                                 setIsSubmittingLead(true)
                                 try {
                                     await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
