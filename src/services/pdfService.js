@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PACKAGING_RATES, PRICING_CONSTANTS } from '../features/inventory/data/pricingRates';
 import { getSimpleQuoteNumber } from '../utils/quoteHelpers';
+import { normalizeInventory } from '../utils/inventoryUtils';
 
 /**
  * Service to generate professional PDF quotes for MasterMovers
@@ -18,7 +19,6 @@ export const generateProfessionalQuote = (data) => {
             moveDate,
             createdAt,
             created_at,
-            inventory = {},
             breakdown = {},
             total = 0,
             vat = 0,
@@ -30,6 +30,9 @@ export const generateProfessionalQuote = (data) => {
             st7Boxes = 0,
             linenBoxes = 0
         } = data;
+
+        const rawInventory = data.inventory || data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {}) || data.items || {};
+        const inventory = normalizeInventory(rawInventory);
 
         const doc = new jsPDF({ compress: true });
         const slate900 = [15, 23, 42]; // Premium Slate
@@ -72,6 +75,9 @@ export const generateProfessionalQuote = (data) => {
             const extraColls = data.extraCollections || data.moveDetails?.extraCollections || data.items_json?.extraCollections || data.quote?.items_json?.extraCollections || [];
             const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || data.items_json?.extraDrops || data.quote?.items_json?.extraDrops || [];
 
+            const customProductsList = data.customProducts || data.custom_products || data.quote?.custom_products || data.items_json?.custom_products || [];
+            const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0);
+
             // Calculate total volume / cubes robustly
             const { breakdown: bd } = data;
             let displayVolume = Number(totalVolume || bd?.totalVolume || bd?.totalVolumeCuFt || data.total_volume || data.quote?.total_volume || 0);
@@ -87,6 +93,7 @@ export const generateProfessionalQuote = (data) => {
                 const st7Count = st7Boxes || data.st7Boxes || data.moveDetails?.st7Boxes || 0;
                 const linenCount = linenBoxes || data.linenBoxes || data.moveDetails?.linenBoxes || 0;
                 displayVolume += (st7Count * 4.25) + (linenCount * 8);
+                displayVolume += customVolSum;
             }
 
             // Move Column
@@ -258,6 +265,14 @@ export const generateProfessionalQuote = (data) => {
                 groupedPdfItems[categoryName].push([`${itemName}${varLabel}`, qty])
             })
 
+            if (Array.isArray(customProductsList) && customProductsList.length > 0) {
+                groupedPdfItems['CUSTOM PRODUCTS & MANUAL ITEMS'] = customProductsList.map(p => {
+                    const cVol = parseFloat(p.cubes || p.cuft || 0);
+                    const volLabel = cVol > 0 ? ` (${cVol.toFixed(2)} ft³)` : '';
+                    return [`${p.name}${volLabel}`, 1];
+                });
+            }
+
             const tableRows = []
             Object.entries(groupedPdfItems).forEach(([category, items]) => {
                 tableRows.push([
@@ -356,7 +371,6 @@ export const generateProfessionalQuote = (data) => {
             }
 
             // Itemize custom products explicitly if provided
-            const customProductsList = data.customProducts || data.custom_products || data.quote?.custom_products || [];
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
                 customProductsList.forEach(prod => {
                     if (prod.name && prod.price !== undefined) {

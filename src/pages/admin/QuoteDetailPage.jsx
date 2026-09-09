@@ -17,6 +17,7 @@ import { calculateTripDistances } from '../../services/googleMaps'
 import { PACKAGING_RATES, detectCityCode } from '../../features/inventory/data/pricingRates'
 import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import CouponInput from '../../features/payment/CouponInput'
+import { normalizeInventory } from '../../utils/inventoryUtils'
 import clsx from 'clsx'
 
 const orderedCategories = (() => {
@@ -65,6 +66,7 @@ export default function QuoteDetailPage() {
     const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
     const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '' })
+    const [showCustomProductModal, setShowCustomProductModal] = useState(false)
 
     useEffect(() => {
         if (id === 'new') {
@@ -190,7 +192,7 @@ export default function QuoteDetailPage() {
             setPriceOffset(0)
             
             // Fix items_json if it's nested or legacy
-            const rawItems = data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {})
+            const rawItems = normalizeInventory(data.items_json)
             const rawSpecialWrapping = data.items_json?.special_wrapping || {}
             const extraColls = data.items_json?.extraCollections || data.extra_collections || []
             const extraDrops = data.items_json?.extraDrops || data.extra_drops || []
@@ -282,11 +284,7 @@ export default function QuoteDetailPage() {
     // Calculate live price — runs always so PDF always has a full breakdown
     const recalculatedData = useMemo(() => {
         // Always compute from editForm since it acts as the staging copy of the quote
-        const sourceItems = editForm.items_json || {}
-        const inventory = {}
-        Object.entries(sourceItems).forEach(([itemId, qty]) => {
-            inventory[itemId] = Number(qty)
-        })
+        const inventory = normalizeInventory(editForm.items_json)
 
         const srcPickup  = editForm.pickup_address  || ''
         const srcDropoff = editForm.dropoff_address || ''
@@ -393,14 +391,17 @@ export default function QuoteDetailPage() {
         setRoomModalItem(null)
     }
 
-    const handleAddCustomProduct = () => {
-        const name = customProductForm.name.trim()
-        const cubes = parseFloat(customProductForm.cubes) || 0
-        const price = parseFloat(customProductForm.price) || 0
+    const handleAddCustomProduct = (nameArg, cubesArg, priceArg) => {
+        const name = (typeof nameArg === 'string' ? nameArg : customProductForm.name).trim()
+        const cubesVal = typeof cubesArg === 'number' || typeof cubesArg === 'string' ? cubesArg : customProductForm.cubes
+        const priceVal = typeof priceArg === 'number' || typeof priceArg === 'string' ? priceArg : customProductForm.price
+        const cubes = parseFloat(cubesVal) || 0
+        const price = parseFloat(priceVal) || 0
         if (!name) return
-        const newProduct = { id: Date.now(), name, cubes, price }
+        const newProduct = { id: Date.now(), name, cubes, cuft: cubes, price }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
         setCustomProductForm({ name: '', cubes: '', price: '' })
+        setShowCustomProductModal(false)
     }
 
     const handleApplyCoupon = (coupon) => {
@@ -415,6 +416,7 @@ export default function QuoteDetailPage() {
             id: `coupon_${Date.now()}`, 
             name: `Coupon (${coupon.code})`, 
             cubes: 0, 
+            cuft: 0,
             price: -Math.abs(discountAmount) 
         }
         
@@ -431,7 +433,8 @@ export default function QuoteDetailPage() {
     }
 
     const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
-    const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes) || 0), 0)
+    const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0)
+
 
     useEffect(() => {
         // Block offset calculation if Google Maps is actively running in the background.
@@ -624,7 +627,8 @@ export default function QuoteDetailPage() {
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
                 extraCollections: extraCollections || quote.items_json?.extraCollections || [],
                 extraDrops: extraDrops || quote.items_json?.extraDrops || [],
-                accessDetails: accessDetails || quote.access_details || {}
+                accessDetails: accessDetails || quote.access_details || {},
+                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             })
             
             if (result.success) {
@@ -672,7 +676,8 @@ export default function QuoteDetailPage() {
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
                 extraCollections: extraCollections || quote.items_json?.extraCollections || [],
                 extraDrops: extraDrops || quote.items_json?.extraDrops || [],
-                accessDetails: accessDetails || quote.access_details || {}
+                accessDetails: accessDetails || quote.access_details || {},
+                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             });
 
             if (result.success) {
@@ -702,7 +707,10 @@ export default function QuoteDetailPage() {
 
     const downloadInventoryPDF = async () => {
         try {
-            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
+            const activeCustomProds = (isEditing ? editForm.custom_products : (quote.custom_products || quote.items_json?.custom_products || editForm.custom_products || [])) || []
+            const activeCustomVol = activeCustomProds.reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0)
+            const computedVolume = (isEditing ? ((recalculatedData?.totalVolume || 0) + activeCustomVol) : (quote.total_volume || ((recalculatedData?.totalVolume || 0) + activeCustomVol)))
             await generateProfessionalQuote({
                 quoteId: quote.id,
                 clientName: quote.client_name,
@@ -721,12 +729,12 @@ export default function QuoteDetailPage() {
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || null,
                 boxQty: recalculatedData?.boxQty,
-                totalVolume: recalculatedData?.totalVolume || quote.total_volume || 0,
+                totalVolume: computedVolume,
                 st7Boxes: quote.st7_boxes || 0,
                 linenBoxes: quote.linen_boxes || 0,
                 accessDetails: quote.access_details || recalculatedData?.accessDetails || {},
                 generalNotes: quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || '',
-                customProducts: editForm.custom_products || quote.custom_products || [],
+                customProducts: activeCustomProds,
                 isMinQuote: recalculatedData?.isMinQuote || false,
                 extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
                 extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
@@ -740,7 +748,7 @@ export default function QuoteDetailPage() {
     if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>
     if (!quote) return <div className="p-8 text-center"><p className="text-red-500">Quote not found</p></div>
 
-    const displayInventory = isEditing ? (editForm.items_json || {}) : (quote?.items_json?.items || quote?.items_json || {})
+    const displayInventory = normalizeInventory(isEditing ? editForm.items_json : (quote?.items_json || quote?.inventory))
     const isManualEditable = true
 
     return (
@@ -1041,13 +1049,20 @@ export default function QuoteDetailPage() {
                                 </h3>
                             </div>
                             {isEditing && (
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCustomProductModal(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm shrink-0"
+                                    >
+                                        <Plus size={14} /> Add Custom Product / Volume
+                                    </button>
                                     <div className="relative">
                                         <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary-500">
                                             <Plus size={16} className="text-slate-400" />
                                             <input 
                                                 placeholder="Add item..." 
-                                                className="bg-transparent border-none outline-none text-sm w-40"
+                                                className="bg-transparent border-none outline-none text-sm w-32 sm:w-40"
                                                 value={searchQuery}
                                                 onChange={e => setSearchQuery(e.target.value)}
                                             />
@@ -1318,6 +1333,54 @@ export default function QuoteDetailPage() {
                                             return <tr><td colSpan="5" className="text-red-500 font-bold p-4">Error rendering inventory: {err.message}</td></tr>
                                         }
                                     })()}
+                                    {/* Custom Products & Manual Items Section */}
+                                    {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).length > 0 && (
+                                        <React.Fragment key="custom-products-section">
+                                            <tr className="bg-indigo-100/90 border-y border-indigo-200">
+                                                <td colSpan="5" className="px-6 py-2.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-black text-indigo-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                                                            📦 Custom Products & Manual Items
+                                                        </span>
+                                                        <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">
+                                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).length} item(s) · {customProductsVolume.toFixed(2)} ft³ (Cubes)
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).map(prod => (
+                                                <tr key={prod.id} className="hover:bg-indigo-50/40">
+                                                    <td className="px-6 py-4 flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
+                                                            📦
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-slate-900">{prod.name}</p>
+                                                            <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">Custom Product · Volume: {parseFloat(prod.cubes || prod.cuft || 0).toFixed(2)} ft³ (cuft)</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-xs text-slate-400">—</td>
+                                                    <td className="px-6 py-4 text-center text-xs text-slate-400">—</td>
+                                                    <td className="px-6 py-4 text-center text-xs font-bold text-slate-800">
+                                                        {parseFloat(prod.price) !== 0 ? (
+                                                            <span className={prod.price < 0 ? "text-emerald-600 font-bold" : "text-slate-900 font-bold"}>
+                                                                {prod.price < 0 ? '-' : '+'} R {Math.abs(parseFloat(prod.price) || 0).toFixed(2)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-500 font-normal">Vol only ({parseFloat(prod.cubes || prod.cuft || 0).toFixed(2)} ft³)</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        {isEditing && (
+                                                            <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1794,50 +1857,50 @@ export default function QuoteDetailPage() {
                                 {(recalculatedData?.breakdown?.packaging > 0 || quote?.packaging_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
                                         <span>Box Supplies {(editForm.st7_boxes || quote?.st7_boxes) > 0 && `(${editForm.st7_boxes || quote?.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {(editForm.linen_boxes || quote?.linen_boxes) > 0 && `(${editForm.linen_boxes || quote?.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.wrappingCost > 0 || quote?.wrapping_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Specialized Wrapping {((recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume) > 0) && `(${(recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume).toFixed(2)} ft³ x R5.90)`}</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.wrappingCost || quote?.wrapping_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span>Specialized Wrapping {((recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume || 0) > 0) && `(${Number(recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume || 0).toFixed(2)} ft³ x R5.90)`}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.wrappingCost || quote?.wrapping_cost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.plasticSleeveCost > 0 || quote?.plastic_sleeve_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Plastic Sleeves {((recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count) > 0) && `(${(recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count)} x R55)`}</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span>Plastic Sleeves {((recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count || 0) > 0) && `(${(Number(recalculatedData?.breakdown?.plasticSleeveCount || quote?.plastic_sleeve_count || 0))} x R55)`}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.shuttleCost > 0 || quote?.shuttle_cost > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400">
                                         <span>Shuttle Vehicle</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.access > 0 || quote?.access_fees > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
                                         <span title={Array.isArray(recalculatedData?.breakdown?.detailedAccess) ? recalculatedData.breakdown.detailedAccess.join(' | ') : recalculatedData?.breakdown?.detailedAccess}>Access & Surcharges</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.access || quote?.access_fees || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.access || quote?.access_fees || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.breakdown?.crew > 0 || quote?.crew_fee > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
                                         <span>Heavy Item Crew</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(recalculatedData?.breakdown?.crew || quote?.crew_fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.crew || quote?.crew_fee || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {(recalculatedData?.discount > 0 || quote?.discount_amount > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400">
                                         <span>Special Discount (Mid-Month)</span>
-                                        <span className="font-bold whitespace-nowrap">- R {(recalculatedData?.discount || quote?.discount_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold whitespace-nowrap">- R {(Number(recalculatedData?.discount || quote?.discount_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
                                 {((isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)) > 0) && (
                                     <div className="flex flex-col gap-1 text-xs text-amber-400/90 py-1 border-t border-slate-700/50">
                                         <div className="flex justify-between">
                                             <span>Master Movers Storage (Monthly Fee)</span>
-                                            <span className="font-bold whitespace-nowrap">+ R {(isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-bold whitespace-nowrap">+ R {(Number(isEditing ? recalculatedData?.breakdown?.storageCost : (quote?.storage_cost || recalculatedData?.breakdown?.storageCost)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                         <p className="text-[10px] text-amber-300/80 font-medium">Note: Delivery out of storage is not included</p>
                                     </div>
@@ -2053,6 +2116,99 @@ export default function QuoteDetailPage() {
                         >
                             Cancel
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Product Modal for Admin */}
+            {showCustomProductModal && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-indigo-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                                    📦
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 leading-tight">
+                                        Add Custom Product / Volume
+                                    </h3>
+                                    <p className="text-xs text-slate-400">Specify item details & manual cuft</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowCustomProductModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleAddCustomProduct();
+                        }} className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                    Product / Item Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Custom Marble Dining Table Top, Server Rack..."
+                                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                    value={customProductForm.name}
+                                    onChange={e => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Volume in CuFt (ft³) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        required
+                                        placeholder="e.g. 35.5"
+                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                        value={customProductForm.cubes}
+                                        onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
+                                    />
+                                    <span className="text-[9px] text-indigo-600 font-bold block mt-1">Adds directly to quote volume</span>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Price (R) (Optional)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        placeholder="0.00"
+                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                        value={customProductForm.price}
+                                        onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
+                                    />
+                                    <span className="text-[9px] text-slate-400 block mt-1">Leave 0 if calculated by volume rate</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCustomProductModal(false)}
+                                    className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!customProductForm.name.trim() || !customProductForm.cubes}
+                                    className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+                                >
+                                    Add Product
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
