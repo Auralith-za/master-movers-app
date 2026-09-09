@@ -269,7 +269,13 @@ export const generateProfessionalQuote = (data) => {
                 groupedPdfItems['CUSTOM PRODUCTS & MANUAL ITEMS'] = customProductsList.map(p => {
                     const cVol = parseFloat(p.cubes || p.cuft || 0);
                     const volLabel = cVol > 0 ? ` (${cVol.toFixed(2)} ft³)` : '';
-                    return [`${p.name}${volLabel}`, 1];
+                    let protLabel = '';
+                    if (p.wrap) {
+                        protLabel = ' [Wrapped]';
+                    } else if (p.sleeves > 0) {
+                        protLabel = ` [${p.sleeves} Plastic Sleeve${p.sleeves > 1 ? 's' : ''}]`;
+                    }
+                    return [`${p.name}${volLabel}${protLabel}`, 1];
                 });
             }
 
@@ -370,14 +376,14 @@ export const generateProfessionalQuote = (data) => {
                 }
             }
 
-            // Itemize custom products explicitly if provided
+            // Itemize custom products explicitly if provided (with non-zero manual prices, e.g. coupons)
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
                 customProductsList.forEach(prod => {
-                    if (prod.name && prod.price !== undefined) {
+                    if (prod.name && prod.price !== undefined && prod.price !== 0) {
                         const pVal = Number(prod.price) || 0;
-                        if (pVal >= 0) {
+                        if (pVal > 0) {
                             costs.push([prod.name, `R ${pVal.toFixed(2)}`]);
-                        } else {
+                        } else if (pVal < 0) {
                             costs.push([prod.name, `-R ${Math.abs(pVal).toFixed(2)}`]);
                         }
                     }

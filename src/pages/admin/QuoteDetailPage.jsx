@@ -65,7 +65,7 @@ export default function QuoteDetailPage() {
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
-    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '' })
+    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', wrap: false, sleeves: 0 })
     const [showCustomProductModal, setShowCustomProductModal] = useState(false)
 
     useEffect(() => {
@@ -315,7 +315,8 @@ export default function QuoteDetailPage() {
             insuranceEnabled: editForm.insurance_enabled || false,
             isSharedLoad: editForm.is_shared_load || false,
             paymentMethod: editForm.payment_method || 'eft',
-            storageDestination: editForm.storage_destination || quote?.storage_destination || null
+            storageDestination: editForm.storage_destination || quote?.storage_destination || null,
+            customProducts: editForm.custom_products || []
         }
 
         const manualServiceCharges = { ...(editForm.manual_service_charges || {}) }
@@ -343,7 +344,8 @@ export default function QuoteDetailPage() {
         editForm.is_shared_load,
         editForm.access_details,
         editForm.special_wrapping,
-        editForm.manual_service_charges
+        editForm.manual_service_charges,
+        editForm.custom_products
     ])
 
 
@@ -391,17 +393,51 @@ export default function QuoteDetailPage() {
         setRoomModalItem(null)
     }
 
-    const handleAddCustomProduct = (nameArg, cubesArg, priceArg) => {
+    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg) => {
         const name = (typeof nameArg === 'string' ? nameArg : customProductForm.name).trim()
         const cubesVal = typeof cubesArg === 'number' || typeof cubesArg === 'string' ? cubesArg : customProductForm.cubes
-        const priceVal = typeof priceArg === 'number' || typeof priceArg === 'string' ? priceArg : customProductForm.price
+        const wrap = typeof wrapArg === 'boolean' ? wrapArg : Boolean(customProductForm.wrap)
+        const sleeves = typeof sleevesArg === 'number' ? sleevesArg : (parseInt(customProductForm.sleeves) || 0)
         const cubes = parseFloat(cubesVal) || 0
-        const price = parseFloat(priceVal) || 0
         if (!name) return
-        const newProduct = { id: Date.now(), name, cubes, cuft: cubes, price }
+        const newProduct = { 
+            id: Date.now(), 
+            name, 
+            cubes, 
+            cuft: cubes, 
+            wrap: sleeves > 0 ? false : wrap, 
+            sleeves, 
+            price: 0 
+        }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
-        setCustomProductForm({ name: '', cubes: '', price: '' })
+        setCustomProductForm({ name: '', cubes: '', wrap: false, sleeves: 0 })
         setShowCustomProductModal(false)
+    }
+
+    const handleToggleCustomProductWrap = (productId, wrapVal) => {
+        setEditForm(prev => ({
+            ...prev,
+            custom_products: (prev.custom_products || []).map(p => {
+                if (p.id === productId) {
+                    const newWrap = wrapVal !== undefined ? wrapVal : !p.wrap
+                    return { ...p, wrap: newWrap, sleeves: newWrap ? 0 : (p.sleeves || 0) }
+                }
+                return p
+            })
+        }))
+    }
+
+    const handleUpdateCustomProductSleeves = (productId, newSleevesQty) => {
+        const sleeves = Math.max(0, parseInt(newSleevesQty) || 0)
+        setEditForm(prev => ({
+            ...prev,
+            custom_products: (prev.custom_products || []).map(p => {
+                if (p.id === productId) {
+                    return { ...p, sleeves, wrap: sleeves > 0 ? false : p.wrap }
+                }
+                return p
+            })
+        }))
     }
 
     const handleApplyCoupon = (coupon) => {
@@ -1348,37 +1384,106 @@ export default function QuoteDetailPage() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).map(prod => (
-                                                <tr key={prod.id} className="hover:bg-indigo-50/40">
-                                                    <td className="px-6 py-4 flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
-                                                            📦
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-slate-900">{prod.name}</p>
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">Custom Product · Volume: {parseFloat(prod.cubes || prod.cuft || 0).toFixed(2)} ft³ (cuft)</p>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-center text-xs text-slate-400">—</td>
-                                                    <td className="px-6 py-4 text-center text-xs text-slate-400">—</td>
-                                                    <td className="px-6 py-4 text-center text-xs font-bold text-slate-800">
-                                                        {parseFloat(prod.price) !== 0 ? (
-                                                            <span className={prod.price < 0 ? "text-emerald-600 font-bold" : "text-slate-900 font-bold"}>
-                                                                {prod.price < 0 ? '-' : '+'} R {Math.abs(parseFloat(prod.price) || 0).toFixed(2)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-slate-500 font-normal">Vol only ({parseFloat(prod.cubes || prod.cuft || 0).toFixed(2)} ft³)</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        {isEditing && (
-                                                            <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).map(prod => {
+                                                 const prodVol = parseFloat(prod.cubes || prod.cuft || 0);
+                                                 const wrapEnabled = Boolean(prod.wrap);
+                                                 const sleeveQty = parseInt(prod.sleeves || 0);
+                                                 const wrapCost = wrapEnabled ? (prodVol * 5.90) : 0;
+                                                 const sleeveCost = sleeveQty * 55;
+
+                                                 return (
+                                                     <tr key={prod.id} className="hover:bg-indigo-50/40">
+                                                         <td className="px-6 py-4 flex items-center gap-3">
+                                                             <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
+                                                                 📦
+                                                             </div>
+                                                             <div>
+                                                                 <p className="font-bold text-slate-900">{prod.name}</p>
+                                                                 <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">Custom Product · Vol: {prodVol.toFixed(2)} ft³ (cuft)</p>
+                                                             </div>
+                                                         </td>
+
+                                                         {/* WRAPPING COLUMN — vol × R5.90 */}
+                                                         <td className="px-6 py-4 text-center">
+                                                             {sleeveQty > 0 ? (
+                                                                 <span className="text-slate-400 text-xs">—</span>
+                                                             ) : isEditing ? (
+                                                                 <div className="flex flex-col items-center gap-1">
+                                                                     <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                         <input
+                                                                             type="checkbox"
+                                                                             checked={wrapEnabled}
+                                                                             onChange={(e) => handleToggleCustomProductWrap(prod.id, e.target.checked)}
+                                                                             className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
+                                                                         />
+                                                                         Add Wrapping
+                                                                     </label>
+                                                                     {wrapEnabled && (
+                                                                         <span className="text-[10px] text-emerald-600 font-bold">
+                                                                             {prodVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
+                                                                         </span>
+                                                                     )}
+                                                                 </div>
+                                                             ) : (
+                                                                 wrapEnabled ? (
+                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                                                         Wrapped (+R {wrapCost.toFixed(2)})
+                                                                     </span>
+                                                                 ) : (
+                                                                     <span className="text-slate-400 text-xs">—</span>
+                                                                 )
+                                                             )}
+                                                         </td>
+
+                                                         {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
+                                                         <td className="px-6 py-4 text-center">
+                                                             {isEditing ? (
+                                                                 <div className="flex flex-col items-center gap-1">
+                                                                     <div className="flex items-center gap-1">
+                                                                         <button
+                                                                             type="button"
+                                                                             onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty - 1)}
+                                                                             className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
+                                                                         >
+                                                                             −
+                                                                         </button>
+                                                                         <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                         <button
+                                                                             type="button"
+                                                                             onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty + 1)}
+                                                                             className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
+                                                                         >
+                                                                             +
+                                                                         </button>
+                                                                     </div>
+                                                                     {sleeveQty > 0 && (
+                                                                         <span className="text-[10px] text-amber-600 font-bold">
+                                                                             {sleeveQty} × R55 = R {sleeveCost.toFixed(2)}
+                                                                         </span>
+                                                                     )}
+                                                                 </div>
+                                                             ) : (
+                                                                 sleeveQty > 0 ? (
+                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                                         {sleeveQty} sleeves (+R {sleeveCost.toFixed(2)})
+                                                                     </span>
+                                                                 ) : (
+                                                                     <span className="text-slate-400 text-xs">—</span>
+                                                                 )
+                                                             )}
+                                                         </td>
+
+                                                         <td className="px-6 py-4 text-center font-bold text-slate-900">1</td>
+                                                         <td className="px-6 py-4 text-right">
+                                                             {isEditing && (
+                                                                 <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
+                                                                     <Trash2 size={16} />
+                                                                 </button>
+                                                             )}
+                                                         </td>
+                                                     </tr>
+                                                 );
+                                             })}
                                         </React.Fragment>
                                     )}
                                 </tbody>
@@ -1939,12 +2044,26 @@ export default function QuoteDetailPage() {
                                         <div key={p.id} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 text-xs">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-slate-700">{p.name}</span>
-                                                {p.cubes > 0 && <span className="text-[10px] text-slate-400">Vol: {p.cubes} ft³</span>}
+                                                <div className="flex items-center gap-1.5 text-[10px]">
+                                                    {p.cubes > 0 && <span className="text-slate-400">Vol: {p.cubes} ft³</span>}
+                                                    {p.wrap && <span className="text-blue-600 font-bold">[Wrapped]</span>}
+                                                    {p.sleeves > 0 && <span className="text-amber-600 font-bold">[{p.sleeves} Sleeves]</span>}
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <span className={`font-bold whitespace-nowrap ${p.price < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                                    {p.price < 0 ? '-' : '+'} R {Math.abs(p.price).toFixed(2)}
-                                                </span>
+                                                {p.price < 0 ? (
+                                                    <span className="font-bold whitespace-nowrap text-emerald-600">
+                                                        - R {Math.abs(p.price).toFixed(2)}
+                                                    </span>
+                                                ) : p.price > 0 ? (
+                                                    <span className="font-bold whitespace-nowrap text-slate-900">
+                                                        + R {p.price.toFixed(2)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                                        (Volume Rate)
+                                                    </span>
+                                                )}
                                                 <button onClick={() => handleRemoveCustomProduct(p.id)} className="text-slate-400 hover:text-red-500">
                                                     <X size={14} />
                                                 </button>
@@ -1954,36 +2073,14 @@ export default function QuoteDetailPage() {
                                 </div>
                             )}
 
-                            {/* Add Custom Item Form */}
+                            {/* Add Custom Item Button */}
                             <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-gray-50">
-                                <input 
-                                    className="text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
-                                    placeholder="Item/Service/Discount Name"
-                                    value={customProductForm.name}
-                                    onChange={e => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
-                                />
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="number"
-                                        className="w-1/2 text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
-                                        placeholder="Volume (ft³)"
-                                        value={customProductForm.cubes}
-                                        onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
-                                    />
-                                    <input 
-                                        type="number"
-                                        className="w-1/2 text-xs bg-white border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-primary-500"
-                                        placeholder="Price (Use - for discount)"
-                                        value={customProductForm.price}
-                                        onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
-                                    />
-                                </div>
                                 <button 
-                                    onClick={handleAddCustomProduct}
-                                    disabled={!customProductForm.name}
-                                    className="w-full mt-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded transition-colors disabled:opacity-50"
+                                    type="button"
+                                    onClick={() => setShowCustomProductModal(true)}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2"
                                 >
-                                    Add Custom Adjustment
+                                    <Plus size={16} /> Add Custom Product / Volume
                                 </button>
                             </div>
 
@@ -2133,7 +2230,7 @@ export default function QuoteDetailPage() {
                                     <h3 className="text-base font-bold text-slate-900 leading-tight">
                                         Add Custom Product / Volume
                                     </h3>
-                                    <p className="text-xs text-slate-400">Specify item details & manual cuft</p>
+                                    <p className="text-xs text-slate-400">Specify item details, volume & protection options</p>
                                 </div>
                             </div>
                             <button onClick={() => setShowCustomProductModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
@@ -2159,36 +2256,80 @@ export default function QuoteDetailPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                        Volume in CuFt (ft³) *
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                    Volume in CuFt (ft³) *
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    required
+                                    placeholder="e.g. 35.5"
+                                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                    value={customProductForm.cubes}
+                                    onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
+                                />
+                                <span className="text-[9px] text-indigo-600 font-bold block mt-1">Adds directly to quote volume</span>
+                            </div>
+
+                            {/* Protection Options: Wrapping & Plastic Sleeves */}
+                            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                                    Special Protection (Optional)
+                                </span>
+
+                                <div className="flex flex-col gap-1">
+                                    <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 text-xs">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(customProductForm.wrap)}
+                                            disabled={(parseInt(customProductForm.sleeves) || 0) > 0}
+                                            onChange={e => setCustomProductForm(prev => ({ ...prev, wrap: e.target.checked, sleeves: e.target.checked ? 0 : prev.sleeves }))}
+                                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                        />
+                                        <span>Add Specialized Wrapping (vol × R5.90)</span>
                                     </label>
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        required
-                                        placeholder="e.g. 35.5"
-                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
-                                        value={customProductForm.cubes}
-                                        onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
-                                    />
-                                    <span className="text-[9px] text-indigo-600 font-bold block mt-1">Adds directly to quote volume</span>
+                                    {customProductForm.wrap && parseFloat(customProductForm.cubes || 0) > 0 && (
+                                        <span className="text-[10px] text-emerald-600 font-bold block ml-6">
+                                            Est. Wrapping Cost: R {(parseFloat(customProductForm.cubes || 0) * 5.90).toFixed(2)}
+                                        </span>
+                                    )}
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                        Price (R) (Optional)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        placeholder="0.00"
-                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
-                                        value={customProductForm.price}
-                                        onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
-                                    />
-                                    <span className="text-[9px] text-slate-400 block mt-1">Leave 0 if calculated by volume rate</span>
+                                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                                    <div>
+                                        <span className="text-xs font-semibold text-slate-700 block">Plastic Sleeves (R55 ea)</span>
+                                        {(parseInt(customProductForm.sleeves) || 0) > 0 && (
+                                            <span className="text-[10px] text-amber-600 font-bold block">
+                                                Sleeves Cost: R {((parseInt(customProductForm.sleeves) || 0) * 55).toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomProductForm(prev => {
+                                                const s = Math.max(0, (parseInt(prev.sleeves) || 0) - 1);
+                                                return { ...prev, sleeves: s, wrap: s > 0 ? false : prev.wrap };
+                                            })}
+                                            className="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-sm flex items-center justify-center transition-colors"
+                                        >
+                                            −
+                                        </button>
+                                        <span className="w-6 text-center font-bold text-sm text-slate-800">
+                                            {customProductForm.sleeves || 0}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomProductForm(prev => {
+                                                const s = (parseInt(prev.sleeves) || 0) + 1;
+                                                return { ...prev, sleeves: s, wrap: false };
+                                            })}
+                                            className="w-7 h-7 rounded-lg bg-indigo-100 hover:bg-indigo-200 font-bold text-indigo-700 text-sm flex items-center justify-center transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

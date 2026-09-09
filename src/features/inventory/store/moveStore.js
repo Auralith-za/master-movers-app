@@ -267,25 +267,26 @@ export const useMoveStore = create(
                 const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || null
                 const referralSource = dbOverrides.referral_source || overrides.referralSource || state.moveDetails.referralSource || ''
 
-                const quotePayload = {
-                    client_name: cleanClientName(rawName),
-                    client_email: dbOverrides.client_email || contactEmail || overrides.contactEmail || state.moveDetails.contactEmail || '',
-                    client_phone: dbOverrides.client_phone || contactPhone || overrides.contactPhone || state.moveDetails.contactPhone || '',
-                    pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
-                    dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
-                    extra_collections: state.moveDetails?.extraCollections || [],
-                    extra_drops: state.moveDetails?.extraDrops || [],
-                    distance_km: Number(dbOverrides.distance_km || state.moveDetails.totalBillableDistance || state.moveDetails.distanceKm || 0),
-                    trip_breakdown: dbOverrides.trip_breakdown || state.moveDetails.tripBreakdown || null,
-                    move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
-                    items_json: {
-                        items: state.inventory || {},
-                        extraCollections: state.moveDetails?.extraCollections || [],
-                        extraDrops: state.moveDetails?.extraDrops || [],
-                        rejection_reason: rejectionReason,
-                        referral_source: referralSource,
-                        ...(state.inventory || {})
-                    },
+                    const activeInventory = overrides.inventory || dbOverrides.inventory || overrides.items_json || dbOverrides.items_json || state.inventory || {}
+                    const quotePayload = {
+                        client_name: cleanClientName(rawName),
+                        client_email: dbOverrides.client_email || contactEmail || overrides.contactEmail || state.moveDetails.contactEmail || '',
+                        client_phone: dbOverrides.client_phone || contactPhone || overrides.contactPhone || state.moveDetails.contactPhone || '',
+                        pickup_address: dbOverrides.pickup_address || state.moveDetails.pickupAddress || 'Address Not Provided',
+                        dropoff_address: dbOverrides.dropoff_address || state.moveDetails.dropoffAddress || 'Address Not Provided',
+                        extra_collections: state.moveDetails?.extraCollections || [],
+                        extra_drops: state.moveDetails?.extraDrops || [],
+                        distance_km: Number(dbOverrides.distance_km || state.moveDetails.totalBillableDistance || state.moveDetails.distanceKm || 0),
+                        trip_breakdown: dbOverrides.trip_breakdown || state.moveDetails.tripBreakdown || null,
+                        move_date: (dbOverrides.move_date || state.moveDetails.moveDate || new Date().toISOString()).split('T')[0],
+                        items_json: {
+                            items: activeInventory,
+                            extraCollections: state.moveDetails?.extraCollections || [],
+                            extraDrops: state.moveDetails?.extraDrops || [],
+                            rejection_reason: rejectionReason,
+                            referral_source: referralSource,
+                            ...activeInventory
+                        },
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
@@ -647,8 +648,38 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         }
     })
 
+    // Add custom products volume, wrapping, and sleeves if provided in moveDetails
+    const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
+    if (Array.isArray(customProductsList)) {
+        customProductsList.forEach(prod => {
+            const pVol = parseFloat(prod.cubes || prod.cuft || 0);
+            if (!extraVolumeCuFt) {
+                totalVolume += pVol;
+            }
+            let appliesWrap = Boolean(prod.wrap);
+            let sleeveQty = parseInt(prod.sleeves) || 0;
+
+            if (specialWrappingOverrides && specialWrappingOverrides[prod.id]) {
+                const override = specialWrappingOverrides[prod.id];
+                if (override.wrap !== undefined) appliesWrap = override.wrap;
+                if (override.sleeves !== undefined) sleeveQty = override.sleeves;
+            }
+
+            if (sleeveQty > 0) {
+                appliesWrap = false;
+                plasticSleeveCount += sleeveQty;
+                plasticSleeveCost += sleeveQty * 55;
+            }
+
+            if (appliesWrap && pVol > 0) {
+                wrappingVolume += pVol;
+                wrappingCost += pVol * 5.90;
+            }
+        });
+    }
+
     // Add any extra volume (e.g. from manual custom items in admin)
-    totalVolume += extraVolumeCuFt
+    totalVolume += extraVolumeCuFt;
 
     // Add volume for ordered boxes — only when user has confirmed the quantities
     const boxesConfirmed = moveDetails.boxesConfirmed !== false

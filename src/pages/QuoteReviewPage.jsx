@@ -7,6 +7,7 @@ import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
 import { emailService } from '../services/emailService';
+import { normalizeInventory, parseInventoryKey } from '../utils/inventoryUtils';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -146,7 +147,7 @@ export default function QuoteReviewPage() {
         </div>
     );
 
-    const inventory = quote.items_json?.items || quote.items_json || {};
+    const inventory = normalizeInventory(quote.items_json || quote.inventory);
 
     // Calculate total volume / cubes
     let quoteVolume = Number(quote.total_volume || quote.items_json?.total_volume || 0);
@@ -379,18 +380,21 @@ export default function QuoteReviewPage() {
                             </h2>
                             <div className="space-y-3">
                                 {Object.entries(inventory).map(([idKey, qty]) => {
-                                    const [id, variation] = idKey.split('_');
-                                    const item = INVENTORY_ITEMS.find(i => i.id === id);
+                                    const { itemId, variation, room } = parseInventoryKey(idKey);
+                                    const item = INVENTORY_ITEMS.find(i => i.id === itemId);
+                                    const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                                     return (
                                         <div key={idKey} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded transition-colors">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
                                                     {item?.image
-                                                        ? <img src={item.image} alt={item.name} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
+                                                        ? <img src={item.image} alt={itemName} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
                                                         : <span className="text-lg">📦</span>
                                                     }
                                                 </div>
-                                                <span className="text-sm font-bold text-slate-700">{item?.name || idKey} {variation ? <span className="text-slate-400 font-normal">({variation})</span> : ''}</span>
+                                                <span className="text-sm font-bold text-slate-700">
+                                                    {itemName} {variation ? <span className="text-slate-400 font-normal">({variation})</span> : ''} {room ? <span className="text-xs text-slate-400 font-normal ml-1">· {room}</span> : ''}
+                                                </span>
                                             </div>
                                             <span className="text-slate-900 font-black">x{qty}</span>
                                         </div>
