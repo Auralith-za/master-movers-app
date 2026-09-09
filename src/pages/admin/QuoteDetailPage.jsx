@@ -649,6 +649,7 @@ export default function QuoteDetailPage() {
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
                 quoteId: quote.id,
+                totalVolume: computedVolume || quote.total_volume,
                 clientName: quote.client_name || editForm.client_name,
                 clientEmail: emailTo,
                 clientPhone: quote.client_phone || editForm.client_phone,
@@ -698,6 +699,7 @@ export default function QuoteDetailPage() {
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
                 quoteId: quote.id,
+                totalVolume: computedVolume || quote.total_volume,
                 clientName: quote.client_name,
                 clientEmail: quote.client_email,
                 clientPhone: quote.client_phone,

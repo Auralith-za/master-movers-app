@@ -104,6 +104,7 @@ export default function QuotesPage() {
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
                 quoteId: quote.id,
+                totalVolume: quote.total_volume,
                 clientName: quote.client_name,
                 clientEmail: quote.client_email,
                 clientPhone: quote.client_phone,

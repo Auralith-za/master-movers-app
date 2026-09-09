@@ -230,6 +230,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
         emailService.sendQuoteEmail({
             type: 'quote_proposal',
             quoteId: targetQuote.id,
+            totalVolume: totalVolume,
             clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
             clientEmail: moveDetails.contactEmail,
             clientPhone: moveDetails.contactPhone,

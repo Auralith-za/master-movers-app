@@ -516,7 +516,7 @@ serve(async (req) => {
                             .maybeSingle()
                         if (qData) {
                             if (qData.items_json) inventoryData = qData.items_json
-                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                            if (qData.total_volume && (!totalVolume || Number(totalVolume) > 2500)) totalVolume = qData.total_volume
                         }
                     }
                 } catch (e) {
@@ -583,7 +583,7 @@ serve(async (req) => {
                             .maybeSingle()
                         if (qData) {
                             if (qData.items_json) inventoryData = qData.items_json
-                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                            if (qData.total_volume && (!totalVolume || Number(totalVolume) > 2500)) totalVolume = qData.total_volume
                         }
                     }
                 } catch (e) {
@@ -653,7 +653,7 @@ serve(async (req) => {
                             .maybeSingle()
                         if (qData) {
                             if (qData.items_json) inventoryData = qData.items_json
-                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                            if (qData.total_volume && (!totalVolume || Number(totalVolume) > 2500)) totalVolume = qData.total_volume
                         }
                     }
                 } catch (e) {
@@ -720,7 +720,7 @@ serve(async (req) => {
                             .maybeSingle()
                         if (qData) {
                             if (qData.items_json) inventoryData = qData.items_json
-                            if (qData.total_volume && !totalVolume) totalVolume = qData.total_volume
+                            if (qData.total_volume && (!totalVolume || Number(totalVolume) > 2500)) totalVolume = qData.total_volume
                         }
                     }
                 } catch (e) {
@@ -1106,20 +1106,29 @@ serve(async (req) => {
                     const dropoff = contactData?.dropoff || quoteData?.dropoff_address || 'Outlaying Area'
                     const moveDate = contactData?.moveDate || quoteData?.move_date || null
                     const comments = `[${type.toUpperCase()}] ${contactData?.notes || contactData?.comments || quoteData?.customer_comments || 'Custom quote requested via website'}`
+                    const itemsJson = quoteData?.items_json || quoteData?.inventory || quoteData?.items || {}
 
-                    await supabaseAdmin.from('quotes').insert([{
+                    const leadPayload: Record<string, unknown> = {
                         client_name: clientName,
                         client_email: clientEmail,
                         client_phone: clientPhone,
                         pickup_address: pickup,
                         dropoff_address: dropoff,
                         move_date: moveDate,
-                        status: 'lead',
                         customer_comments: comments,
                         request_call_back: true,
                         total_price: quoteData?.total_price || 0,
-                        total_volume: quoteData?.total_volume || 0
-                    }])
+                        total_volume: quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || 0,
+                        items_json: itemsJson
+                    }
+
+                    if (quoteData?.id) {
+                        // Update existing quote instead of creating a duplicate row!
+                        await supabaseAdmin.from('quotes').update(leadPayload).eq('id', quoteData.id)
+                    } else {
+                        leadPayload.status = 'lead'
+                        await supabaseAdmin.from('quotes').insert([leadPayload])
+                    }
                 }
 
                 // 2. Auto-save to contact_submissions table for all website inquiries

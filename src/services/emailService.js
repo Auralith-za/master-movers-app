@@ -8,7 +8,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [] }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], totalVolume }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -47,6 +47,8 @@ export const emailService = {
             const pdfBase64 = doc.output('base64')
             const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
 
+            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || moveDetails?.totalVolume || moveDetails?.totalVolumeCuFt || 0
+
             // 3. Construct quote payload for the email template
             const quoteData = {
                 id: quoteId,
@@ -62,7 +64,7 @@ export const emailService = {
                 payment_method: paymentMethod,
                 referral_source: moveDetails?.referralSource || '',
                 items_json: inventory || inventoryItems,
-                total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
+                total_volume: computedVol
             }
 
             // 4. Send request to Supabase Edge Function
@@ -138,7 +140,7 @@ export const emailService = {
      * Admin-only booking confirmed alert — no PDF, fires instantly after payment
      * Separate from the customer email so admins always get notified
      */
-    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'card/eft' }) => {
+    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'card/eft', totalVolume }) => {
         try {
             console.log(`Generating in-memory PDF for booking confirmed alert...`)
 
@@ -166,6 +168,8 @@ export const emailService = {
             const pdfBase64 = doc.output('base64')
             const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
 
+            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || 0
+
             const quoteData = {
                 id: quoteId,
                 client_name: clientName,
@@ -180,7 +184,7 @@ export const emailService = {
                 payment_method: paymentMethod,
                 referral_source: referralSource || referral_source || '',
                 items_json: inventory || inventoryItems,
-                total_volume: breakdown?.cubicFeet || breakdown?.totalVolume || breakdown?.volume
+                total_volume: computedVol
             }
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''

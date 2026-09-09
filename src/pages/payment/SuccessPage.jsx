@@ -26,6 +26,7 @@ export default function SuccessPage() {
             await emailService.sendQuoteEmail({
                 type: 'booking_confirmation',
                 quoteId: quote.id,
+                totalVolume: quote.total_volume,
                 clientName: quote.client_name,
                 clientEmail: quote.client_email,
                 clientPhone: quote.client_phone,
