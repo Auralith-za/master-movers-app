@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { 
     ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, 
     Building, Package, Download, Save, X, Edit2, AlertCircle, RefreshCw,
-    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search
+    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search, Tag
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
@@ -65,8 +65,10 @@ export default function QuoteDetailPage() {
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
-    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', quantity: 1, wrap: false, sleeves: 0 })
+    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0 })
     const [showCustomProductModal, setShowCustomProductModal] = useState(false)
+    const [showManualCouponModal, setShowManualCouponModal] = useState(false)
+    const [manualCouponForm, setManualCouponForm] = useState({ name: '', discountType: 'fixed', amount: '' })
 
     useEffect(() => {
         if (id === 'new') {
@@ -393,14 +395,16 @@ export default function QuoteDetailPage() {
         setRoomModalItem(null)
     }
 
-    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg, quantityArg) => {
+    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg, quantityArg, priceArg) => {
         const name = (typeof nameArg === 'string' ? nameArg : customProductForm.name).trim()
         const cubesVal = typeof cubesArg === 'number' || typeof cubesArg === 'string' ? cubesArg : customProductForm.cubes
         const wrap = typeof wrapArg === 'boolean' ? wrapArg : Boolean(customProductForm.wrap)
         const sleeves = typeof sleevesArg === 'number' ? sleevesArg : (parseInt(customProductForm.sleeves) || 0)
         const qtyVal = typeof quantityArg === 'number' || typeof quantityArg === 'string' ? quantityArg : customProductForm.quantity
+        const priceVal = typeof priceArg === 'number' || typeof priceArg === 'string' ? priceArg : customProductForm.price
         const cubes = parseFloat(cubesVal) || 0
         const quantity = Math.max(1, parseInt(qtyVal) || 1)
+        const price = priceVal !== '' && priceVal !== null && priceVal !== undefined ? (parseFloat(priceVal) || 0) : 0
         if (!name) return
         const newProduct = { 
             id: Date.now(), 
@@ -410,11 +414,59 @@ export default function QuoteDetailPage() {
             quantity, 
             wrap: sleeves > 0 ? false : wrap, 
             sleeves, 
-            price: 0 
+            price 
         }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
-        setCustomProductForm({ name: '', cubes: '', quantity: 1, wrap: false, sleeves: 0 })
+        setCustomProductForm({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0 })
         setShowCustomProductModal(false)
+    }
+
+    const handleApplyManualCoupon = () => {
+        const amountNum = parseFloat(manualCouponForm.amount)
+        if (isNaN(amountNum) || amountNum === 0) return
+
+        const basePrice = recalculatedData?.total || editForm.total_price || 0
+        const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
+        const currentTotal = Math.max(0, basePrice + customProductsTotal)
+
+        let finalPriceChange = 0
+        if (manualCouponForm.discountType === 'percent') {
+            finalPriceChange = (currentTotal * amountNum) / 100
+        } else {
+            finalPriceChange = amountNum
+        }
+
+        if (finalPriceChange === 0) return
+
+        const isDiscount = finalPriceChange < 0
+        const absVal = Math.abs(finalPriceChange)
+
+        const defaultLabel = isDiscount
+            ? (manualCouponForm.discountType === 'percent' 
+                ? `Manual Discount (${amountNum}%)` 
+                : `Manual Discount (-R${absVal.toFixed(2)})`)
+            : (manualCouponForm.discountType === 'percent' 
+                ? `Manual Adjustment (+${amountNum}%)` 
+                : `Manual Adjustment (+R${absVal.toFixed(2)})`)
+
+        const labelName = manualCouponForm.name.trim() || defaultLabel
+
+        const newProduct = {
+            id: `manual_adjustment_${Date.now()}`,
+            name: labelName,
+            cubes: 0,
+            cuft: 0,
+            quantity: 1,
+            price: finalPriceChange
+        }
+
+        setEditForm(prev => ({
+            ...prev,
+            custom_products: [...(prev.custom_products || []), newProduct]
+        }))
+
+        setManualCouponForm({ name: '', discountType: 'fixed', amount: '' })
+        setShowManualCouponModal(false)
     }
 
     const handleUpdateCustomProductQty = (productId, newQty) => {
@@ -541,8 +593,7 @@ export default function QuoteDetailPage() {
         try {
             const basePrice = recalculatedData?.total || editForm.total_price || 0
             const finalPrice = basePrice + customProductsTotal + priceOffset
-            const baseVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
-            const finalVolume = baseVolume + customProductsVolume
+            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
 
             const payload = {
                 client_name: editForm.client_name,
@@ -763,9 +814,8 @@ export default function QuoteDetailPage() {
     const downloadInventoryPDF = async () => {
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
-            const activeCustomProds = (isEditing ? editForm.custom_products : (quote.custom_products || quote.items_json?.custom_products || editForm.custom_products || [])) || []
-            const activeCustomVol = activeCustomProds.reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0)
-            const computedVolume = (isEditing ? ((recalculatedData?.totalVolume || 0) + activeCustomVol) : (quote.total_volume || ((recalculatedData?.totalVolume || 0) + activeCustomVol)))
+            const computedVolume = (isEditing ? (recalculatedData?.totalVolume || 0) : (quote?.total_volume || recalculatedData?.totalVolume || 0))
+            const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             await generateProfessionalQuote({
                 quoteId: quote.id,
                 clientName: quote.client_name,
@@ -2002,7 +2052,7 @@ export default function QuoteDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Total Cubes / Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? ((recalculatedData?.totalVolume || 0) + customProductsVolume) : (quote?.total_volume || 0))?.toFixed(2)} ft³ (Cubes)</span>
+                                    <span className="text-white font-bold tracking-wide">{(isEditing ? (recalculatedData?.totalVolume || 0) : (quote?.total_volume || recalculatedData?.totalVolume || 0))?.toFixed(2)} ft³ (Cubes)</span>
                                 </div>
 
                                 {isEditing && customProductsTotal > 0 && (
@@ -2126,14 +2176,21 @@ export default function QuoteDetailPage() {
                                 </div>
                             )}
 
-                            {/* Add Custom Item Button */}
-                            <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-gray-50">
+                            {/* Action Buttons */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4 pb-4 border-b border-gray-50">
                                 <button 
                                     type="button"
                                     onClick={() => setShowCustomProductModal(true)}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2"
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2"
                                 >
                                     <Plus size={16} /> Add Custom Product / Volume
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowManualCouponModal(true)}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2"
+                                >
+                                    <Tag size={16} /> Add Manual Coupon / Discount
                                 </button>
                             </div>
 
@@ -2358,6 +2415,22 @@ export default function QuoteDetailPage() {
                                 Adds directly to quote volume: {((parseFloat(customProductForm.cubes || 0)) * (parseInt(customProductForm.quantity || 1) || 1)).toFixed(2)} ft³ total
                             </span>
 
+                            {/* Optional Custom Price / Adjustment */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                    Price Adjustment (R) (Optional)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="0.00 (e.g. 250 or -150)"
+                                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                    value={customProductForm.price}
+                                    onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
+                                />
+                                <span className="text-[9px] text-slate-400 block mt-1">Leave blank to calculate by volume rate. Use - for discount.</span>
+                            </div>
+
                             {/* Protection Options: Wrapping & Plastic Sleeves */}
                             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
@@ -2433,6 +2506,120 @@ export default function QuoteDetailPage() {
                                     className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
                                 >
                                     Add Product
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Manual Coupon / Adjustment Modal */}
+            {showManualCouponModal && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-emerald-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                                    🏷️
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 leading-tight">
+                                        Add Manual Adjustment / Coupon
+                                    </h3>
+                                    <p className="text-xs text-slate-400">Use positive number (e.g. 5000) to add cost, negative (e.g. -5000) for discount</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowManualCouponModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleApplyManualCoupon();
+                        }} className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                    Adjustment / Discount Name (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. VIP Discount, Fuel Surcharge, Manager Courtesy..."
+                                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                                    value={manualCouponForm.name}
+                                    onChange={e => setManualCouponForm(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Adjustment Type *
+                                    </label>
+                                    <select
+                                        value={manualCouponForm.discountType}
+                                        onChange={e => setManualCouponForm(prev => ({ ...prev, discountType: e.target.value }))}
+                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-slate-800 bg-white"
+                                    >
+                                        <option value="fixed">Fixed Amount (R)</option>
+                                        <option value="percent">Percentage (%)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Amount *
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            required
+                                            placeholder={manualCouponForm.discountType === 'percent' ? "e.g. -10 or 10" : "e.g. -5000 or 5000"}
+                                            className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-slate-800"
+                                            value={manualCouponForm.amount}
+                                            onChange={e => setManualCouponForm(prev => ({ ...prev, amount: e.target.value }))}
+                                        />
+                                        <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                                            {manualCouponForm.discountType === 'percent' ? '%' : 'R'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {manualCouponForm.amount !== '' && !isNaN(parseFloat(manualCouponForm.amount)) && parseFloat(manualCouponForm.amount) !== 0 && (() => {
+                                const val = parseFloat(manualCouponForm.amount)
+                                const basePrice = recalculatedData?.total || editForm.total_price || 0
+                                const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
+                                const currentTotal = Math.max(0, basePrice + customProductsTotal)
+                                const calcChange = manualCouponForm.discountType === 'percent' ? (currentTotal * val / 100) : val
+                                const isDiscount = calcChange < 0
+                                return (
+                                    <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                                        isDiscount ? 'bg-emerald-50/70 border-emerald-100 text-emerald-800' : 'bg-blue-50/70 border-blue-100 text-blue-800'
+                                    }`}>
+                                        <span className="font-medium">{isDiscount ? 'Discount Applied:' : 'Addition to Quote:'}</span>
+                                        <span className={`font-bold text-sm ${isDiscount ? 'text-emerald-600' : 'text-indigo-600'}`}>
+                                            {isDiscount ? `- R ${Math.abs(calcChange).toFixed(2)}` : `+ R ${calcChange.toFixed(2)}`}
+                                        </span>
+                                    </div>
+                                )
+                            })()}
+
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowManualCouponModal(false)}
+                                    className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!manualCouponForm.amount || parseFloat(manualCouponForm.amount) === 0 || isNaN(parseFloat(manualCouponForm.amount))}
+                                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+                                >
+                                    Apply Adjustment
                                 </button>
                             </div>
                         </form>
