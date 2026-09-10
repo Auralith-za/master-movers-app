@@ -76,7 +76,7 @@ export const generateProfessionalQuote = (data) => {
             const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || data.items_json?.extraDrops || data.quote?.items_json?.extraDrops || [];
 
             const customProductsList = data.customProducts || data.custom_products || data.quote?.custom_products || data.items_json?.custom_products || [];
-            const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0);
+            const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0);
 
             // Calculate total volume / cubes robustly
             const { breakdown: bd } = data;
@@ -268,14 +268,16 @@ export const generateProfessionalQuote = (data) => {
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
                 groupedPdfItems['CUSTOM PRODUCTS & MANUAL ITEMS'] = customProductsList.map(p => {
                     const cVol = parseFloat(p.cubes || p.cuft || 0);
-                    const volLabel = cVol > 0 ? ` (${cVol.toFixed(2)} ft³)` : '';
+                    const qty = Math.max(1, parseInt(p.quantity || p.qty) || 1);
+                    const totalVol = cVol * qty;
+                    const volLabel = totalVol > 0 ? (qty > 1 ? ` (${cVol.toFixed(2)} ft³ ea · Total: ${totalVol.toFixed(2)} ft³)` : ` (${cVol.toFixed(2)} ft³)`) : '';
                     let protLabel = '';
                     if (p.wrap) {
                         protLabel = ' [Wrapped]';
                     } else if (p.sleeves > 0) {
                         protLabel = ` [${p.sleeves} Plastic Sleeve${p.sleeves > 1 ? 's' : ''}]`;
                     }
-                    return [`${p.name}${volLabel}${protLabel}`, 1];
+                    return [`${p.name}${volLabel}${protLabel}`, qty];
                 });
             }
 

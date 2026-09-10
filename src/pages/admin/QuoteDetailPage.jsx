@@ -65,7 +65,7 @@ export default function QuoteDetailPage() {
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
-    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', wrap: false, sleeves: 0 })
+    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', quantity: 1, wrap: false, sleeves: 0 })
     const [showCustomProductModal, setShowCustomProductModal] = useState(false)
 
     useEffect(() => {
@@ -393,25 +393,41 @@ export default function QuoteDetailPage() {
         setRoomModalItem(null)
     }
 
-    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg) => {
+    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg, quantityArg) => {
         const name = (typeof nameArg === 'string' ? nameArg : customProductForm.name).trim()
         const cubesVal = typeof cubesArg === 'number' || typeof cubesArg === 'string' ? cubesArg : customProductForm.cubes
         const wrap = typeof wrapArg === 'boolean' ? wrapArg : Boolean(customProductForm.wrap)
         const sleeves = typeof sleevesArg === 'number' ? sleevesArg : (parseInt(customProductForm.sleeves) || 0)
+        const qtyVal = typeof quantityArg === 'number' || typeof quantityArg === 'string' ? quantityArg : customProductForm.quantity
         const cubes = parseFloat(cubesVal) || 0
+        const quantity = Math.max(1, parseInt(qtyVal) || 1)
         if (!name) return
         const newProduct = { 
             id: Date.now(), 
             name, 
             cubes, 
-            cuft: cubes, 
+            cuft: cubes,
+            quantity, 
             wrap: sleeves > 0 ? false : wrap, 
             sleeves, 
             price: 0 
         }
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
-        setCustomProductForm({ name: '', cubes: '', wrap: false, sleeves: 0 })
+        setCustomProductForm({ name: '', cubes: '', quantity: 1, wrap: false, sleeves: 0 })
         setShowCustomProductModal(false)
+    }
+
+    const handleUpdateCustomProductQty = (productId, newQty) => {
+        const quantity = Math.max(1, parseInt(newQty) || 1)
+        setEditForm(prev => ({
+            ...prev,
+            custom_products: (prev.custom_products || []).map(p => {
+                if (p.id === productId) {
+                    return { ...p, quantity }
+                }
+                return p
+            })
+        }))
     }
 
     const handleToggleCustomProductWrap = (productId, wrapVal) => {
@@ -453,6 +469,7 @@ export default function QuoteDetailPage() {
             name: `Coupon (${coupon.code})`, 
             cubes: 0, 
             cuft: 0,
+            quantity: 1,
             price: -Math.abs(discountAmount) 
         }
         
@@ -469,7 +486,7 @@ export default function QuoteDetailPage() {
     }
 
     const customProductsTotal = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0)
-    const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft) || 0), 0)
+    const customProductsVolume = (editForm.custom_products || []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0)
 
 
     useEffect(() => {
@@ -1120,25 +1137,31 @@ export default function QuoteDetailPage() {
                                             </div>
                                         )}
 
-                                        {selectedItemForVariation && (
-                                            <div className="absolute top-full right-0 w-64 bg-slate-900 text-white rounded-lg shadow-xl mt-1 z-50 p-4 animate-in fade-in zoom-in-95">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Select Variation</h4>
-                                                <p className="text-xs font-bold mb-3">{selectedItemForVariation.name}</p>
-                                                <div className="space-y-1">
-                                                    {selectedItemForVariation.variationOptions.map(opt => (
-                                                        <button 
-                                                            key={opt}
-                                                            onClick={() => handleAddItem(selectedItemForVariation, opt)}
-                                                            className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold hover:bg-white/10 rounded transition-colors flex justify-between items-center"
-                                                        >
-                                                            {opt}
-                                                            <Plus size={10} />
-                                                        </button>
-                                                    ))}
+                                        {selectedItemForVariation && (() => {
+                                            const targetItem = selectedItemForVariation.item || selectedItemForVariation;
+                                            const opts = targetItem?.variationOptions || [];
+                                            const targetRoom = selectedItemForVariation.targetRoom;
+
+                                            return (
+                                                <div className="absolute top-full right-0 w-64 bg-slate-900 text-white rounded-lg shadow-xl mt-1 z-50 p-4 animate-in fade-in zoom-in-95">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Select Variation</h4>
+                                                    <p className="text-xs font-bold mb-3">{targetItem?.name}</p>
+                                                    <div className="space-y-1">
+                                                        {opts.map(opt => (
+                                                            <button 
+                                                                key={opt}
+                                                                onClick={() => handleAddItem(targetItem, opt, targetRoom)}
+                                                                className="w-full text-left px-3 py-2 text-[10px] uppercase font-bold hover:bg-white/10 rounded transition-colors flex justify-between items-center"
+                                                            >
+                                                                {opt}
+                                                                <Plus size={10} />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <button onClick={() => setSelectedItemForVariation(null)} className="w-full mt-4 text-[9px] uppercase font-black text-slate-500 hover:text-white">Cancel</button>
                                                 </div>
-                                                <button onClick={() => setSelectedItemForVariation(null)} className="w-full mt-4 text-[9px] uppercase font-black text-slate-500 hover:text-white">Cancel</button>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -1387,10 +1410,12 @@ export default function QuoteDetailPage() {
                                                 </td>
                                             </tr>
                                             {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).map(prod => {
+                                                 const prodQty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
                                                  const prodVol = parseFloat(prod.cubes || prod.cuft || 0);
+                                                 const totalProdVol = prodVol * prodQty;
                                                  const wrapEnabled = Boolean(prod.wrap);
                                                  const sleeveQty = parseInt(prod.sleeves || 0);
-                                                 const wrapCost = wrapEnabled ? (prodVol * 5.90) : 0;
+                                                 const wrapCost = wrapEnabled ? (totalProdVol * 5.90) : 0;
                                                  const sleeveCost = sleeveQty * 55;
 
                                                  return (
@@ -1401,11 +1426,13 @@ export default function QuoteDetailPage() {
                                                              </div>
                                                              <div>
                                                                  <p className="font-bold text-slate-900">{prod.name}</p>
-                                                                 <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">Custom Product · Vol: {prodVol.toFixed(2)} ft³ (cuft)</p>
+                                                                 <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">
+                                                                     Custom Product · Vol: {prodVol.toFixed(2)} ft³ {prodQty > 1 ? `ea (Total: ${totalProdVol.toFixed(2)} ft³)` : '(cuft)'}
+                                                                 </p>
                                                              </div>
                                                          </td>
 
-                                                         {/* WRAPPING COLUMN — vol × R5.90 */}
+                                                         {/* WRAPPING COLUMN — total vol × R5.90 */}
                                                          <td className="px-6 py-4 text-center">
                                                              {sleeveQty > 0 ? (
                                                                  <span className="text-slate-400 text-xs">—</span>
@@ -1422,7 +1449,7 @@ export default function QuoteDetailPage() {
                                                                      </label>
                                                                      {wrapEnabled && (
                                                                          <span className="text-[10px] text-emerald-600 font-bold">
-                                                                             {prodVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
+                                                                             {totalProdVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
                                                                          </span>
                                                                      )}
                                                                  </div>
@@ -1475,7 +1502,30 @@ export default function QuoteDetailPage() {
                                                              )}
                                                          </td>
 
-                                                         <td className="px-6 py-4 text-center font-bold text-slate-900">1</td>
+                                                         {/* QUANTITY COLUMN */}
+                                                         <td className="px-6 py-4 text-center font-bold text-slate-900">
+                                                             {isEditing ? (
+                                                                 <div className="flex items-center justify-center gap-1">
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => handleUpdateCustomProductQty(prod.id, prodQty - 1)}
+                                                                         className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
+                                                                     >
+                                                                         −
+                                                                     </button>
+                                                                     <span className="w-8 text-center font-bold text-sm">{prodQty}</span>
+                                                                     <button
+                                                                         type="button"
+                                                                         onClick={() => handleUpdateCustomProductQty(prod.id, prodQty + 1)}
+                                                                         className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
+                                                                     >
+                                                                         +
+                                                                     </button>
+                                                                 </div>
+                                                             ) : (
+                                                                 <span>{prodQty}</span>
+                                                             )}
+                                                         </td>
                                                          <td className="px-6 py-4 text-right">
                                                              {isEditing && (
                                                                  <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
@@ -2047,7 +2097,8 @@ export default function QuoteDetailPage() {
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-slate-700">{p.name}</span>
                                                 <div className="flex items-center gap-1.5 text-[10px]">
-                                                    {p.cubes > 0 && <span className="text-slate-400">Vol: {p.cubes} ft³</span>}
+                                                    <span className="text-slate-500 font-semibold">Qty: {p.quantity || 1}</span>
+                                                    {p.cubes > 0 && <span className="text-slate-400">Vol: {(parseFloat(p.cubes) * (parseInt(p.quantity || 1) || 1)).toFixed(2)} ft³</span>}
                                                     {p.wrap && <span className="text-blue-600 font-bold">[Wrapped]</span>}
                                                     {p.sleeves > 0 && <span className="text-amber-600 font-bold">[{p.sleeves} Sleeves]</span>}
                                                 </div>
@@ -2258,21 +2309,54 @@ export default function QuoteDetailPage() {
                                 />
                             </div>
 
-                            <div>
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                    Volume in CuFt (ft³) *
-                                </label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    required
-                                    placeholder="e.g. 35.5"
-                                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
-                                    value={customProductForm.cubes}
-                                    onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
-                                />
-                                <span className="text-[9px] text-indigo-600 font-bold block mt-1">Adds directly to quote volume</span>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Volume in CuFt (ft³) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        required
+                                        placeholder="e.g. 35.5"
+                                        className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                        value={customProductForm.cubes}
+                                        onChange={e => setCustomProductForm(prev => ({ ...prev, cubes: e.target.value }))}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                        Quantity *
+                                    </label>
+                                    <div className="flex items-center gap-1 border border-slate-200 rounded-xl p-1 bg-white">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomProductForm(prev => ({ ...prev, quantity: Math.max(1, (parseInt(prev.quantity) || 1) - 1) }))}
+                                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-sm flex items-center justify-center transition-colors"
+                                        >
+                                            −
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            required
+                                            className="w-full text-center text-sm font-bold text-slate-800 outline-none bg-transparent"
+                                            value={customProductForm.quantity}
+                                            onChange={e => setCustomProductForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomProductForm(prev => ({ ...prev, quantity: (parseInt(prev.quantity) || 1) + 1 }))}
+                                            className="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 font-bold text-indigo-600 text-sm flex items-center justify-center transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+                            <span className="text-[9px] text-indigo-600 font-bold block">
+                                Adds directly to quote volume: {((parseFloat(customProductForm.cubes || 0)) * (parseInt(customProductForm.quantity || 1) || 1)).toFixed(2)} ft³ total
+                            </span>
 
                             {/* Protection Options: Wrapping & Plastic Sleeves */}
                             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
@@ -2293,7 +2377,7 @@ export default function QuoteDetailPage() {
                                     </label>
                                     {customProductForm.wrap && parseFloat(customProductForm.cubes || 0) > 0 && (
                                         <span className="text-[10px] text-emerald-600 font-bold block ml-6">
-                                            Est. Wrapping Cost: R {(parseFloat(customProductForm.cubes || 0) * 5.90).toFixed(2)}
+                                            Est. Wrapping Cost: R {((parseFloat(customProductForm.cubes || 0) * (parseInt(customProductForm.quantity || 1) || 1)) * 5.90).toFixed(2)}
                                         </span>
                                     )}
                                 </div>

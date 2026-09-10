@@ -652,7 +652,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
     if (Array.isArray(customProductsList)) {
         customProductsList.forEach(prod => {
-            const pVol = parseFloat(prod.cubes || prod.cuft || 0);
+            const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
+            const unitVol = parseFloat(prod.cubes || prod.cuft || 0);
+            const pVol = unitVol * qty;
             if (!extraVolumeCuFt) {
                 totalVolume += pVol;
             }
