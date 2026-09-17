@@ -202,10 +202,13 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 return CITY_CODES.CPT;
             }
 
-            // Check Durban
+            // Check Durban / KZN
             if (
-                val === "durban" || val === "dbn" ||
-                val.includes("ethekwini") || val === "umhlanga" || val === "ballito" || val === "pinetown"
+                val === "durban" || val === "dbn" || val.includes("ethekwini") ||
+                val === "kingsburgh" || val === "astra park" || val === "amanzimtoti" ||
+                val === "umhlanga" || val === "ballito" || val === "pinetown" ||
+                val === "pietermaritzburg" || val === "hillcrest" || val === "westville" ||
+                val === "kwazulu-natal" || val === "kzn"
             ) {
                 return CITY_CODES.DBN;
             }
@@ -214,7 +217,9 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             if (
                 val === "johannesburg" || val === "joburg" || val === "jhb" ||
                 val === "pretoria" || val === "tshwane" || val === "sandton" || val === "midrand" ||
-                val === "centurion" || val === "randburg"
+                val === "centurion" || val === "randburg" || val === "roodepoort" ||
+                val === "ekurhuleni" || val === "boksburg" || val === "benoni" || val === "brakpan" ||
+                val === "germiston" || val === "alberton" || val === "kempton park" || val === "gauteng"
             ) {
                 return CITY_CODES.JHB;
             }
@@ -230,6 +235,7 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         const postalMatch = name.match(/\b(\d{4})\s*(?:,\s*south\s+africa)?\s*$/);
         if (postalMatch) {
             const code = parseInt(postalMatch[1], 10);
+            // Western Cape (6500 to 8299, with Garden Route towns separated)
             if (code >= 6500 && code <= 8299) {
                 // Check if specific to Garden Route towns
                 if (name.includes('george') || name.includes('knysna') || name.includes('mossel bay') || name.includes('mosselbay') || name.includes('plettenberg') || name.includes('plett') || name.includes('sedgefield') || name.includes('wilderness')) {
@@ -237,13 +243,21 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 }
                 return CITY_CODES.CPT;
             }
+            // Garden Route / Southern Cape / Eastern Cape coastal transit
             if (code >= 5000 && code <= 6499) {
                 return CITY_CODES.GR;
             }
-            if (code >= 2900 && code <= 4799) {
+            // Accurate postal codes for serviced metropolitan hub areas:
+            // Durban / KZN (postal codes 2900 to 4499 cover Durban metro, South Coast 41xx/42xx, North Coast 43xx/44xx, Midlands 32xx)
+            if (code >= 2900 && code <= 4499) {
                 return CITY_CODES.DBN;
             }
-            if ((code >= 1 && code <= 2899) || (code >= 8300 && code <= 9999)) {
+            // Johannesburg / East Rand / West Rand / Vaal (1400 to 2199)
+            if (code >= 1400 && code <= 2199) {
+                return CITY_CODES.JHB;
+            }
+            // Pretoria / Tshwane / Centurion (0001 to 0299)
+            if (code >= 1 && code <= 299) {
                 return CITY_CODES.JHB;
             }
         }
@@ -269,16 +283,21 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         const hasDurbanHint = name.includes('durban') || name.includes('kwazulu-natal') || name.includes('kzn') || name.includes('dbn') || name.includes('ethekwini');
         if (
             hasDurbanHint ||
-            name.includes('umhlanga') || name.includes('pinetown') || name.includes('amanzimtoti') ||
-            name.includes('ballito') || name.includes('salt rock') || name.includes('hillcrest') ||
-            name.includes('kloof') || name.includes('pietermaritzburg') || name.includes('westville') ||
-            name.includes('kwamashu') || name.includes('emgidweni') || name.includes('richards bay') ||
-            name.includes('empangeni') || name.includes('margate') || name.includes('port shepstone')
+            name.includes('kingsburgh') || name.includes('astra park') || name.includes('amanzimtoti') ||
+            name.includes('umhlanga') || name.includes('pinetown') || name.includes('ballito') ||
+            name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof') ||
+            name.includes('pietermaritzburg') || name.includes('westville') || name.includes('kwamashu') ||
+            name.includes('emgidweni') || name.includes('richards bay') || name.includes('empangeni') ||
+            name.includes('margate') || name.includes('port shepstone') || name.includes('scottburgh') ||
+            name.includes('shepstone') || name.includes('umdloti') || name.includes('mount edgecombe') ||
+            name.includes('la lucia') || name.includes('morningside, durban') || name.includes('queensburgh') ||
+            name.includes('berea, durban') || name.includes('glenwood') || name.includes('chatsworth') ||
+            name.includes('phoenix') || name.includes('kloof') || name.includes('newcastle')
         ) {
             return CITY_CODES.DBN;
         }
 
-        // Check Johannesburg / Gauteng / Inland
+        // Check Johannesburg / Gauteng Metro Hub
         if (
             name.includes('johannesburg') || name.includes('joburg') || name.includes('gauteng') || name.includes('jhb') ||
             name.includes('sandton') || name.includes('midrand') || name.includes('pretoria') ||
@@ -287,9 +306,8 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('morningside') || name.includes('melrose') || name.includes('rosebank') ||
             name.includes('germiston') || name.includes('edenvale') || name.includes('kempton park') ||
             name.includes('alberton') || name.includes('boksburg') || name.includes('benoni') ||
-            name.includes('krugersdorp') || name.includes('bloemfontein') || name.includes('polokwane') ||
-            name.includes('nelspruit') || name.includes('mbombela') || name.includes('potchefstroom') ||
-            name.includes('klerksdorp') || name.includes('rustenburg') || name.includes('kimberley') ||
+            name.includes('brakpan') || name.includes('springs') || name.includes('nigel') ||
+            name.includes('krugersdorp') ||
             (name.includes('heidelberg') && !name.includes('western cape'))
         ) {
             return CITY_CODES.JHB;

@@ -161,6 +161,10 @@ export default function QuoteReviewPage() {
         const st7Count = quote.st7_boxes || quote.items_json?.st7Boxes || 0;
         const linenCount = quote.linen_boxes || quote.items_json?.linenBoxes || 0;
         quoteVolume += (st7Count * 4.25) + (linenCount * 8);
+
+        const customProductsList = quote.custom_products || quote.items_json?.custom_products || [];
+        const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0);
+        quoteVolume += customVolSum;
     }
 
     return (
@@ -346,15 +350,49 @@ export default function QuoteReviewPage() {
                                     <ShieldCheck size={20} className="text-emerald-500" /> Included Services
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {quote.packaging_option !== 'none' && (
-                                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
-                                            <Package className="text-red-600" size={24} />
-                                            <div>
-                                                <p className="text-xs font-black text-slate-900 uppercase">Packaging: {quote.packaging_option === 'boxes_only' ? 'Supplying Boxes' : 'Full Packing Service'}</p>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{quote.st7_boxes || 0}x ST7, {quote.linen_boxes || 0}x Linen</p>
+                                    {quote.packaging_option !== 'none' && (() => {
+                                        const pkgDetails = quote.items_json?.packaging_details || quote.packaging_details;
+                                        const sendDetails = pkgDetails?.send_me_boxes || quote.send_me_boxes;
+                                        const packDetails = pkgDetails?.boxes_and_packing || quote.boxes_and_packing;
+
+                                        const hasSend = Boolean(sendDetails?.enabled || quote.packaging_option === 'boxes_only' || quote.packaging_option === 'both');
+                                        const hasPack = Boolean(packDetails?.enabled || quote.packaging_option === 'boxes_and_packing' || quote.packaging_option === 'both');
+
+                                        const sendSt7 = sendDetails?.st7 ?? (quote.packaging_option === 'boxes_only' ? quote.st7_boxes : 0);
+                                        const sendLinen = sendDetails?.linen ?? (quote.packaging_option === 'boxes_only' ? quote.linen_boxes : 0);
+
+                                        const packSt7 = packDetails?.st7 ?? (quote.packaging_option === 'boxes_and_packing' ? quote.st7_boxes : 0);
+                                        const packLinen = packDetails?.linen ?? (quote.packaging_option === 'boxes_and_packing' ? quote.linen_boxes : 0);
+
+                                        if (hasSend && hasPack && (quote.packaging_option === 'both' || (pkgDetails && sendDetails?.enabled && packDetails?.enabled))) {
+                                            return (
+                                                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                                                    <Package className="text-red-600 flex-shrink-0" size={24} />
+                                                    <div>
+                                                        <p className="text-xs font-black text-slate-900 uppercase">Packaging: Box Delivery &amp; Full Packing</p>
+                                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                                            Pre-Delivery: {sendSt7 || 0}x ST7, {sendLinen || 0}x Linen (+ Delivery Fee) | Packing: {packSt7 || 0}x ST7, {packLinen || 0}x Linen
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                                                <Package className="text-red-600 flex-shrink-0" size={24} />
+                                                <div>
+                                                    <p className="text-xs font-black text-slate-900 uppercase">
+                                                        Packaging: {quote.packaging_option === 'boxes_only' ? 'Supplying Boxes (Pre-Move Delivery)' : 'Full Packing Service'}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                                        {quote.st7_boxes || 0}x ST7, {quote.linen_boxes || 0}x Linen
+                                                        {quote.packaging_option === 'boxes_only' ? ' (Delivery Fee Included)' : ''}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                     {quote.insurance_enabled && (
                                         <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
                                             <ShieldCheck className="text-emerald-600" size={24} />

@@ -57,6 +57,7 @@ export default function JobApplicationsPage() {
 
                         let cv_name = null
                         let cv_url = null
+                        let region = null
                         if (c.message) {
                             const nameMatch = c.message.match(/CV Attached:\s*([^\n]+)/i)
                             if (nameMatch && !nameMatch[1].toLowerCase().includes('no cv file')) {
@@ -66,6 +67,10 @@ export default function JobApplicationsPage() {
                             if (urlMatch) {
                                 cv_url = urlMatch[1].trim()
                             }
+                            const regionMatch = c.message.match(/Region\s*(?:\/\s*Branch)?:\s*([^\n]+)/i)
+                            if (regionMatch) {
+                                region = regionMatch[1].trim()
+                            }
                         }
 
                         return {
@@ -73,6 +78,7 @@ export default function JobApplicationsPage() {
                             full_name: cleanName,
                             email: c.email || '',
                             phone: c.phone || '',
+                            region: c.region || region || null,
                             position: 'General Applicant',
                             experience_years: 'N/A',
                             license_type: 'N/A',
@@ -168,6 +174,7 @@ export default function JobApplicationsPage() {
             (app.full_name || '').toLowerCase().includes(query) ||
             (app.email || '').toLowerCase().includes(query) ||
             (app.phone || '').toLowerCase().includes(query) ||
+            (app.region || '').toLowerCase().includes(query) ||
             (app.position || '').toLowerCase().includes(query)
 
         if (statusFilter === 'all') return matchesSearch
@@ -344,6 +351,7 @@ export default function JobApplicationsPage() {
                                 <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                                     <th className="px-6 py-4">Applied Date</th>
                                     <th className="px-6 py-4">Candidate</th>
+                                    <th className="px-6 py-4">Region / Branch</th>
                                     <th className="px-6 py-4">Position Applied For</th>
                                     <th className="px-6 py-4">Experience &amp; License</th>
                                     <th className="px-6 py-4">Status</th>
@@ -363,6 +371,15 @@ export default function JobApplicationsPage() {
                                                 <span>•</span>
                                                 <span className="text-slate-400">{app.email}</span>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {app.region ? (
+                                                <span className="font-bold text-slate-700 text-xs bg-red-50 text-red-700 border border-red-100 px-2.5 py-1 rounded-lg inline-block">
+                                                    📍 {app.region}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 font-medium italic">Not Specified</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="font-bold text-slate-800 text-xs bg-slate-100 px-3 py-1 rounded-lg inline-block">
@@ -463,6 +480,10 @@ export default function JobApplicationsPage() {
                             </div>
 
                             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500 font-semibold">Region / Branch:</span>
+                                    <strong className="text-red-600 font-bold">{selectedApp.region || 'Not Specified'}</strong>
+                                </div>
                                 <div className="flex justify-between">
                                     <span className="text-slate-500 font-semibold">Applied Position:</span>
                                     <strong className="text-slate-900">{selectedApp.position}</strong>

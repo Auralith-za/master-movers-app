@@ -10,7 +10,7 @@ import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle
 import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
-import { hasCompletedEmailAndPhone } from '../../lib/utils'
+import { hasCompletedEmailAndPhone, hasContactInfo } from '../../lib/utils'
 
 export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initialData = {}, title = "Request a Call Back", subtitle = "We'll contact you shortly" }) => {
     const [form, setForm] = useState({ name: '', surname: '', email: '', phone: '' })
@@ -148,19 +148,13 @@ export default function Step1Details() {
     const isOutlineAddress = (address, components, latLng) => {
         if (!address && !components && !latLng) return false;
         
-        const cityCode = detectCityCode(address, components, latLng);
-        
-        // If it resolves to JHB, DBN, or CPT, it's NOT outline
-        if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
-            return false;
-        }
-        
         const textOrComponentMatchesOutline = (addr, comps) => {
             const outlineTerms = [
                 'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
                 'mpumulanga', 'mphumulanga',
                 'potchefstroom', 'klerksdorp', 'rustenburg', 
                 'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+                'burgersfort', 'middelburg',
                 'kimberley', 'upington',
                 'east london', 'eastlondon', 'buffalo city',
                 'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
@@ -179,8 +173,16 @@ export default function Step1Details() {
             return false;
         };
 
+        // 1. Explicit text or component match always flags as outline
         if (textOrComponentMatchesOutline(address, components)) {
             return true;
+        }
+
+        const cityCode = detectCityCode(address, components, latLng);
+        
+        // If it resolves to JHB, DBN, or CPT, it's NOT outline
+        if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
+            return false;
         }
 
         // GPS check: if it has coordinates but is far from hubs
@@ -207,8 +209,6 @@ export default function Step1Details() {
                     return true;
                 }
             }
-        } else {
-            return true; // No GPS coords and not resolved -> treat as outline
         }
 
         return false;
@@ -220,9 +220,16 @@ export default function Step1Details() {
             return
         }
 
+        const contactKey = (moveDetails.contactEmail || '').trim().toLowerCase() || (moveDetails.contactPhone || '').replace(/\D/g, '') || 'lead'
+        const outlineKey = `mm_outline_sent_${contactKey}`
+        if (sessionStorage.getItem(outlineKey)) {
+            alert("Your request for this area has already been received. One of our consultants will contact you shortly! 📞")
+            return
+        }
+
         setIsSubmittingLead(true)
         try {
-            await submitQuote({ 
+            const result = await submitQuote({ 
                 status: 'lead', 
                 request_call_back: true,
                 client_name: moveDetails.contactName || 'Valued Client',
@@ -231,11 +238,16 @@ export default function Step1Details() {
                 pickup_address: moveDetails.pickupAddress || 'Outlaying Area',
                 dropoff_address: moveDetails.dropoffAddress || 'Outlaying Area',
                 customer_comments: '[OUTLAYING AREA] User requested custom quote from callback button.',
-                forceNew: true
+                forceNew: !lastSavedQuote?.id
             })
+            const quoteId = result?.data?.id || lastSavedQuote?.id
+            sessionStorage.setItem(outlineKey, '1')
+            if (quoteId) sessionStorage.setItem(`mm_outline_sent_${quoteId}`, '1')
+
             // 🔴 Google Ads: Lead conversion (Outline Area callback)
             trackCallbackRequest({ step: 'Step 1 — Outlaying Area' })
             await emailService.sendOutlineAreaEmail({
+                quoteId: quoteId,
                 name: moveDetails.contactName,
                 email: moveDetails.contactEmail,
                 phone: moveDetails.contactPhone,
@@ -657,28 +669,69 @@ export default function Step1Details() {
             return
         }
 
-        // 🔴 Save/confirm lead in Supabase if both email and number are completed
-        if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+        // 🔴 Save/confirm lead in Supabase and send ONE lead email when Step 1 is completed
+        if (hasContactInfo(moveDetails.contactEmail, moveDetails.contactPhone)) {
             submitQuote({ 
                 status: 'lead',
+                lead_email_sent: true,
                 forceNew: !lastSavedQuote?.id
             }).then(async (res) => {
-                if (res?.data?.id) {
+                const quoteId = res?.data?.id || lastSavedQuote?.id
+                if (quoteId) {
+                    const cleanEmail = (moveDetails.contactEmail || '').trim().toLowerCase()
+                    const cleanPhone = (moveDetails.contactPhone || '').replace(/\D/g, '')
+                    const contactKey = cleanEmail || cleanPhone || String(quoteId)
+
+                    const fullSentKey = `mm_step1_full_sent_${contactKey}`
+                    const fullSentQuoteKey = `mm_step1_full_sent_${quoteId}`
+                    const legacyKey = `mm_step1_lead_sent_${cleanEmail}`
+                    const legacyQuoteKey = `mm_step1_lead_sent_${quoteId}`
+
+                    if (
+                        sessionStorage.getItem(fullSentKey) || 
+                        sessionStorage.getItem(fullSentQuoteKey) ||
+                        sessionStorage.getItem(legacyKey) ||
+                        sessionStorage.getItem(legacyQuoteKey)
+                    ) {
+                        console.log(`[Step1] Lead alert already sent for quote ${quoteId} / ${contactKey}, skipping duplicate email.`)
+                        return
+                    }
+
+                    sessionStorage.setItem(fullSentKey, '1')
+                    sessionStorage.setItem(fullSentQuoteKey, '1')
+                    sessionStorage.setItem(`mm_step1_early_sent_${contactKey}`, '1')
+                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
+                    sessionStorage.setItem(legacyKey, '1')
+                    sessionStorage.setItem(legacyQuoteKey, '1')
+
                     try {
-                        await emailService.sendAbandonedLeadAlert({
-                            quoteId: res.data.id,
+                        const sendRes = await emailService.sendAbandonedLeadAlert({
+                            quoteId: quoteId,
                             clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
-                            clientEmail: moveDetails.contactEmail,
-                            clientPhone: moveDetails.contactPhone,
-                            moveDate: moveDetails.moveDate,
-                            referralSource: moveDetails.referralSource,
-                            pickupAddress: moveDetails.pickupAddress,
-                            dropoffAddress: moveDetails.dropoffAddress,
+                            clientEmail: moveDetails.contactEmail || '',
+                            clientPhone: moveDetails.contactPhone || '',
+                            moveDate: moveDetails.moveDate || '',
+                            referralSource: moveDetails.referralSource || '',
+                            pickupAddress: moveDetails.pickupAddress || '',
+                            dropoffAddress: moveDetails.dropoffAddress || '',
                             moveType: isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move'),
                             total: 0,
                             isInstant: true
                         })
+                        if (sendRes && sendRes.success === false) {
+                            sessionStorage.removeItem(fullSentKey)
+                            sessionStorage.removeItem(fullSentQuoteKey)
+                            sessionStorage.removeItem(legacyKey)
+                            sessionStorage.removeItem(legacyQuoteKey)
+                            console.warn(`[Step1] Lead alert failed:`, sendRes.error)
+                        } else {
+                            console.log(`[Step1] Lead alert sent successfully for quote ${quoteId}`)
+                        }
                     } catch (e) {
+                        sessionStorage.removeItem(fullSentKey)
+                        sessionStorage.removeItem(fullSentQuoteKey)
+                        sessionStorage.removeItem(legacyKey)
+                        sessionStorage.removeItem(legacyQuoteKey)
                         console.error('Step 1 lead email alert error:', e)
                     }
                 }
@@ -1399,9 +1452,20 @@ export default function Step1Details() {
                         type="button"
                         onClick={async () => {
                             if (hasCompletedEmailAndPhone(moveDetails.contactEmail, moveDetails.contactPhone)) {
+                                const contactKey = (moveDetails.contactEmail || '').trim().toLowerCase() || (moveDetails.contactPhone || '').replace(/\D/g, '') || 'lead'
+                                const callbackKey = `mm_callback_sent_${contactKey}`
+                                if (sessionStorage.getItem(callbackKey)) {
+                                    alert("Your callback request has already been received. One of our agents will call you back shortly! 📞")
+                                    return
+                                }
+
                                 setIsSubmittingLead(true)
                                 try {
-                                    const result = await submitQuote({ status: 'lead', request_call_back: true, forceNew: true })
+                                    const result = await submitQuote({ status: 'lead', request_call_back: true, forceNew: !lastSavedQuote?.id })
+                                    const quoteId = result?.data?.id || lastSavedQuote?.id
+                                    sessionStorage.setItem(callbackKey, '1')
+                                    if (quoteId) sessionStorage.setItem(`mm_callback_sent_${quoteId}`, '1')
+
                                     // 🔴 Google Ads: Lead / Callback conversion
                                     trackCallbackRequest({ step: 'Step 1 — Details' })
                                     // Send urgent callback alert to all admins
@@ -1451,6 +1515,12 @@ export default function Step1Details() {
                     onClose={() => setShowLeadModal(false)}
                     isLoading={isSubmittingLead}
                     onSubmit={async (formData) => {
+                        const contactKey = (formData.email || '').trim().toLowerCase() || (formData.phone || '').replace(/\D/g, '') || 'lead'
+                        const modalKey = `mm_callback_sent_${contactKey}`
+                        if (sessionStorage.getItem(modalKey)) {
+                            return true
+                        }
+
                         setIsSubmittingLead(true)
                         try {
                             // Save to store
@@ -1462,14 +1532,18 @@ export default function Step1Details() {
                                 contactPhone: formData.phone
                             })
                             // Submit lead
-                            await submitQuote({ 
+                            const result = await submitQuote({ 
                                 status: 'lead', 
                                 request_call_back: true,
                                 client_name: fullName,
                                 contactEmail: formData.email,
                                 contactPhone: formData.phone,
-                                forceNew: true
+                                forceNew: !lastSavedQuote?.id
                             })
+                            const quoteId = result?.data?.id || lastSavedQuote?.id
+                            sessionStorage.setItem(modalKey, '1')
+                            if (quoteId) sessionStorage.setItem(`mm_callback_sent_${quoteId}`, '1')
+
                             // 🔴 Send urgent callback email to admins
                             trackCallbackRequest({ step: 'Step 1 — Call Back Modal' })
                             await emailService.sendCallbackEmail({
@@ -1523,9 +1597,18 @@ export default function Step1Details() {
                                                 setShowLeadModal(true)
                                                 return
                                             }
+
+                                            const contactKey = (moveDetails.contactEmail || '').trim().toLowerCase() || (moveDetails.contactPhone || '').replace(/\D/g, '') || 'lead'
+                                            const outlineModalKey = `mm_outline_sent_${contactKey}`
+                                            if (sessionStorage.getItem(outlineModalKey)) {
+                                                setShowOutlineModal(false)
+                                                alert("Your custom quote request for this area has already been received. One of our consultants will contact you shortly! 📞")
+                                                return
+                                            }
+
                                             setIsSubmittingLead(true)
                                             try {
-                                                await submitQuote({ 
+                                                const result = await submitQuote({ 
                                                     status: 'lead', 
                                                     request_call_back: true,
                                                     client_name: moveDetails.contactName || 'Valued Client',
@@ -1534,11 +1617,16 @@ export default function Step1Details() {
                                                     pickup_address: moveDetails.pickupAddress || 'Outlaying Area',
                                                     dropoff_address: moveDetails.dropoffAddress || 'Outlaying Area',
                                                     customer_comments: '[OUTLAYING AREA] User requested a custom quote for an outlaying area.',
-                                                    forceNew: true
+                                                    forceNew: !lastSavedQuote?.id
                                                 })
+                                                const quoteId = result?.data?.id || lastSavedQuote?.id
+                                                sessionStorage.setItem(outlineModalKey, '1')
+                                                if (quoteId) sessionStorage.setItem(`mm_outline_sent_${quoteId}`, '1')
+
                                                 // 🔴 Google Ads: Lead conversion (Outline Area callback)
                                                 trackCallbackRequest({ step: 'Step 1 — Outlaying Area' })
                                                 await emailService.sendOutlineAreaEmail({
+                                                    quoteId: quoteId,
                                                     name: moveDetails.contactName,
                                                     email: moveDetails.contactEmail,
                                                     phone: moveDetails.contactPhone,

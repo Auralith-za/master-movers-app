@@ -176,7 +176,7 @@ export const useMoveStore = create(
             reset: () => {
                 // Clear sessionStorage dedup guards so a new quote flow can create a fresh lead
                 Object.keys(sessionStorage)
-                    .filter(k => k.startsWith('mm_step4_lead_saved_'))
+                    .filter(k => k.startsWith('mm_step4_') || k.startsWith('mm_step1_'))
                     .forEach(k => sessionStorage.removeItem(k))
                 sessionStorage.removeItem('abandoned_lead_sent')
                 set({ 
@@ -285,8 +285,10 @@ export const useMoveStore = create(
                             extraDrops: state.moveDetails?.extraDrops || [],
                             rejection_reason: rejectionReason,
                             referral_source: referralSource,
+                            custom_products: state.moveDetails?.customProducts || state.moveDetails?.custom_products || [],
                             ...activeInventory
                         },
+                    custom_products: state.moveDetails?.customProducts || state.moveDetails?.custom_products || [],
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
@@ -648,16 +650,15 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         }
     })
 
-    // Add custom products volume, wrapping, and sleeves if provided in moveDetails
+    // Add custom products volume, wrapping, sleeves, and price if provided in moveDetails
     const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
+    let customProductsCost = 0;
     if (Array.isArray(customProductsList)) {
         customProductsList.forEach(prod => {
             const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
             const unitVol = parseFloat(prod.cubes || prod.cuft || 0);
             const pVol = unitVol * qty;
-            if (!extraVolumeCuFt) {
-                totalVolume += pVol;
-            }
+            totalVolume += pVol;
             let appliesWrap = Boolean(prod.wrap);
             let sleeveQty = parseInt(prod.sleeves) || 0;
 
@@ -677,6 +678,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
                 wrappingVolume += pVol;
                 wrappingCost += pVol * 5.90;
             }
+
+            // Ex-VAT price for custom product
+            if (prod.price !== undefined && prod.price !== null && prod.price !== '' && !isNaN(parseFloat(prod.price))) {
+                customProductsCost += (parseFloat(prod.price) || 0);
+            }
         });
     }
 
@@ -685,8 +691,25 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // Add volume for ordered boxes — only when user has confirmed the quantities
     const boxesConfirmed = moveDetails.boxesConfirmed !== false
-    const orderedSt7Volume = boxesConfirmed ? (moveDetails.st7Boxes || 0) * 4.25 : 0
-    const orderedLinenVolume = boxesConfirmed ? (moveDetails.linenBoxes || 0) * 8 : 0
+    let totalOrderedSt7 = 0
+    let totalOrderedLinen = 0
+
+    if (moveDetails.sendMeBoxes || moveDetails.boxesAndPacking) {
+        if (moveDetails.sendMeBoxes?.enabled) {
+            totalOrderedSt7 += Number(moveDetails.sendMeBoxes.st7) || 0
+            totalOrderedLinen += Number(moveDetails.sendMeBoxes.linen) || 0
+        }
+        if (moveDetails.boxesAndPacking?.enabled) {
+            totalOrderedSt7 += Number(moveDetails.boxesAndPacking.st7) || 0
+            totalOrderedLinen += Number(moveDetails.boxesAndPacking.linen) || 0
+        }
+    } else {
+        totalOrderedSt7 = moveDetails.st7Boxes || 0
+        totalOrderedLinen = moveDetails.linenBoxes || 0
+    }
+
+    const orderedSt7Volume = boxesConfirmed ? totalOrderedSt7 * 4.25 : 0
+    const orderedLinenVolume = boxesConfirmed ? totalOrderedLinen * 8 : 0
     totalVolume += orderedSt7Volume + orderedLinenVolume
 
     const totalVolumeCuFt = totalVolume
@@ -730,6 +753,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         'mpumulanga', 'mphumulanga',
         'potchefstroom', 'klerksdorp', 'rustenburg', 
         'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
+        'burgersfort', 'middelburg',
         'kimberley', 'upington',
         'east london', 'eastlondon', 'buffalo city',
         'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
@@ -1105,24 +1129,113 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     }
 
     let packagingCost = 0
-    const hasStep2Packaging = moveDetails.packagingOption && moveDetails.packagingOption !== 'none';
-    const totalSt7 = boxesConfirmed ? (moveDetails.st7Boxes || 0) : 0
-    const totalLinen = boxesConfirmed ? (moveDetails.linenBoxes || 0) : 0
-    const totalBoxesOrdered = totalSt7 + totalLinen
-    
-    if ((hasStep2Packaging && totalBoxesOrdered > 0) || boxQty > 0) {
-        const isBoxesOnly = moveDetails.packagingOption === 'boxes_only' || !hasStep2Packaging
-        const rates = isBoxesOnly 
-            ? PACKAGING_RATES.sendMeBoxesOnly 
-            : PACKAGING_RATES.boxesAndPacking
+    let boxDeliveryFee = 0
+    let sendMeBoxesCost = 0
+    let boxesAndPackingCost = 0
+    let packagingDetails = null
+
+    const sendMeBoxes = moveDetails.sendMeBoxes
+    const boxesAndPacking = moveDetails.boxesAndPacking
+
+    if (sendMeBoxes || boxesAndPacking) {
+        const sendEnabled = Boolean(sendMeBoxes?.enabled)
+        const sendSt7 = sendEnabled ? (Number(sendMeBoxes?.st7) || 0) : 0
+        const sendLinen = sendEnabled ? (Number(sendMeBoxes?.linen) || 0) : 0
+        const hasSendBoxes = sendEnabled && (sendSt7 > 0 || sendLinen > 0)
+
+        if (hasSendBoxes) {
+            boxDeliveryFee = sendMeBoxes?.deliveryFee !== undefined 
+                ? Number(sendMeBoxes.deliveryFee) 
+                : (sendMeBoxes?.delivery_fee !== undefined ? Number(sendMeBoxes.delivery_fee) : (PACKAGING_RATES.sendMeBoxesOnly.deliveryFee || 500))
+            const st7Cost = sendSt7 * PACKAGING_RATES.sendMeBoxesOnly.st7
+            const linenCost = sendLinen * PACKAGING_RATES.sendMeBoxesOnly.linen
+            sendMeBoxesCost = st7Cost + linenCost + boxDeliveryFee
+        }
+
+        const packEnabled = Boolean(boxesAndPacking?.enabled)
+        const packSt7 = packEnabled ? (Number(boxesAndPacking?.st7) || 0) : 0
+        const packLinen = packEnabled ? (Number(boxesAndPacking?.linen) || 0) : 0
+        const hasPackBoxes = packEnabled && (packSt7 > 0 || packLinen > 0)
+
+        if (hasPackBoxes) {
+            const st7Cost = packSt7 * PACKAGING_RATES.boxesAndPacking.st7
+            const linenCost = packLinen * PACKAGING_RATES.boxesAndPacking.linen
+            boxesAndPackingCost = st7Cost + linenCost
+        }
+
+        packagingCost = sendMeBoxesCost + boxesAndPackingCost
+        packagingDetails = {
+            sendMeBoxes: {
+                enabled: sendEnabled,
+                st7: sendSt7,
+                linen: sendLinen,
+                st7Rate: PACKAGING_RATES.sendMeBoxesOnly.st7,
+                linenRate: PACKAGING_RATES.sendMeBoxesOnly.linen,
+                deliveryFee: hasSendBoxes ? boxDeliveryFee : 0,
+                st7Cost: sendSt7 * PACKAGING_RATES.sendMeBoxesOnly.st7,
+                linenCost: sendLinen * PACKAGING_RATES.sendMeBoxesOnly.linen,
+                total: sendMeBoxesCost
+            },
+            boxesAndPacking: {
+                enabled: packEnabled,
+                st7: packSt7,
+                linen: packLinen,
+                st7Rate: PACKAGING_RATES.boxesAndPacking.st7,
+                linenRate: PACKAGING_RATES.boxesAndPacking.linen,
+                st7Cost: packSt7 * PACKAGING_RATES.boxesAndPacking.st7,
+                linenCost: packLinen * PACKAGING_RATES.boxesAndPacking.linen,
+                total: boxesAndPackingCost
+            }
+        }
+    } else {
+        const hasStep2Packaging = moveDetails.packagingOption && moveDetails.packagingOption !== 'none';
+        const totalSt7 = boxesConfirmed ? (moveDetails.st7Boxes || 0) : 0
+        const totalLinen = boxesConfirmed ? (moveDetails.linenBoxes || 0) : 0
+        const totalBoxesOrdered = totalSt7 + totalLinen
+        
+        if ((hasStep2Packaging && totalBoxesOrdered > 0) || boxQty > 0) {
+            const isBoxesOnly = moveDetails.packagingOption === 'boxes_only' || !hasStep2Packaging
+            const rates = isBoxesOnly 
+                ? PACKAGING_RATES.sendMeBoxesOnly 
+                : PACKAGING_RATES.boxesAndPacking
+                
+            const st7Cost = totalSt7 * rates.st7
+            const linenCost = totalLinen * rates.linen
             
-        const st7Cost = totalSt7 * rates.st7
-        const linenCost = totalLinen * rates.linen
-        
-        // Apply delivery fee from rates if they explicitly used a packaging service and ordered boxes
-        const deliveryFee = hasStep2Packaging ? (rates.deliveryFee || 0) : 0
-        
-        packagingCost = st7Cost + linenCost + deliveryFee
+            const deliveryFee = hasStep2Packaging ? (rates.deliveryFee || 0) : 0
+            boxDeliveryFee = deliveryFee
+            
+            if (isBoxesOnly) {
+                sendMeBoxesCost = st7Cost + linenCost + deliveryFee
+            } else {
+                boxesAndPackingCost = st7Cost + linenCost
+            }
+
+            packagingCost = st7Cost + linenCost + deliveryFee
+            packagingDetails = {
+                sendMeBoxes: {
+                    enabled: isBoxesOnly,
+                    st7: isBoxesOnly ? totalSt7 : 0,
+                    linen: isBoxesOnly ? totalLinen : 0,
+                    st7Rate: PACKAGING_RATES.sendMeBoxesOnly.st7,
+                    linenRate: PACKAGING_RATES.sendMeBoxesOnly.linen,
+                    deliveryFee: isBoxesOnly ? deliveryFee : 0,
+                    st7Cost: isBoxesOnly ? totalSt7 * PACKAGING_RATES.sendMeBoxesOnly.st7 : 0,
+                    linenCost: isBoxesOnly ? totalLinen * PACKAGING_RATES.sendMeBoxesOnly.linen : 0,
+                    total: isBoxesOnly ? packagingCost : 0
+                },
+                boxesAndPacking: {
+                    enabled: !isBoxesOnly,
+                    st7: !isBoxesOnly ? totalSt7 : 0,
+                    linen: !isBoxesOnly ? totalLinen : 0,
+                    st7Rate: PACKAGING_RATES.boxesAndPacking.st7,
+                    linenRate: PACKAGING_RATES.boxesAndPacking.linen,
+                    st7Cost: !isBoxesOnly ? totalSt7 * PACKAGING_RATES.boxesAndPacking.st7 : 0,
+                    linenCost: !isBoxesOnly ? totalLinen * PACKAGING_RATES.boxesAndPacking.linen : 0,
+                    total: !isBoxesOnly ? packagingCost : 0
+                }
+            }
+        }
     }
 
     const specialWrappingCost = parseFloat(manualServiceCharges?.specialWrapping) || 0
@@ -1145,9 +1258,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const documentationFee = needsQuoteRequest ? 0 : (PRICING_CONSTANTS.documentationFee || 175)
     const autoPackagingCost = plasticSleeveCost + wrappingCost
 
-    // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs)
+    // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs, custom products)
     // Packaging add-ons are kept separate so they always apply ON TOP of the minimum charge
-    let baseCost = transportCost + volumeCost + accessFees + longCarryCost + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee
+    let baseCost = transportCost + volumeCost + accessFees + longCarryCost + shuttleCost + additionalCrewCost + extraDistanceFees + packagingCost + manualServiceChargesTotal + standardInsurance + documentationFee + customProductsCost
 
     // Robust day-of-month extractor supporting YYYY-MM-DD, DD/MM/YYYY, YYYY/MM/DD, DD-MM-YYYY, and Date instances
     const getDayOfMonth = (dateVal) => {
@@ -1177,7 +1290,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // Check if raw unpadded move transport/volume cost was at or below minimum threshold
     const rawMoveCost = isNationalMove
-        ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${dropoffCityCode}`]?.ratePerCuFt || 25))
+        ? (totalVolumeCuFt * (NATIONAL_RATES[`${pickupCityCode}-${nationalDestinationCityCode}`]?.ratePerCuFt || 25))
         : ((totalDistance * transportRate) + (totalVolumeCuFt * volumeRate));
 
     let isMinQuote = (rawMoveCost <= routeMinCharge);
@@ -1281,12 +1394,17 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             extraDistance: extraDistanceFees,
             detailedExtraDistance: detailedExtraDistance.length > 0 ? detailedExtraDistance.join(' | ') : 'No Depot Surcharges',
             packaging: packagingCost,
+            boxDeliveryFee: boxDeliveryFee,
+            sendMeBoxesCost: sendMeBoxesCost,
+            boxesAndPackingCost: boxesAndPackingCost,
+            packagingDetails: packagingDetails,
             wrapping: autoPackagingCost,
             wrappingVolume: wrappingVolume,
             wrappingCost: wrappingCost,
             plasticSleeveCost: plasticSleeveCost,
             plasticSleeveCount: plasticSleeveCount,
             specialWrapping: specialWrappingCost,
+            customProductsCost: customProductsCost,
             shuttleCost: shuttleCost,
             longCarryCost: longCarryCost,
             standardInsurance: standardInsurance,

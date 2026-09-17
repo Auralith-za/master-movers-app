@@ -152,39 +152,60 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     ) : 0
     const discountedTotal = Math.max(0, total - couponDiscount)
 
-    // Auto-save as 'lead' the moment customer reaches Step 4 — captures abandoners.
-    // Uses sessionStorage to guard against duplicate inserts from:
+    // Auto-save as 'lead' the moment customer reaches Step 4 and send Step 4 summary alert
+    // Uses sessionStorage to guard against duplicate inserts and duplicate emails from:
     //   - React StrictMode double-invocation
-    //   - Page refreshes (useRef resets, but sessionStorage persists)
-    //   - Component unmount/remount from navigation
-    // If a lastSavedQuote already exists in the store, it UPDATE that record instead.
+    //   - Page refreshes
+    //   - Navigation back and forth
     React.useEffect(() => {
         if (!moveDetails.contactName || submissionType === 'admin') return
 
-        // Already captured a lead for this customer in this browser session
-        if (sessionStorage.getItem(step4SessionKey)) {
-            console.log('[Step4] Lead already captured this session, skipping duplicate insert.')
-            return
-        }
-
-        // Mark as captured immediately (before async call) to prevent race conditions
-        sessionStorage.setItem(step4SessionKey, '1')
-        console.log('[Step4] Auto-saving as lead on arrival...')
+        console.log('[Step4] Auto-saving lead with full inventory & totals on arrival...')
 
         submitQuote({
             status: 'lead',
             submission_type: submissionType,
-            // forceNew only if no existing quote from this session
             forceNew: !lastSavedQuote?.id
         }).then(result => {
-            if (result.success) {
-                console.log('[Step4] Lead captured:', result.data?.[0]?.id)
-            } else {
-                // Clear the flag so it can retry on next visit
-                sessionStorage.removeItem(step4SessionKey)
+            const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
+            const quoteId = savedQuote?.id || lastSavedQuote?.id
+
+            if (quoteId) {
+                console.log('[Step4] Lead saved to DB:', quoteId)
+
+                // Only send the pending quote admin email once per session
+                if (!sessionStorage.getItem(step4SessionKey)) {
+                    sessionStorage.setItem(step4SessionKey, '1')
+                    console.log('[Step4] Dispatching pending quote alert email for quote:', quoteId)
+                    emailService.sendPendingQuoteAlert({
+                        quoteId: quoteId,
+                        totalVolume: totalVolume,
+                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                        clientEmail: moveDetails.contactEmail,
+                        clientPhone: moveDetails.contactPhone,
+                        moveDate: moveDetails.moveDate,
+                        pickupAddress: moveDetails.pickupAddress,
+                        dropoffAddress: moveDetails.dropoffAddress,
+                        extraCollections: moveDetails.extraCollections || [],
+                        extraDrops: moveDetails.extraDrops || [],
+                        accessDetails: accessDetails,
+                        total: discountedTotal || total,
+                        vat: vat,
+                        subTotal: subTotal,
+                        inventory: inventory,
+                        breakdown: breakdown,
+                        inventoryItems: INVENTORY_ITEMS,
+                        moveType: moveDetails.moveType || '',
+                        paymentMethod: moveDetails.paymentMethod || 'not selected'
+                    }).catch(err => {
+                        sessionStorage.removeItem(step4SessionKey)
+                        console.error('[Step4] Non-blocking admin alert error:', err)
+                    })
+                }
+            } else if (!result.success) {
                 console.warn('[Step4] Lead save failed:', result.error)
             }
-        })
+        }).catch(err => console.error('[Step4] Auto-save error:', err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [moveDetails.contactName])
 

@@ -344,14 +344,51 @@ export const generateProfessionalQuote = (data) => {
                 if (bd.longCarryCost > 0) costs.push(['Long Carry', `R ${Number(bd.longCarryCost).toFixed(2)}`]);
                 if (bd.access > 0) costs.push(['Access Fees (Stairs/Elevator/Hoisting)', `R ${Number(bd.access).toFixed(2)}`]);
                 if (bd.crew > 0) costs.push(['Additional Crew', `R ${Number(bd.crew).toFixed(2)}`]);
-                if (bd.packaging > 0) {
+                const pkgDetails = bd.packagingDetails || data.packagingDetails;
+                if (pkgDetails) {
+                    const sendMeBoxes = pkgDetails.sendMeBoxes;
+                    const boxesAndPacking = pkgDetails.boxesAndPacking;
+
+                    if (sendMeBoxes && sendMeBoxes.enabled && (sendMeBoxes.st7 > 0 || sendMeBoxes.linen > 0)) {
+                        const sendLabels = [];
+                        if (sendMeBoxes.st7 > 0) sendLabels.push(`${sendMeBoxes.st7} x R${PACKAGING_RATES.sendMeBoxesOnly.st7.toFixed(0)}`);
+                        if (sendMeBoxes.linen > 0) sendLabels.push(`${sendMeBoxes.linen} x R${PACKAGING_RATES.sendMeBoxesOnly.linen.toFixed(0)}`);
+                        const sendCost = (sendMeBoxes.st7 * PACKAGING_RATES.sendMeBoxesOnly.st7) + (sendMeBoxes.linen * PACKAGING_RATES.sendMeBoxesOnly.linen);
+                        costs.push([`Box Supplies - Pre-Move Delivery (${sendLabels.join(', ')})`, `R ${Number(sendCost).toFixed(2)}`]);
+
+                        const deliveryFee = Number(sendMeBoxes.deliveryFee !== undefined ? sendMeBoxes.deliveryFee : (bd.boxDeliveryFee || 500));
+                        if (deliveryFee > 0) {
+                            costs.push(['Box Delivery & Handling Fee', `R ${Number(deliveryFee).toFixed(2)}`]);
+                        }
+                    }
+
+                    if (boxesAndPacking && boxesAndPacking.enabled && (boxesAndPacking.st7 > 0 || boxesAndPacking.linen > 0)) {
+                        const packLabels = [];
+                        if (boxesAndPacking.st7 > 0) packLabels.push(`${boxesAndPacking.st7} x R${PACKAGING_RATES.boxesAndPacking.st7.toFixed(0)}`);
+                        if (boxesAndPacking.linen > 0) packLabels.push(`${boxesAndPacking.linen} x R${PACKAGING_RATES.boxesAndPacking.linen.toFixed(0)}`);
+                        const packCost = (boxesAndPacking.st7 * PACKAGING_RATES.boxesAndPacking.st7) + (boxesAndPacking.linen * PACKAGING_RATES.boxesAndPacking.linen);
+                        costs.push([`Full Packaging Service - Boxes + Packing (${packLabels.join(', ')})`, `R ${Number(packCost).toFixed(2)}`]);
+                    }
+                } else if (bd.packaging > 0) {
                     const numSt7 = st7Boxes || data.st7Boxes || 0;
                     const numLinen = linenBoxes || data.linenBoxes || 0;
+                    const isBoxesOnly = data.packagingOption === 'boxes_only';
                     const labels = [];
-                    if (numSt7 > 0) labels.push(`${numSt7} x R${(data.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)}`);
-                    if (numLinen > 0) labels.push(`${numLinen} x R${(data.packagingOption === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)}`);
-                    const boxText = labels.length > 0 ? `Box Supplies (${labels.join(', ')})` : 'Box Supplies';
-                    costs.push([boxText, `R ${Number(bd.packaging).toFixed(2)}`]);
+                    if (numSt7 > 0) labels.push(`${numSt7} x R${(isBoxesOnly ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)}`);
+                    if (numLinen > 0) labels.push(`${numLinen} x R${(isBoxesOnly ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)}`);
+                    
+                    const boxMaterialsCost = (numSt7 * (isBoxesOnly ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7)) +
+                                             (numLinen * (isBoxesOnly ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen));
+                    const boxText = isBoxesOnly 
+                        ? (labels.length > 0 ? `Box Supplies - Pre-Move Delivery (${labels.join(', ')})` : 'Box Supplies')
+                        : (labels.length > 0 ? `Full Packaging Service (${labels.join(', ')})` : 'Full Packaging Service');
+
+                    costs.push([boxText, `R ${Number(boxMaterialsCost || bd.packaging).toFixed(2)}`]);
+
+                    const dFee = bd.boxDeliveryFee !== undefined ? bd.boxDeliveryFee : (isBoxesOnly && bd.packaging > boxMaterialsCost ? (bd.packaging - boxMaterialsCost) : 0);
+                    if (dFee > 0) {
+                        costs.push(['Box Delivery & Handling Fee', `R ${Number(dFee).toFixed(2)}`]);
+                    }
                 }
                 if (bd.plasticSleeveCost > 0) {
                     costs.push(['Plastic Sleeves', `R ${Number(bd.plasticSleeveCost).toFixed(2)}`]);
@@ -378,10 +415,10 @@ export const generateProfessionalQuote = (data) => {
                 }
             }
 
-            // Itemize custom products explicitly if provided (with non-zero manual prices, e.g. coupons)
+            // Itemize custom products explicitly if provided (prices are EX-VAT matching table format)
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
                 customProductsList.forEach(prod => {
-                    if (prod.name && prod.price !== undefined && prod.price !== 0) {
+                    if (prod.name && prod.price !== undefined && prod.price !== 0 && !isNaN(parseFloat(prod.price))) {
                         const pVal = Number(prod.price) || 0;
                         if (pVal > 0) {
                             costs.push([prod.name, `R ${pVal.toFixed(2)}`]);
@@ -403,10 +440,19 @@ export const generateProfessionalQuote = (data) => {
                 return acc + (parseFloat(valStr) || 0);
             }, 0);
 
-            // Use calculated subtotal from valid lines so table and totals are 100% synchronized
-            const finalSubtotal = (bd || calculatedSubtotal > 0) ? calculatedSubtotal : serviceFees;
-            const finalVat = finalSubtotal * 0.15;
-            const finalTotal = finalSubtotal * 1.15;
+            // Reconcile with target subtotal / total ONLY if quote is flagged as a manual override
+            const isManualPrice = Boolean(data.is_manual_price || data.isManualPrice);
+            const targetSubtotal = numSubTotal > 0 ? numSubTotal : (numTotal > 0 ? numTotal / 1.15 : calculatedSubtotal);
+            const diff = Math.round((targetSubtotal - calculatedSubtotal) * 100) / 100;
+
+            if (isManualPrice && Math.abs(diff) >= 0.01) {
+                const diffLabel = diff > 0 ? 'Manual Price Adjustment' : 'Manual Discount / Adjustment';
+                costs.push([diffLabel, `${diff >= 0 ? 'R ' : '-R '}${Math.abs(diff).toFixed(2)}`]);
+            }
+
+            const finalSubtotal = isManualPrice ? targetSubtotal : calculatedSubtotal;
+            const finalVat = (isManualPrice && numVat > 0) ? numVat : (finalSubtotal * 0.15);
+            const finalTotal = isManualPrice && numTotal > 0 ? numTotal : (finalSubtotal + finalVat);
 
             costs.push(
                 ['Subtotal Excl. VAT', `R ${finalSubtotal.toFixed(2)}`],

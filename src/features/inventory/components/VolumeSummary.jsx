@@ -18,8 +18,12 @@ export default function VolumeSummary({ items, inventory, breakdown = {}, childr
         
         const orderedSt7Boxes = moveDetails?.st7Boxes || 0
         const orderedLinenBoxes = moveDetails?.linenBoxes || 0
-        return baseVolume + (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8)
-    }, [items, inventory, moveDetails?.st7Boxes, moveDetails?.linenBoxes])
+        const customProductsList = moveDetails?.customProducts || moveDetails?.custom_products || []
+        const customVol = Array.isArray(customProductsList) 
+            ? customProductsList.reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0)
+            : 0
+        return baseVolume + (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8) + customVol
+    }, [items, inventory, moveDetails?.st7Boxes, moveDetails?.linenBoxes, moveDetails?.customProducts, moveDetails?.custom_products])
 
     const boxQty = useMemo(() => {
         let baseQty = Object.entries(inventory).reduce((total, [idKey, qty]) => {

@@ -21,3 +21,13 @@ export function hasCompletedEmailAndPhone(email, phone) {
     return isEmailValid(email) && isPhoneValid(phone)
 }
 
+export function hasContactInfo(email, phone) {
+    return isEmailValid(email) || isPhoneValid(phone)
+}
+
+export function hasEarlyLeadInfo(name, surname, email, phone) {
+    const hasName = Boolean((name && typeof name === 'string' && name.trim().length > 0) || (surname && typeof surname === 'string' && surname.trim().length > 0))
+    const hasContact = hasContactInfo(email, phone)
+    return hasName && hasContact
+}
+

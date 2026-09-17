@@ -149,7 +149,15 @@ export default function TestCalcBreakdown() {
     const orderedSt7Boxes = moveDetails.st7Boxes || 0;
     const orderedLinenBoxes = moveDetails.linenBoxes || 0;
     totalVolume += (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8);
-    boxQty += orderedSt7Boxes + orderedLinenBoxes;
+    // Add custom products volume
+    const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
+    if (Array.isArray(customProductsList)) {
+        customProductsList.forEach(prod => {
+            const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
+            const unitVol = parseFloat(prod.cubes || prod.cuft || 0);
+            totalVolume += (unitVol * qty);
+        });
+    }
 
     // Vehicle selection (mirroring moveStore logic)
     const isNational = result?.isNationalMove || false

@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { useMoveStore } from '../inventory/store/moveStore'
+import { detectCityCode } from '../inventory/data/pricingRates'
+import { formatClientName } from '../../utils/quoteHelpers'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
-import { hasCompletedEmailAndPhone } from '../../lib/utils'
+import { hasCompletedEmailAndPhone, hasContactInfo, hasEarlyLeadInfo } from '../../lib/utils'
 import Step1Details from './Step1Details'
 import Step2Access from './Step2Access'
 import Step3Inventory from './Step3Inventory'
@@ -20,8 +22,8 @@ function sendInstantLeadAlert(quoteData) {
     if (!quoteData) return
     const email = quoteData.client_email || quoteData.contactEmail
     const phone = quoteData.client_phone || quoteData.contactPhone
-    if (!hasCompletedEmailAndPhone(email, phone)) {
-        console.log('Skipping instant lead alert: email and number not completed yet.')
+    if (!hasContactInfo(email, phone)) {
+        console.log('Skipping instant lead alert: valid email or phone number required.')
         return
     }
 
@@ -50,22 +52,30 @@ export default function MoveWizard() {
     const navigate = useNavigate()
     const { moveDetails, accessDetails, inventory, getTotals, submitQuote, lastSavedQuote } = useMoveStore()
 
-    // Track whether a "new lead" alert has already been sent this session
-    const leadAlertSentRef = useRef(false)
-    // Track the latest saved quote for use inside event listeners (avoids stale closure)
+    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' :
+        location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote'
+    const isAdmin = basePath === '/admin/quotes/new'
+    const isTest = basePath === '/quote-test'
+
+    // Track the latest saved quote for use inside effects
     const lastSavedQuoteRef = useRef(lastSavedQuote)
-    // Inactivity timer ref
-    const inactivityTimerRef = useRef(null)
 
     // Keep lastSavedQuoteRef in sync
     useEffect(() => {
         lastSavedQuoteRef.current = lastSavedQuote
     }, [lastSavedQuote])
 
-    // ─── Helper: has completed email AND phone number to trigger auto-save/alert ───────────────
+    // ─── Helper: has entered name and either phone or email to trigger auto-save/alert ─────────
     const hasLeadProgress = useCallback(() => {
-        return hasCompletedEmailAndPhone(moveDetails?.contactEmail, moveDetails?.contactPhone)
+        return hasEarlyLeadInfo(
+            moveDetails?.contactName,
+            moveDetails?.surname,
+            moveDetails?.contactEmail,
+            moveDetails?.contactPhone
+        )
     }, [
+        moveDetails?.contactName,
+        moveDetails?.surname,
         moveDetails?.contactEmail,
         moveDetails?.contactPhone
     ])
@@ -98,133 +108,151 @@ export default function MoveWizard() {
         }
     }, [lastSavedQuote?.id, lastSavedQuote?.status, location.pathname])
 
-    // ─── 1. Debounced Auto-Save to Database ─────────────────────────────────
+    // ─── 1. Debounced Auto-Save to Database (Fast: 1.5s) ──────────────────────
     useEffect(() => {
-        // Auto-save once any lead progress detail is entered
+        // Auto-save once any lead progress detail is entered (Name + Phone or Email)
         if (!hasLeadProgress()) return
 
-        const timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(async () => {
             // Preserve existing advanced statuses, but always at least 'lead'
             const currentStatus = lastSavedQuote?.status
             const advancedStatuses = ['processing', 'pending_payment', 'booked', 'paid', 'booked_paid', 'completed', 'rejected', 'on_hold']
             const statusToUse = (currentStatus && advancedStatuses.includes(currentStatus)) ? currentStatus : 'lead'
             console.log('Auto-saving progress to database as status:', statusToUse)
-            submitQuote({ status: statusToUse }).catch(console.error)
+            
+            await submitQuote({ status: statusToUse }).catch(console.error)
         }, 1500)
 
         return () => clearTimeout(timeoutId)
     }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status, hasLeadProgress])
 
-    // ─── 2. Inactivity Timer (2 min idle = send lead alert) ─────────────────
-    const resetInactivityTimer = useCallback(() => {
-        if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
-
-        inactivityTimerRef.current = setTimeout(() => {
-            if (!hasLeadProgress()) return
-            if (leadAlertSentRef.current) return
-
-            const quote = lastSavedQuoteRef.current
-            if (!quote) return
-
-            console.log('⏰ 2-min inactivity detected — sending lead alert...')
-            leadAlertSentRef.current = true
-            sessionStorage.setItem('mm_lead_alert_sent', quote.id || 'sent')
-
-            sendInstantLeadAlert(quote)
-        }, 2 * 60 * 1000) // 2 minutes
-    }, [hasLeadProgress])
-
+    // ─── 2. Step 1 Lead Email Triggers (Tier 1: 25s Inactivity/Abandon; Tier 2: Complete) ─────
     useEffect(() => {
-        // Only watch for inactivity when we have progress details
-        if (!hasLeadProgress()) return
+        if (isAdmin || isTest || !hasLeadProgress()) return
 
-        // Restore dedup guard from sessionStorage
-        const savedQuoteId = lastSavedQuote?.id
-        if (savedQuoteId && sessionStorage.getItem('mm_lead_alert_sent') === String(savedQuoteId)) {
-            leadAlertSentRef.current = true
-            return // Already sent for this quote session
-        }
+        const cleanEmail = (moveDetails?.contactEmail || '').trim().toLowerCase()
+        const cleanPhone = (moveDetails?.contactPhone || '').replace(/\D/g, '')
+        const contactKey = cleanEmail || cleanPhone || (lastSavedQuote?.id ? String(lastSavedQuote.id) : '')
+        if (!contactKey) return
 
-        const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart']
-        events.forEach(e => window.addEventListener(e, resetInactivityTimer, { passive: true }))
-        resetInactivityTimer() // Start immediately
+        const hasCompletedName = Boolean(moveDetails?.contactName?.trim() || moveDetails?.surname?.trim())
+        const hasValidContact = hasContactInfo(moveDetails?.contactEmail, moveDetails?.contactPhone)
+        const hasCompletedAddresses = Boolean(moveDetails?.pickupAddress?.trim() && (moveDetails?.dropoffAddress?.trim() || moveDetails?.storageDestination))
+        const hasMoveDate = Boolean(moveDetails?.moveDate)
 
-        return () => {
-            events.forEach(e => window.removeEventListener(e, resetInactivityTimer))
-            if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
-        }
-    }, [hasLeadProgress, resetInactivityTimer, lastSavedQuote?.id])
+        const earlySentKey = `mm_step1_early_sent_${contactKey}`
+        const fullSentKey = `mm_step1_full_sent_${contactKey}`
 
-    // ─── 3. Tab Close / Navigate Away (beforeunload + visibilitychange) ─────
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            if (!hasLeadProgress()) return
-            if (leadAlertSentRef.current) return
+        const isEarlySent = Boolean(sessionStorage.getItem(earlySentKey) || (lastSavedQuote?.id && sessionStorage.getItem(`mm_step1_early_sent_${lastSavedQuote.id}`)))
+        const isFullSent = Boolean(sessionStorage.getItem(fullSentKey) || (lastSavedQuote?.id && sessionStorage.getItem(`mm_step1_full_sent_${lastSavedQuote.id}`)))
 
-            const quote = lastSavedQuoteRef.current
-            if (!quote) return
+        const pickupCity = detectCityCode(moveDetails?.pickupAddress)
+        const dropoffCity = detectCityCode(moveDetails?.dropoffAddress)
+        const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || (moveDetails?.distanceKm > 250)
+        const moveType = isNational ? 'National Move' : (moveDetails?.storageDestination ? 'Storage Move' : 'Local Move')
 
-            console.log('🚪 Tab closing — sending instant lead alert...')
-            leadAlertSentRef.current = true
-            sendInstantLeadAlert(quote)
-        }
+        // TIER 2: Completed rest of Step 1 info (addresses & move date)
+        if (hasCompletedName && hasValidContact && hasCompletedAddresses && hasMoveDate) {
+            if (!isFullSent) {
+                // Short debounce (1.5s) so address autocomplete finishes
+                const fullTimer = setTimeout(async () => {
+                    const quoteId = lastSavedQuote?.id
+                    if (!quoteId) return
 
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                if (!hasLeadProgress()) return
-                if (leadAlertSentRef.current) return
+                    sessionStorage.setItem(fullSentKey, '1')
+                    sessionStorage.setItem(`mm_step1_full_sent_${quoteId}`, '1')
+                    sessionStorage.setItem(earlySentKey, '1')
+                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
 
-                const quote = lastSavedQuoteRef.current
-                if (!quote) return
+                    console.log(`[Step1 Lead Trigger] Dispatching FULL lead alert for ${contactKey} (Quote: ${quoteId})...`)
+                    const alertRes = await emailService.sendAbandonedLeadAlert({
+                        quoteId: quoteId,
+                        clientName: formatClientName(moveDetails?.contactName, moveDetails?.surname),
+                        clientEmail: moveDetails?.contactEmail || '',
+                        clientPhone: moveDetails?.contactPhone || '',
+                        moveDate: moveDetails?.moveDate || '',
+                        referralSource: moveDetails?.referralSource || '',
+                        pickupAddress: moveDetails?.pickupAddress || '',
+                        dropoffAddress: moveDetails?.dropoffAddress || '',
+                        moveType: moveType,
+                        total: 0,
+                        isInstant: true,
+                        isUpdate: isEarlySent
+                    })
 
-                console.log('👁 Page hidden — sending lead alert...')
-                leadAlertSentRef.current = true
-                sessionStorage.setItem('mm_lead_alert_sent', quote.id || 'sent')
-                sendInstantLeadAlert(quote)
+                    if (alertRes && alertRes.success === false) {
+                        sessionStorage.removeItem(fullSentKey)
+                        sessionStorage.removeItem(`mm_step1_full_sent_${quoteId}`)
+                        console.warn(`[Step1 Lead Trigger] Full lead alert failed:`, alertRes.error)
+                    } else {
+                        console.log(`[Step1 Lead Trigger] Full lead alert sent successfully for ${contactKey}`)
+                    }
+                }, 1500)
+
+                return () => clearTimeout(fullTimer)
             }
         }
+        // TIER 1: Contact entered, but stopped there (addresses not complete)
+        // Fires only after 25s of inactivity on Step 1, or immediately on tab hide/exit
+        else if (hasCompletedName && hasValidContact && !hasCompletedAddresses) {
+            if (!isEarlySent && !isFullSent) {
+                const sendEarlyAlert = async () => {
+                    const quoteId = lastSavedQuote?.id
+                    if (!quoteId) return
+                    if (sessionStorage.getItem(earlySentKey) || sessionStorage.getItem(fullSentKey)) return
 
-        window.addEventListener('beforeunload', handleBeforeUnload)
-        document.addEventListener('visibilitychange', handleVisibilityChange)
+                    sessionStorage.setItem(earlySentKey, '1')
+                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
 
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload)
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
+                    console.log(`[Step1 Lead Trigger] User stopped on Step 1. Dispatching EARLY contact lead alert for ${contactKey} (Quote: ${quoteId})...`)
+                    const alertRes = await emailService.sendAbandonedLeadAlert({
+                        quoteId: quoteId,
+                        clientName: formatClientName(moveDetails?.contactName, moveDetails?.surname),
+                        clientEmail: moveDetails?.contactEmail || '',
+                        clientPhone: moveDetails?.contactPhone || '',
+                        moveDate: moveDetails?.moveDate || '',
+                        referralSource: moveDetails?.referralSource || '',
+                        pickupAddress: moveDetails?.pickupAddress || 'Not entered yet',
+                        dropoffAddress: moveDetails?.dropoffAddress || 'Not entered yet',
+                        moveType: moveType,
+                        total: 0,
+                        isInstant: true
+                    })
+
+                    if (alertRes && alertRes.success === false) {
+                        sessionStorage.removeItem(earlySentKey)
+                        sessionStorage.removeItem(`mm_step1_early_sent_${quoteId}`)
+                        console.warn(`[Step1 Lead Trigger] Early lead alert failed:`, alertRes.error)
+                    } else {
+                        console.log(`[Step1 Lead Trigger] Early lead alert sent successfully for ${contactKey}`)
+                    }
+                }
+
+                // Inactivity timer: 25 seconds without proceeding or entering addresses
+                const idleTimer = setTimeout(sendEarlyAlert, 25000)
+
+                // Tab visibility / leave handler
+                const handleVisibility = () => {
+                    if (document.visibilityState === 'hidden') {
+                        sendEarlyAlert()
+                    }
+                }
+
+                document.addEventListener('visibilitychange', handleVisibility)
+
+                return () => {
+                    clearTimeout(idleTimer)
+                    document.removeEventListener('visibilitychange', handleVisibility)
+                }
+            }
         }
-    }, [hasLeadProgress])
-
-    // ─── 4. "New Lead" Instant Email on first progress capture ──────────
-    //    Fires once as soon as the customer progress has been auto-saved
-    const newLeadAlertSentRef = useRef(false)
-    useEffect(() => {
-        if (newLeadAlertSentRef.current) return
-        if (!lastSavedQuote?.id) return
-
-        // Don't send for admin-created quotes or test flows
-        const currentBase = location.pathname.startsWith('/quote-test') ? '/quote-test' :
-            location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote'
-        if (currentBase !== '/quote') return
-
-        // Check if this quote already had a new-lead alert sent
-        const sentKey = `mm_new_lead_${lastSavedQuote.id}`
-        if (sessionStorage.getItem(sentKey)) return
-
-        // Don't re-send for quotes that are already fully completed or booked
-        if (['booked', 'confirmed', 'paid', 'completed'].includes(lastSavedQuote.status)) return
-
-        console.log('⭐ New lead captured — sending instant new-lead alert...')
-        newLeadAlertSentRef.current = true
-        sessionStorage.setItem(sentKey, '1')
-
-        sendInstantLeadAlert(lastSavedQuote)
-    }, [lastSavedQuote?.id, lastSavedQuote?.status, location.pathname])
-
-    // ─── Determine base path & admin mode ────────────────────────────────────
-    const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' :
-        location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote'
-
-    const isAdmin = basePath === '/admin/quotes/new'
-    const isTest = basePath === '/quote-test'
+    }, [
+        moveDetails,
+        lastSavedQuote?.id,
+        hasLeadProgress,
+        isAdmin,
+        isTest
+    ])
 
     const STEPS = useMemo(() => [
         { id: 'details', label: 'Details', path: basePath },

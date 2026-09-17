@@ -13,6 +13,7 @@ export default function FloatingCareersButton() {
         full_name: '',
         email: '',
         phone: '',
+        region: '',
         notes: ''
     })
 
@@ -46,8 +47,8 @@ export default function FloatingCareersButton() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        if (!formData.full_name || !formData.email || !formData.phone) {
-            alert('Please fill in your name, email, and phone number.')
+        if (!formData.full_name || !formData.email || !formData.phone || !formData.region) {
+            alert('Please fill in your name, email, phone number, and select your region.')
             return
         }
 
@@ -77,6 +78,7 @@ export default function FloatingCareersButton() {
 
         const appMessage = `[JOB APPLICATION]
 Applicant: ${formData.full_name}
+Region / Branch: ${formData.region}
 Phone: ${formData.phone}
 Email: ${formData.email}
 CV Attached: ${cvFile?.name || 'No CV file attached'}
@@ -112,16 +114,33 @@ ${formData.notes || 'No extra notes provided.'}`
                     full_name: formData.full_name,
                     email: formData.email,
                     phone: formData.phone,
+                    region: formData.region,
                     position: 'General Applicant',
-                    notes: formData.notes,
+                    notes: `Region: ${formData.region}\n\n${formData.notes || ''}`.trim(),
                     cv_name: cvFile?.name || null,
                     cv_url: cvUrl,
                     status: 'new'
                 })
                 .select()
 
-            if (jErr) console.warn('job_applications insert error:', jErr)
-            else console.log('job_applications saved:', jData)
+            if (jErr) {
+                // If region column does not exist in schema, fallback to inserting without region column
+                console.warn('job_applications insert notice, retrying with fallback:', jErr)
+                await supabase
+                    .from('job_applications')
+                    .insert({
+                        full_name: formData.full_name,
+                        email: formData.email,
+                        phone: formData.phone,
+                        position: 'General Applicant',
+                        notes: `Region: ${formData.region}\n\n${formData.notes || ''}`.trim(),
+                        cv_name: cvFile?.name || null,
+                        cv_url: cvUrl,
+                        status: 'new'
+                    })
+            } else {
+                console.log('job_applications saved:', jData)
+            }
         } catch (jobErr) {
             console.warn('job_applications insert notice:', jobErr)
         }
@@ -132,6 +151,7 @@ ${formData.notes || 'No extra notes provided.'}`
                 name: formData.full_name,
                 email: formData.email,
                 phone: formData.phone,
+                region: formData.region,
                 position: 'General Applicant',
                 notes: appMessage,
                 to: 'marketing@mastermoversjhb.co.za'
@@ -155,6 +175,7 @@ ${formData.notes || 'No extra notes provided.'}`
                 full_name: '',
                 email: '',
                 phone: '',
+                region: '',
                 notes: ''
             })
         }, 300)
@@ -257,7 +278,7 @@ ${formData.notes || 'No extra notes provided.'}`
                                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
                                                 />
                                             </div>
-                                            <div className="sm:col-span-2">
+                                            <div>
                                                 <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Phone Number *</label>
                                                 <input
                                                     type="tel"
@@ -268,6 +289,23 @@ ${formData.notes || 'No extra notes provided.'}`
                                                     onChange={handleChange}
                                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all"
                                                 />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1 block">Region / Branch *</label>
+                                                <select
+                                                    name="region"
+                                                    required
+                                                    value={formData.region}
+                                                    onChange={handleChange}
+                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-red-600 focus:bg-white transition-all cursor-pointer"
+                                                >
+                                                    <option value="">Select Region...</option>
+                                                    <option value="Gauteng / Johannesburg & Pretoria">Gauteng / Johannesburg &amp; Pretoria</option>
+                                                    <option value="Western Cape / Cape Town">Western Cape / Cape Town</option>
+                                                    <option value="KwaZulu-Natal / Durban">KwaZulu-Natal / Durban</option>
+                                                    <option value="Garden Route / Eastern Cape">Garden Route / Eastern Cape</option>
+                                                    <option value="Other / Relocating">Other / Relocating</option>
+                                                </select>
                                             </div>
                                         </div>
                                     </div>

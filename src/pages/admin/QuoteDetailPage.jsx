@@ -72,7 +72,14 @@ export default function QuoteDetailPage() {
 
     useEffect(() => {
         if (id === 'new') {
-            setQuote({ id: 'new', status: 'lead', client_name: '', items_json: {} })
+            setQuote({ 
+                id: 'new', 
+                status: 'lead', 
+                client_name: '', 
+                items_json: {},
+                send_me_boxes: { enabled: false, st7: 0, linen: 0, delivery_fee: 500 },
+                boxes_and_packing: { enabled: false, st7: 0, linen: 0 }
+            })
             setEditForm({
                 client_name: '',
                 client_email: '',
@@ -88,6 +95,8 @@ export default function QuoteDetailPage() {
                 packaging_option: 'none',
                 st7_boxes: 0,
                 linen_boxes: 0,
+                send_me_boxes: { enabled: false, st7: 0, linen: 0, delivery_fee: 500 },
+                boxes_and_packing: { enabled: false, st7: 0, linen: 0 },
                 insurance_enabled: false,
                 is_shared_load: false,
                 custom_products: [],
@@ -189,7 +198,53 @@ export default function QuoteDetailPage() {
                 .single()
 
             if (error) throw error
-            setQuote(data)
+            // Packaging options (both Send Me Boxes and Boxes + Packing)
+            const pkgDetails = data.items_json?.packaging_details || data.packaging_details || {}
+            let initialSendMeBoxes = pkgDetails.send_me_boxes
+            let initialBoxesAndPacking = pkgDetails.boxes_and_packing
+
+            if (!initialSendMeBoxes && !initialBoxesAndPacking) {
+                if (data.packaging_option === 'boxes_only') {
+                    initialSendMeBoxes = {
+                        enabled: true,
+                        st7: data.st7_boxes || 0,
+                        linen: data.linen_boxes || 0,
+                        delivery_fee: 500
+                    }
+                    initialBoxesAndPacking = { enabled: false, st7: 0, linen: 0 }
+                } else if (data.packaging_option === 'boxes_and_packing') {
+                    initialSendMeBoxes = { enabled: false, st7: 0, linen: 0, delivery_fee: 500 }
+                    initialBoxesAndPacking = {
+                        enabled: true,
+                        st7: data.st7_boxes || 0,
+                        linen: data.linen_boxes || 0
+                    }
+                } else if (data.packaging_option === 'both') {
+                    initialSendMeBoxes = { enabled: true, st7: data.st7_boxes || 0, linen: 0, delivery_fee: 500 }
+                    initialBoxesAndPacking = { enabled: true, st7: 0, linen: data.linen_boxes || 0 }
+                } else {
+                    initialSendMeBoxes = { enabled: false, st7: 0, linen: 0, delivery_fee: 500 }
+                    initialBoxesAndPacking = { enabled: false, st7: 0, linen: 0 }
+                }
+            } else {
+                initialSendMeBoxes = {
+                    enabled: Boolean(initialSendMeBoxes?.enabled),
+                    st7: initialSendMeBoxes?.st7 || 0,
+                    linen: initialSendMeBoxes?.linen || 0,
+                    delivery_fee: initialSendMeBoxes?.delivery_fee !== undefined ? initialSendMeBoxes.delivery_fee : 500
+                }
+                initialBoxesAndPacking = {
+                    enabled: Boolean(initialBoxesAndPacking?.enabled),
+                    st7: initialBoxesAndPacking?.st7 || 0,
+                    linen: initialBoxesAndPacking?.linen || 0
+                }
+            }
+
+            setQuote({
+                ...data,
+                send_me_boxes: initialSendMeBoxes,
+                boxes_and_packing: initialBoxesAndPacking
+            })
             setHasCalculatedOffset(false)
             setPriceOffset(0)
             
@@ -224,7 +279,9 @@ export default function QuoteDetailPage() {
                 special_wrapping: rawSpecialWrapping,
                 custom_products: data.custom_products || [],
                 extraCollections: extraColls,
-                extraDrops: extraDrops
+                extraDrops: extraDrops,
+                send_me_boxes: initialSendMeBoxes,
+                boxes_and_packing: initialBoxesAndPacking
             })
         } catch (error) {
             console.error('Error fetching quote:', error)
@@ -300,6 +357,23 @@ export default function QuoteDetailPage() {
         const srcExtraColls = editForm.extraCollections || editForm.extra_collections || []
         const srcExtraDrops = editForm.extraDrops || editForm.extra_drops || []
 
+        const sendMeBoxes = editForm.send_me_boxes || { enabled: false, st7: 0, linen: 0, delivery_fee: 500 }
+        const boxesAndPacking = editForm.boxes_and_packing || { enabled: false, st7: 0, linen: 0 }
+
+        const totalSt7 = (sendMeBoxes.enabled ? (Number(sendMeBoxes.st7) || 0) : 0) + (boxesAndPacking.enabled ? (Number(boxesAndPacking.st7) || 0) : 0)
+        const totalLinen = (sendMeBoxes.enabled ? (Number(sendMeBoxes.linen) || 0) : 0) + (boxesAndPacking.enabled ? (Number(boxesAndPacking.linen) || 0) : 0)
+
+        let resolvedPkg = 'none'
+        if (sendMeBoxes.enabled && boxesAndPacking.enabled) {
+            resolvedPkg = 'both'
+        } else if (sendMeBoxes.enabled) {
+            resolvedPkg = 'boxes_only'
+        } else if (boxesAndPacking.enabled) {
+            resolvedPkg = 'boxes_and_packing'
+        } else if (srcPkg && srcPkg !== 'none') {
+            resolvedPkg = srcPkg
+        }
+
         const moveDetails = {
             pickupAddress: srcPickup,
             dropoffAddress: srcDropoff,
@@ -311,9 +385,11 @@ export default function QuoteDetailPage() {
             totalBillableDistance: srcDist,
             tripBreakdown: editForm.trip_breakdown || null,
             moveDate: srcDate,
-            packagingOption: srcPkg,
-            st7Boxes: srcSt7,
-            linenBoxes: srcLinen,
+            packagingOption: resolvedPkg,
+            st7Boxes: totalSt7 || srcSt7,
+            linenBoxes: totalLinen || srcLinen,
+            sendMeBoxes: sendMeBoxes,
+            boxesAndPacking: boxesAndPacking,
             insuranceEnabled: editForm.insurance_enabled || false,
             isSharedLoad: editForm.is_shared_load || false,
             paymentMethod: editForm.payment_method || 'eft',
@@ -342,6 +418,8 @@ export default function QuoteDetailPage() {
         editForm.packaging_option,
         editForm.st7_boxes,
         editForm.linen_boxes,
+        editForm.send_me_boxes,
+        editForm.boxes_and_packing,
         editForm.insurance_enabled,
         editForm.is_shared_load,
         editForm.access_details,
@@ -552,7 +630,7 @@ export default function QuoteDetailPage() {
 
         if (quote && recalculatedData && !recalculatedData.error && !hasCalculatedOffset && !isEditing && !isMapsRunning) {
             const dbPrice = Number(quote.total_price || 0);
-            const recalcPrice = Number((recalculatedData.total || 0) + customProductsTotal);
+            const recalcPrice = Number(recalculatedData.total || 0);
             if (recalcPrice === 0) {
                 setPriceOffset(0);
                 setHasCalculatedOffset(true);
@@ -567,33 +645,49 @@ export default function QuoteDetailPage() {
                 setHasCalculatedOffset(true);
             }
         }
-    }, [quote, recalculatedData, hasCalculatedOffset, isEditing, customProductsTotal, editForm.trip_breakdown, mapsStatus])
+    }, [quote, recalculatedData, hasCalculatedOffset, isEditing, editForm.trip_breakdown, mapsStatus])
 
-    const hasNoItemsOrCustomQuote = (recalculatedData?.total === 0 && customProductsTotal === 0);
+    const hasNoItemsOrCustomQuote = (recalculatedData?.total === 0 && (editForm.custom_products || []).length === 0);
 
     const finalPrice = hasNoItemsOrCustomQuote
         ? 0
-        : ((isEditing || !quote?.total_price)
-            ? (((recalculatedData?.total || 0) + customProductsTotal) + priceOffset)
+        : ((isEditing || !quote?.total_price || !quote?.is_manual_price)
+            ? ((recalculatedData?.total || 0) + priceOffset)
             : (Number(quote?.total_price) || 0));
 
     const finalVat = hasNoItemsOrCustomQuote
         ? 0
-        : ((isEditing || !quote?.total_price)
+        : ((isEditing || !quote?.total_price || !quote?.is_manual_price)
             ? ((recalculatedData?.vat || 0) + (priceOffset * 0.15 / 1.15))
             : ((Number(quote?.total_price) || 0) * 0.15 / 1.15));
 
     const finalSubTotal = hasNoItemsOrCustomQuote
         ? 0
-        : ((isEditing || !quote?.total_price)
+        : ((isEditing || !quote?.total_price || !quote?.is_manual_price)
             ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
             : ((Number(quote?.total_price) || 0) / 1.15));
 
     const handleSave = async () => {
         try {
             const basePrice = recalculatedData?.total || editForm.total_price || 0
-            const finalPrice = basePrice + customProductsTotal + priceOffset
+            const finalPrice = basePrice + priceOffset
             const finalVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
+
+            const sendMeBoxes = editForm.send_me_boxes || { enabled: false, st7: 0, linen: 0, delivery_fee: 500 }
+            const boxesAndPacking = editForm.boxes_and_packing || { enabled: false, st7: 0, linen: 0 }
+            const totalSt7 = (sendMeBoxes.enabled ? (Number(sendMeBoxes.st7) || 0) : 0) + (boxesAndPacking.enabled ? (Number(boxesAndPacking.st7) || 0) : 0)
+            const totalLinen = (sendMeBoxes.enabled ? (Number(sendMeBoxes.linen) || 0) : 0) + (boxesAndPacking.enabled ? (Number(boxesAndPacking.linen) || 0) : 0)
+
+            let resolvedPackagingOption = 'none'
+            if (sendMeBoxes.enabled && boxesAndPacking.enabled) {
+                resolvedPackagingOption = 'both'
+            } else if (sendMeBoxes.enabled) {
+                resolvedPackagingOption = 'boxes_only'
+            } else if (boxesAndPacking.enabled) {
+                resolvedPackagingOption = 'boxes_and_packing'
+            } else if (editForm.packaging_option && editForm.packaging_option !== 'none') {
+                resolvedPackagingOption = editForm.packaging_option
+            }
 
             const payload = {
                 client_name: editForm.client_name,
@@ -613,15 +707,19 @@ export default function QuoteDetailPage() {
                     items: editForm.items_json,
                     special_wrapping: editForm.special_wrapping || {},
                     extraCollections: editForm.extraCollections || editForm.extra_collections || [],
-                    extraDrops: editForm.extraDrops || editForm.extra_drops || []
+                    extraDrops: editForm.extraDrops || editForm.extra_drops || [],
+                    packaging_details: {
+                        send_me_boxes: sendMeBoxes,
+                        boxes_and_packing: boxesAndPacking
+                    }
                 },
                 total_price: finalPrice,
                 total_volume: finalVolume,
                 customer_comments: editForm.customer_comments,
                 access_details: editForm.access_details,
-                packaging_option: editForm.packaging_option,
-                st7_boxes: editForm.st7_boxes,
-                linen_boxes: editForm.linen_boxes,
+                packaging_option: resolvedPackagingOption,
+                st7_boxes: totalSt7,
+                linen_boxes: totalLinen,
                 insurance_enabled: editForm.insurance_enabled,
                 is_shared_load: editForm.is_shared_load,
                 custom_products: editForm.custom_products || [],
@@ -675,17 +773,34 @@ export default function QuoteDetailPage() {
             } else {
                 setQuote({ 
                     ...editForm, 
+                    packaging_option: resolvedPackagingOption,
+                    st7_boxes: totalSt7,
+                    linen_boxes: totalLinen,
+                    send_me_boxes: sendMeBoxes,
+                    boxes_and_packing: boxesAndPacking,
                     extra_collections: editForm.extraCollections || editForm.extra_collections || [],
                     extra_drops: editForm.extraDrops || editForm.extra_drops || [],
                     items_json: {
                         items: editForm.items_json,
                         special_wrapping: editForm.special_wrapping || {},
                         extraCollections: editForm.extraCollections || editForm.extra_collections || [],
-                        extraDrops: editForm.extraDrops || editForm.extra_drops || []
+                        extraDrops: editForm.extraDrops || editForm.extra_drops || [],
+                        packaging_details: {
+                            send_me_boxes: sendMeBoxes,
+                            boxes_and_packing: boxesAndPacking
+                        }
                     },
                     total_price: finalPrice, 
                     total_volume: finalVolume 
                 })
+                setEditForm(prev => ({
+                    ...prev,
+                    packaging_option: resolvedPackagingOption,
+                    st7_boxes: totalSt7,
+                    linen_boxes: totalLinen,
+                    send_me_boxes: sendMeBoxes,
+                    boxes_and_packing: boxesAndPacking
+                }))
                 await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
                 setIsEditing(false)
                 alert('Quote updated successfully!')
@@ -818,12 +933,12 @@ export default function QuoteDetailPage() {
             const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             await generateProfessionalQuote({
                 quoteId: quote.id,
-                clientName: quote.client_name,
-                clientEmail: quote.client_email,
-                clientPhone: quote.client_phone,
-                pickupAddress: quote.pickup_address,
-                dropoffAddress: quote.dropoff_address,
-                moveDate: quote.move_date,
+                clientName: isEditing ? editForm.client_name : quote.client_name,
+                clientEmail: isEditing ? editForm.client_email : quote.client_email,
+                clientPhone: isEditing ? editForm.client_phone : quote.client_phone,
+                pickupAddress: isEditing ? editForm.pickup_address : quote.pickup_address,
+                dropoffAddress: isEditing ? editForm.dropoff_address : quote.dropoff_address,
+                moveDate: isEditing ? editForm.move_date : quote.move_date,
                 createdAt: quote.created_at,
                 inventory: inventoryForPdf,
                 // Always prefer live recalculated values so PDF matches sidebar
@@ -835,14 +950,16 @@ export default function QuoteDetailPage() {
                 breakdown: recalculatedData?.breakdown || null,
                 boxQty: recalculatedData?.boxQty,
                 totalVolume: computedVolume,
-                st7Boxes: quote.st7_boxes || 0,
-                linenBoxes: quote.linen_boxes || 0,
-                accessDetails: quote.access_details || recalculatedData?.accessDetails || {},
-                generalNotes: quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || '',
+                packagingOption: isEditing ? (editForm.packaging_option || 'none') : (quote.packaging_option || 'none'),
+                packagingDetails: recalculatedData?.breakdown?.packagingDetails || (isEditing ? { sendMeBoxes: editForm.send_me_boxes, boxesAndPacking: editForm.boxes_and_packing } : quote.items_json?.packaging_details),
+                st7Boxes: isEditing ? editForm.st7_boxes : (quote.st7_boxes || 0),
+                linenBoxes: isEditing ? editForm.linen_boxes : (quote.linen_boxes || 0),
+                accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
+                generalNotes: isEditing ? (editForm.general_notes || editForm.notes || editForm.customer_comments || '') : (quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || ''),
                 customProducts: activeCustomProds,
                 isMinQuote: recalculatedData?.isMinQuote || false,
-                extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
-                extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
+                extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
+                extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || [])
             })
         } catch (err) {
             console.error('PDF generation error:', err)
@@ -1047,33 +1164,225 @@ export default function QuoteDetailPage() {
 
                             <div className="p-4 bg-slate-50 rounded-xl space-y-4 border border-slate-100">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-indigo-400 mb-2 block">Packaging Service</label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-[10px] font-black uppercase text-indigo-500">Packaging &amp; Box Services</label>
+                                        {isEditing && (
+                                            <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Select one or both</span>
+                                        )}
+                                    </div>
+                                    
                                     {isEditing ? (
-                                        <select 
-                                            className="w-full text-xs border border-gray-200 rounded p-2 bg-white"
-                                            value={editForm.packaging_option}
-                                            onChange={e => setEditForm({...editForm, packaging_option: e.target.value})}
-                                        >
-                                            <option value="none">No Packaging (User Packs)</option>
-                                            <option value="boxes_only">Send Me Boxes Only</option>
-                                            <option value="boxes_and_packing">Full Packaging (Boxes + Packing)</option>
-                                        </select>
+                                        <div className="space-y-3">
+                                            {/* 1. Send Me Boxes (Client Packs) */}
+                                            <div className={clsx(
+                                                "p-3 rounded-xl border transition-all",
+                                                editForm.send_me_boxes?.enabled ? "bg-white border-blue-200 shadow-sm" : "bg-slate-100/70 border-slate-200"
+                                            )}>
+                                                <label className="flex items-start justify-between cursor-pointer gap-2">
+                                                    <div className="flex items-start gap-2.5">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={Boolean(editForm.send_me_boxes?.enabled)}
+                                                            onChange={e => {
+                                                                const enabled = e.target.checked
+                                                                setEditForm(prev => {
+                                                                    const updatedSend = {
+                                                                        enabled,
+                                                                        st7: prev.send_me_boxes?.st7 || 0,
+                                                                        linen: prev.send_me_boxes?.linen || 0,
+                                                                        delivery_fee: prev.send_me_boxes?.delivery_fee !== undefined ? prev.send_me_boxes.delivery_fee : 500
+                                                                    }
+                                                                    return {
+                                                                        ...prev,
+                                                                        send_me_boxes: updatedSend
+                                                                    }
+                                                                })
+                                                            }}
+                                                            className="rounded text-blue-600 focus:ring-blue-500 mt-0.5"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-bold text-slate-900 block">Send Me Boxes (Delivery in Advance)</span>
+                                                            <span className="text-[10px] text-slate-500 block">Boxes delivered early for client packing</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 whitespace-nowrap">
+                                                        + R500 Delivery Fee
+                                                    </span>
+                                                </label>
+
+                                                {editForm.send_me_boxes?.enabled && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2.5">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div>
+                                                                <label className="text-[9px] uppercase font-bold text-slate-500 flex justify-between mb-1">
+                                                                    <span>ST7 Boxes</span>
+                                                                    <span className="text-blue-600 font-bold">R{PACKAGING_RATES.sendMeBoxesOnly.st7.toFixed(2)} ea</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    className="w-full p-2 border border-blue-100 rounded-lg bg-white text-xs font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                                                                    value={editForm.send_me_boxes?.st7 || 0} 
+                                                                    onChange={e => {
+                                                                        const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                                        setEditForm(prev => ({
+                                                                            ...prev,
+                                                                            send_me_boxes: { ...prev.send_me_boxes, st7: val }
+                                                                        }))
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[9px] uppercase font-bold text-slate-500 flex justify-between mb-1">
+                                                                    <span>Linen Boxes</span>
+                                                                    <span className="text-blue-600 font-bold">R{PACKAGING_RATES.sendMeBoxesOnly.linen.toFixed(2)} ea</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    className="w-full p-2 border border-blue-100 rounded-lg bg-white text-xs font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                                                                    value={editForm.send_me_boxes?.linen || 0} 
+                                                                    onChange={e => {
+                                                                        const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                                        setEditForm(prev => ({
+                                                                            ...prev,
+                                                                            send_me_boxes: { ...prev.send_me_boxes, linen: val }
+                                                                        }))
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-[10px] text-slate-600 bg-blue-50/50 px-2.5 py-1.5 rounded-lg border border-blue-100">
+                                                            <span className="font-medium">Box Delivery &amp; Handling:</span>
+                                                            <span className="font-bold text-blue-700">R {Number(editForm.send_me_boxes?.delivery_fee !== undefined ? editForm.send_me_boxes.delivery_fee : 500).toFixed(2)}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* 2. Boxes + Packing (Full Service) */}
+                                            <div className={clsx(
+                                                "p-3 rounded-xl border transition-all",
+                                                editForm.boxes_and_packing?.enabled ? "bg-white border-purple-200 shadow-sm" : "bg-slate-100/70 border-slate-200"
+                                            )}>
+                                                <label className="flex items-start justify-between cursor-pointer gap-2">
+                                                    <div className="flex items-start gap-2.5">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={Boolean(editForm.boxes_and_packing?.enabled)}
+                                                            onChange={e => {
+                                                                const enabled = e.target.checked
+                                                                setEditForm(prev => {
+                                                                    const updatedPack = {
+                                                                        enabled,
+                                                                        st7: prev.boxes_and_packing?.st7 || 0,
+                                                                        linen: prev.boxes_and_packing?.linen || 0
+                                                                    }
+                                                                    return {
+                                                                        ...prev,
+                                                                        boxes_and_packing: updatedPack
+                                                                    }
+                                                                })
+                                                            }}
+                                                            className="rounded text-purple-600 focus:ring-purple-500 mt-0.5"
+                                                        />
+                                                        <div>
+                                                            <span className="text-xs font-bold text-slate-900 block">Boxes + Full Packing Service</span>
+                                                            <span className="text-[10px] text-slate-500 block">Movers supply &amp; pack everything on move day</span>
+                                                        </div>
+                                                    </div>
+                                                </label>
+
+                                                {editForm.boxes_and_packing?.enabled && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2.5">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div>
+                                                                <label className="text-[9px] uppercase font-bold text-slate-500 flex justify-between mb-1">
+                                                                    <span>ST7 Boxes</span>
+                                                                    <span className="text-purple-600 font-bold">R{PACKAGING_RATES.boxesAndPacking.st7.toFixed(2)} ea</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    className="w-full p-2 border border-purple-100 rounded-lg bg-white text-xs font-bold text-slate-800 focus:border-purple-500 focus:ring-1 focus:ring-purple-500" 
+                                                                    value={editForm.boxes_and_packing?.st7 || 0} 
+                                                                    onChange={e => {
+                                                                        const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                                        setEditForm(prev => ({
+                                                                            ...prev,
+                                                                            boxes_and_packing: { ...prev.boxes_and_packing, st7: val }
+                                                                        }))
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[9px] uppercase font-bold text-slate-500 flex justify-between mb-1">
+                                                                    <span>Linen Boxes</span>
+                                                                    <span className="text-purple-600 font-bold">R{PACKAGING_RATES.boxesAndPacking.linen.toFixed(2)} ea</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    className="w-full p-2 border border-purple-100 rounded-lg bg-white text-xs font-bold text-slate-800 focus:border-purple-500 focus:ring-1 focus:ring-purple-500" 
+                                                                    value={editForm.boxes_and_packing?.linen || 0} 
+                                                                    onChange={e => {
+                                                                        const val = Math.max(0, parseInt(e.target.value) || 0)
+                                                                        setEditForm(prev => ({
+                                                                            ...prev,
+                                                                            boxes_and_packing: { ...prev.boxes_and_packing, linen: val }
+                                                                        }))
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     ) : (
-                                        <span className="text-xs font-bold text-slate-900 uppercase">{quote?.packaging_option}</span>
+                                        <div className="space-y-2">
+                                            {(() => {
+                                                const pkgDetails = quote?.items_json?.packaging_details || quote?.packaging_details
+                                                const hasSend = quote?.send_me_boxes?.enabled || pkgDetails?.send_me_boxes?.enabled || quote?.packaging_option === 'boxes_only' || quote?.packaging_option === 'both'
+                                                const hasPack = quote?.boxes_and_packing?.enabled || pkgDetails?.boxes_and_packing?.enabled || quote?.packaging_option === 'boxes_and_packing' || quote?.packaging_option === 'both'
+
+                                                const sendSt7 = quote?.send_me_boxes?.st7 ?? pkgDetails?.send_me_boxes?.st7 ?? (quote?.packaging_option === 'boxes_only' ? quote?.st7_boxes : 0)
+                                                const sendLinen = quote?.send_me_boxes?.linen ?? pkgDetails?.send_me_boxes?.linen ?? (quote?.packaging_option === 'boxes_only' ? quote?.linen_boxes : 0)
+
+                                                const packSt7 = quote?.boxes_and_packing?.st7 ?? pkgDetails?.boxes_and_packing?.st7 ?? (quote?.packaging_option === 'boxes_and_packing' ? quote?.st7_boxes : 0)
+                                                const packLinen = quote?.boxes_and_packing?.linen ?? pkgDetails?.boxes_and_packing?.linen ?? (quote?.packaging_option === 'boxes_and_packing' ? quote?.linen_boxes : 0)
+
+                                                if (!hasSend && !hasPack) {
+                                                    return <span className="text-xs font-bold text-slate-500 uppercase">No Packaging (User Packs)</span>
+                                                }
+
+                                                return (
+                                                    <>
+                                                        {hasSend && (
+                                                            <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-100 text-xs">
+                                                                <span className="font-bold text-blue-950 block">Send Me Boxes (Delivery in Advance)</span>
+                                                                <div className="text-[11px] text-blue-800 flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                                                    <span>{sendSt7 || 0}x ST7 Boxes</span>
+                                                                    <span>{sendLinen || 0}x Linen Boxes</span>
+                                                                    <span className="font-bold text-blue-900">+ R500 Delivery Fee</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {hasPack && (
+                                                            <div className="p-2.5 rounded-lg bg-purple-50/70 border border-purple-100 text-xs">
+                                                                <span className="font-bold text-purple-950 block">Boxes + Full Packing Service</span>
+                                                                <div className="text-[11px] text-purple-800 flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                                                    <span>{packSt7 || 0}x ST7 Boxes</span>
+                                                                    <span>{packLinen || 0}x Linen Boxes</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )
+                                            })()}
+                                        </div>
                                     )}
                                 </div>
-                                {editForm.packaging_option !== 'none' && isEditing && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label className="text-[9px] uppercase font-bold text-slate-400">ST7 Boxes</label>
-                                            <input type="number" className="w-full p-2 border border-blue-100 rounded bg-white text-xs" value={editForm.st7_boxes || 0} onChange={e => setEditForm({...editForm, st7_boxes: parseInt(e.target.value) || 0})} />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] uppercase font-bold text-slate-400">Linen Boxes</label>
-                                            <input type="number" className="w-full p-2 border border-blue-100 rounded bg-white text-xs" value={editForm.linen_boxes || 0} onChange={e => setEditForm({...editForm, linen_boxes: parseInt(e.target.value) || 0})} />
-                                        </div>
-                                    </div>
-                                )}
                                 <div>
                                     <label className="flex items-center gap-2 cursor-pointer pt-2">
                                         <input 
@@ -2055,18 +2364,60 @@ export default function QuoteDetailPage() {
                                     <span className="text-white font-bold tracking-wide">{(isEditing ? (recalculatedData?.totalVolume || 0) : (quote?.total_volume || recalculatedData?.totalVolume || 0))?.toFixed(2)} ft³ (Cubes)</span>
                                 </div>
 
+                                <div className="flex justify-between text-xs text-slate-300 font-bold pt-2 border-t border-white/5">
+                                    <span>Vehicle & Moving Cost</span>
+                                    <span className="text-white whitespace-nowrap">R {(Number(recalculatedData?.breakdown?.transport || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+
                                 {isEditing && customProductsTotal > 0 && (
                                     <div className="flex justify-between text-xs text-amber-400">
-                                        <span>Custom Products</span>
+                                        <span>Custom Products (Excl. VAT)</span>
                                         <span className="font-bold whitespace-nowrap">+ R {customProductsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {(recalculatedData?.breakdown?.packaging > 0 || quote?.packaging_cost > 0) && (
-                                    <div className="flex justify-between text-xs text-emerald-400/80">
-                                        <span>Box Supplies {(editForm.st7_boxes || quote?.st7_boxes) > 0 && `(${editForm.st7_boxes || quote?.st7_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.st7 : PACKAGING_RATES.boxesAndPacking.st7).toFixed(0)})`} {(editForm.linen_boxes || quote?.linen_boxes) > 0 && `(${editForm.linen_boxes || quote?.linen_boxes} x R${(quote?.packaging_option === 'boxes_only' ? PACKAGING_RATES.sendMeBoxesOnly.linen : PACKAGING_RATES.boxesAndPacking.linen).toFixed(0)})`}</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.packaging || quote?.packaging_cost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                )}
+                                {(() => {
+                                    const pkgDetails = recalculatedData?.breakdown?.packagingDetails || quote?.items_json?.packaging_details
+                                    const sendDetails = pkgDetails?.sendMeBoxes || editForm.send_me_boxes || quote?.send_me_boxes
+                                    const packDetails = pkgDetails?.boxesAndPacking || editForm.boxes_and_packing || quote?.boxes_and_packing
+
+                                    const hasSendBoxes = Boolean(sendDetails?.enabled && ((sendDetails?.st7 > 0) || (sendDetails?.linen > 0))) || 
+                                        Boolean(!pkgDetails && (editForm.packaging_option === 'boxes_only' || quote?.packaging_option === 'boxes_only') && ((editForm.st7_boxes || quote?.st7_boxes) > 0 || (editForm.linen_boxes || quote?.linen_boxes) > 0))
+
+                                    const hasPackBoxes = Boolean(packDetails?.enabled && ((packDetails?.st7 > 0) || (packDetails?.linen > 0))) ||
+                                        Boolean(!pkgDetails && (editForm.packaging_option === 'boxes_and_packing' || quote?.packaging_option === 'boxes_and_packing') && ((editForm.st7_boxes || quote?.st7_boxes) > 0 || (editForm.linen_boxes || quote?.linen_boxes) > 0))
+
+                                    const sendSt7 = sendDetails?.st7 || (hasSendBoxes && !pkgDetails ? (editForm.st7_boxes || quote?.st7_boxes || 0) : 0)
+                                    const sendLinen = sendDetails?.linen || (hasSendBoxes && !pkgDetails ? (editForm.linen_boxes || quote?.linen_boxes || 0) : 0)
+                                    const packSt7 = packDetails?.st7 || (hasPackBoxes && !pkgDetails ? (editForm.st7_boxes || quote?.st7_boxes || 0) : 0)
+                                    const packLinen = packDetails?.linen || (hasPackBoxes && !pkgDetails ? (editForm.linen_boxes || quote?.linen_boxes || 0) : 0)
+
+                                    const sendBoxesCost = (sendSt7 * PACKAGING_RATES.sendMeBoxesOnly.st7) + (sendLinen * PACKAGING_RATES.sendMeBoxesOnly.linen)
+                                    const packBoxesCost = (packSt7 * PACKAGING_RATES.boxesAndPacking.st7) + (packLinen * PACKAGING_RATES.boxesAndPacking.linen)
+                                    const deliveryFee = hasSendBoxes ? (recalculatedData?.breakdown?.boxDeliveryFee ?? (sendDetails?.delivery_fee !== undefined ? Number(sendDetails.delivery_fee) : 500)) : 0
+
+                                    return (
+                                        <>
+                                            {hasSendBoxes && sendBoxesCost > 0 && (
+                                                <div className="flex justify-between text-xs text-emerald-400/80">
+                                                    <span>Send Me Boxes {sendSt7 > 0 && `(${sendSt7} x R${PACKAGING_RATES.sendMeBoxesOnly.st7.toFixed(0)})`} {sendLinen > 0 && `(${sendLinen} x R${PACKAGING_RATES.sendMeBoxesOnly.linen.toFixed(0)})`}</span>
+                                                    <span className="font-bold whitespace-nowrap">+ R {sendBoxesCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            {deliveryFee > 0 && (
+                                                <div className="flex justify-between text-xs text-blue-300">
+                                                    <span>Box Delivery &amp; Handling Fee</span>
+                                                    <span className="font-bold whitespace-nowrap">+ R {deliveryFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            {hasPackBoxes && packBoxesCost > 0 && (
+                                                <div className="flex justify-between text-xs text-emerald-400/80">
+                                                    <span>Boxes + Packing {packSt7 > 0 && `(${packSt7} x R${PACKAGING_RATES.boxesAndPacking.st7.toFixed(0)})`} {packLinen > 0 && `(${packLinen} x R${PACKAGING_RATES.boxesAndPacking.linen.toFixed(0)})`}</span>
+                                                    <span className="font-bold whitespace-nowrap">+ R {packBoxesCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )
+                                })()}
                                 {(recalculatedData?.breakdown?.wrappingCost > 0 || quote?.wrapping_cost > 0) && (
                                     <div className="flex justify-between text-xs text-emerald-400/80">
                                         <span>Specialized Wrapping {((recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume || 0) > 0) && `(${Number(recalculatedData?.breakdown?.wrappingVolume || quote?.wrapping_volume || 0).toFixed(2)} ft³ x R5.90)`}</span>
@@ -2124,8 +2475,18 @@ export default function QuoteDetailPage() {
                                         <span className="font-bold whitespace-nowrap">+ R {recalculatedData.payflexSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
+                                {(recalculatedData?.breakdown?.documentationFee > 0) && (
+                                    <div className="flex justify-between text-xs text-slate-400">
+                                        <span>Documentation Fee</span>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData.breakdown.documentationFee)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-xs text-slate-300 pt-3 border-t border-white/10 font-bold">
+                                    <span>Subtotal Excl. VAT</span>
+                                    <span className="text-white whitespace-nowrap">R {finalSubTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
                                 <div className="flex justify-between text-xs text-slate-400">
-                                    <span>Vat Included (15%)</span>
+                                    <span>VAT Included (15%)</span>
                                     <span className="text-white font-bold tracking-wide whitespace-nowrap">R {finalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
@@ -2418,7 +2779,7 @@ export default function QuoteDetailPage() {
                             {/* Optional Custom Price / Adjustment */}
                             <div>
                                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                    Price Adjustment (R) (Optional)
+                                    Price Adjustment (R Excl. VAT) (Optional)
                                 </label>
                                 <input
                                     type="number"
@@ -2428,7 +2789,7 @@ export default function QuoteDetailPage() {
                                     value={customProductForm.price}
                                     onChange={e => setCustomProductForm(prev => ({ ...prev, price: e.target.value }))}
                                 />
-                                <span className="text-[9px] text-slate-400 block mt-1">Leave blank to calculate by volume rate. Use - for discount.</span>
+                                <span className="text-[9px] text-slate-400 block mt-1">Leave blank to calculate by volume rate. 15% VAT will be added automatically to invoice.</span>
                             </div>
 
                             {/* Protection Options: Wrapping & Plastic Sleeves */}

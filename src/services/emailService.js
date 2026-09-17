@@ -1,5 +1,5 @@
 import { generateProfessionalQuote } from './pdfService'
-import { hasCompletedEmailAndPhone } from '../lib/utils'
+import { hasCompletedEmailAndPhone, isEmailValid, isPhoneValid, hasContactInfo } from '../lib/utils'
 
 /**
  * Service to handle triggering emails from the frontend via Supabase Edge Functions
@@ -249,6 +249,9 @@ export const emailService = {
                 extra_collections: extraCollections,
                 extra_drops: extraDrops,
                 total_price: total,
+                total_volume: totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || 0,
+                items_json: inventory || {},
+                inventory: inventory || {},
                 move_type: moveType,
                 payment_method: paymentMethod,
                 referral_source: referralSource || referral_source || ''
@@ -282,11 +285,11 @@ export const emailService = {
      * Send admin alert for an abandoned lead after inactivity
      * Uses whatever data is available from the incomplete form
      */
-    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false }) => {
+    sendAbandonedLeadAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, paymentMethod = 'abandoned', isInstant = false, isUpdate = false }) => {
         try {
-            if (!hasCompletedEmailAndPhone(clientEmail, clientPhone)) {
-                console.warn("Skipping abandoned lead alert: both email and phone number are required.")
-                return { success: false, error: "Both email address and phone number are required." }
+            if (!hasContactInfo(clientEmail, clientPhone)) {
+                console.warn("Skipping abandoned lead alert: either a valid email address or phone number is required.")
+                return { success: false, error: "A valid email address or phone number is required." }
             }
 
             let pdfBase64 = null;
@@ -325,9 +328,13 @@ export const emailService = {
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
                 total_price: total || 0,
+                total_volume: breakdown?.totalVolume || breakdown?.totalVolumeCuFt || 0,
+                items_json: inventory || {},
+                inventory: inventory || {},
                 move_type: moveType || 'Unknown',
                 payment_method: paymentMethod,
-                referral_source: referralSource || referral_source || ''
+                referral_source: referralSource || referral_source || '',
+                is_update: isUpdate
             }
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -346,13 +353,11 @@ export const emailService = {
                 })
             })
             
-            // Note: if isInstant is true (tab closing), we might not even get a response back here, 
-            // but the request is guaranteed to be sent to the server.
-            if (!isInstant) {
-                const result = await response.json()
-                if (!response.ok) throw new Error(result.error || 'Abandoned lead alert failed')
-                console.log('⚠️ Abandoned lead admin alert sent')
+            const result = await response.json().catch(() => ({}))
+            if (!response.ok) {
+                throw new Error(result?.error || `Abandoned lead alert failed (${response.status})`)
             }
+            console.log('⚠️ Abandoned lead admin alert sent')
             return { success: true }
         } catch (error) {
             console.error('sendAbandonedLeadAlert error:', error)
@@ -431,7 +436,7 @@ export const emailService = {
         }
     },
 
-    sendOutlineAreaEmail: async ({ name, email, phone, pickup, dropoff, moveDate, referralSource, referral_source, comments, notes }) => {
+    sendOutlineAreaEmail: async ({ quoteId, name, email, phone, pickup, dropoff, moveDate, referralSource, referral_source, comments, notes }) => {
         try {
             if (!hasCompletedEmailAndPhone(email, phone)) {
                 console.warn("Skipping outline area lead alert: both email and phone number are required.")
@@ -447,6 +452,7 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'outline_area_alert',
+                    quoteData: quoteId ? { id: quoteId } : undefined,
                     contactData: {
                         name,
                         email,
@@ -563,7 +569,7 @@ export const emailService = {
         }
     },
 
-    sendJobApplicationEmail: async ({ name, email, phone, position, experience, license, availability, notes, to = 'marketing@mastermoversjhb.co.za' }) => {
+    sendJobApplicationEmail: async ({ name, email, phone, region, position, experience, license, availability, notes, to = 'marketing@mastermoversjhb.co.za' }) => {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const target = to || 'marketing@mastermoversjhb.co.za'
@@ -577,7 +583,7 @@ export const emailService = {
                     type: 'job_application_alert',
                     to: target,
                     targetEmail: target,
-                    contactData: { name, email, phone, position, experience, license, availability, notes }
+                    contactData: { name, email, phone, region, position, experience, license, availability, notes }
                 })
             })
             const result = await response.json()

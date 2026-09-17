@@ -203,7 +203,7 @@ export default function Step3Inventory() {
         return [...catalogItems, ...extraItems]
     }, [searchTerm, activeCategory, inventory])
 
-    const handleProceed = () => {
+    const handleProceed = async () => {
         if (totalVolume === 0) {
             alert("Oops! Please add at least one item to your inventory before proceeding.")
             return
@@ -211,6 +211,11 @@ export default function Step3Inventory() {
         if (totalVolume > VOLUME_THRESHOLD_FT3 && !showVolumeModal) {
             setShowVolumeModal(true)
         } else {
+            try {
+                await submitQuote({ status: 'lead', forceNew: false })
+            } catch (e) {
+                console.warn('[Step3] Non-blocking inventory save on proceed:', e)
+            }
             navigate(`${basePath}/summary`)
         }
     }
@@ -251,7 +256,14 @@ export default function Step3Inventory() {
                                 <Button
                                     variant="ghost"
                                     className="w-full text-slate-400 hover:text-red-600 font-semibold"
-                                    onClick={() => navigate(`${basePath}/summary`)}
+                                    onClick={async () => {
+                                        try {
+                                            await submitQuote({ status: 'lead', forceNew: false })
+                                        } catch (e) {
+                                            console.warn('[Step3] Non-blocking inventory save on proceed:', e)
+                                        }
+                                        navigate(`${basePath}/summary`)
+                                    }}
                                 >
                                     I know what I'm doing, complete quote
                                 </Button>
