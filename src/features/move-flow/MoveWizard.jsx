@@ -126,9 +126,13 @@ export default function MoveWizard() {
         return () => clearTimeout(timeoutId)
     }, [moveDetails, accessDetails, inventory, submitQuote, lastSavedQuote?.status, hasLeadProgress])
 
-    // ─── 2. Step 1 Lead Email Triggers (Tier 1: 25s Inactivity/Abandon; Tier 2: Complete) ─────
+    // ─── 2. Step 1 Lead Email Triggers (Tier 1: 30s Inactivity/Abandon; Tier 2: 45s Inactivity/Abandon) ─────
     useEffect(() => {
-        if (isAdmin || isTest || !hasLeadProgress()) return
+        const currentPath = location.pathname.toLowerCase().replace(/\/$/, '')
+        const basePathNormalized = basePath.toLowerCase().replace(/\/$/, '')
+        const isOnStep1 = currentPath === basePathNormalized
+
+        if (!isOnStep1 || isAdmin || isTest || !hasLeadProgress()) return
 
         const cleanEmail = (moveDetails?.contactEmail || '').trim().toLowerCase()
         const cleanPhone = (moveDetails?.contactPhone || '').replace(/\D/g, '')
@@ -151,20 +155,22 @@ export default function MoveWizard() {
         const isNational = (pickupCity && dropoffCity && pickupCity !== dropoffCity) || (moveDetails?.distanceKm > 250)
         const moveType = isNational ? 'National Move' : (moveDetails?.storageDestination ? 'Storage Move' : 'Local Move')
 
-        // TIER 2: Completed rest of Step 1 info (addresses & move date)
-        if (hasCompletedName && hasValidContact && hasCompletedAddresses && hasMoveDate) {
+        // TIER 2: Completed Step 1 info (addresses captured)
+        // Fires only after 45s of genuine inactivity on Step 1, or immediately on tab hide/exit
+        if (hasCompletedName && hasValidContact && hasCompletedAddresses) {
             if (!isFullSent) {
-                // Short debounce (1.5s) so address autocomplete finishes
-                const fullTimer = setTimeout(async () => {
-                    const quoteId = lastSavedQuote?.id
-                    if (!quoteId) return
+                const sendFullAlert = async () => {
+                    const quoteId = lastSavedQuote?.id || null
+                    if (sessionStorage.getItem(fullSentKey)) return
 
                     sessionStorage.setItem(fullSentKey, '1')
-                    sessionStorage.setItem(`mm_step1_full_sent_${quoteId}`, '1')
-                    sessionStorage.setItem(earlySentKey, '1')
-                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
+                    if (quoteId) {
+                        sessionStorage.setItem(`mm_step1_full_sent_${quoteId}`, '1')
+                        sessionStorage.setItem(earlySentKey, '1')
+                        sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
+                    }
 
-                    console.log(`[Step1 Lead Trigger] Dispatching FULL lead alert for ${contactKey} (Quote: ${quoteId})...`)
+                    console.log(`[Step1 Lead Trigger] User idle on Step 1 with addresses. Dispatching lead alert for ${contactKey} (Quote: ${quoteId ?? 'unsaved'})...`)
                     const alertRes = await emailService.sendAbandonedLeadAlert({
                         quoteId: quoteId,
                         clientName: formatClientName(moveDetails?.contactName, moveDetails?.surname),
@@ -177,19 +183,35 @@ export default function MoveWizard() {
                         moveType: moveType,
                         total: 0,
                         isInstant: true,
+                        leadTier: 'Step 1 Complete (Addresses Captured)',
                         isUpdate: isEarlySent
                     })
 
                     if (alertRes && alertRes.success === false) {
                         sessionStorage.removeItem(fullSentKey)
-                        sessionStorage.removeItem(`mm_step1_full_sent_${quoteId}`)
+                        if (quoteId) sessionStorage.removeItem(`mm_step1_full_sent_${quoteId}`)
                         console.warn(`[Step1 Lead Trigger] Full lead alert failed:`, alertRes.error)
                     } else {
                         console.log(`[Step1 Lead Trigger] Full lead alert sent successfully for ${contactKey}`)
                     }
-                }, 1500)
+                }
 
-                return () => clearTimeout(fullTimer)
+                // Inactivity timer: 45 seconds of staying on Step 1 without proceeding
+                const fullTimer = setTimeout(sendFullAlert, 45000)
+
+                // Tab visibility / leave handler
+                const handleVisibility = () => {
+                    if (document.visibilityState === 'hidden') {
+                        sendFullAlert()
+                    }
+                }
+
+                document.addEventListener('visibilitychange', handleVisibility)
+
+                return () => {
+                    clearTimeout(fullTimer)
+                    document.removeEventListener('visibilitychange', handleVisibility)
+                }
             }
         }
         // TIER 1: Contact entered, but stopped there (addresses not complete)
@@ -197,14 +219,13 @@ export default function MoveWizard() {
         else if (hasCompletedName && hasValidContact && !hasCompletedAddresses) {
             if (!isEarlySent && !isFullSent) {
                 const sendEarlyAlert = async () => {
-                    const quoteId = lastSavedQuote?.id
-                    if (!quoteId) return
+                    const quoteId = lastSavedQuote?.id || null
                     if (sessionStorage.getItem(earlySentKey) || sessionStorage.getItem(fullSentKey)) return
 
                     sessionStorage.setItem(earlySentKey, '1')
-                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
+                    if (quoteId) sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
 
-                    console.log(`[Step1 Lead Trigger] User stopped on Step 1. Dispatching EARLY contact lead alert for ${contactKey} (Quote: ${quoteId})...`)
+                    console.log(`[Step1 Lead Trigger] User stopped on Step 1. Dispatching EARLY contact lead alert for ${contactKey} (Quote: ${quoteId ?? 'unsaved'})...`)
                     const alertRes = await emailService.sendAbandonedLeadAlert({
                         quoteId: quoteId,
                         clientName: formatClientName(moveDetails?.contactName, moveDetails?.surname),
@@ -221,7 +242,7 @@ export default function MoveWizard() {
 
                     if (alertRes && alertRes.success === false) {
                         sessionStorage.removeItem(earlySentKey)
-                        sessionStorage.removeItem(`mm_step1_early_sent_${quoteId}`)
+                        if (quoteId) sessionStorage.removeItem(`mm_step1_early_sent_${quoteId}`)
                         console.warn(`[Step1 Lead Trigger] Early lead alert failed:`, alertRes.error)
                     } else {
                         console.log(`[Step1 Lead Trigger] Early lead alert sent successfully for ${contactKey}`)
@@ -251,7 +272,9 @@ export default function MoveWizard() {
         lastSavedQuote?.id,
         hasLeadProgress,
         isAdmin,
-        isTest
+        isTest,
+        location.pathname,
+        basePath
     ])
 
     const STEPS = useMemo(() => [

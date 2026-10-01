@@ -11,7 +11,9 @@ import {
     PACKAGING_RATES, 
     PRICING_CONSTANTS, 
     getCityCode,
-    detectCityCode
+    detectCityCode,
+    isOutlyingOrOuterRegional,
+    isValidHubToHubRoute
 } from '../data/pricingRates.js'
 
 export const useMoveStore = create(
@@ -253,22 +255,30 @@ export const useMoveStore = create(
                 const { forceNew, submission_type, contactName, contactEmail, contactPhone, ...dbOverrides } = overrides
 
                 // Build a clean payload with only known database columns
-                const isLocationNotFound = Boolean(overrides.cant_find_address || state.moveDetails.cant_find_address)
+                const isLocationNotFound = Boolean(overrides.cant_find_address || state.moveDetails.cant_find_address || state.moveDetails.pickupManualActive || state.moveDetails.dropoffManualActive)
+                const isCallbackRequired = Boolean(overrides.request_call_back || state.moveDetails.request_call_back || isLocationNotFound || totals.needsQuoteRequest)
                 const commentsBase = dbOverrides.customer_comments || state.moveDetails.generalNotes || ''
-                const commentsFinal = isLocationNotFound 
-                    ? `[LOCATION SEARCH FAILED] User could not find their address. Please contact them. ${commentsBase}`
-                    : commentsBase
+                let commentsFinal = commentsBase
+                if (isLocationNotFound) {
+                    commentsFinal = `[LOCATION SEARCH FAILED] User could not find their address. Please contact them. ${commentsBase}`
+                } else if (totals.needsQuoteRequest) {
+                    commentsFinal = `[OUTLYING AREA / CUSTOM QUOTE REQUEST] Route exceeds standard automated parameters or involves outlying/outer regional area. User requested a custom quote callback. ${commentsBase}`
+                }
 
                 const defaultFullName = formatClientName(state.moveDetails.contactName, state.moveDetails.surname) || 'Anonymous'
                 const rawName = dbOverrides.client_name || overrides.contactName || defaultFullName
 
-                const targetStatus = dbOverrides.status || overrides.status || 'new'
+                let targetStatus = dbOverrides.status || overrides.status || 'new'
                 const isWon = ['booked', 'paid', 'booked_paid', 'completed'].includes(targetStatus)
-                const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || null
-                const referralSource = dbOverrides.referral_source || overrides.referralSource || state.moveDetails.referralSource || ''
+                if (totals.needsQuoteRequest && !isWon) {
+                    targetStatus = 'lead'
+                }
 
-                    const activeInventory = overrides.inventory || dbOverrides.inventory || overrides.items_json || dbOverrides.items_json || state.inventory || {}
-                    const quotePayload = {
+                const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || state.moveDetails?.rejectionReason || null
+                const referralSource = dbOverrides.referral_source || overrides.referral_source || overrides.referralSource || state.moveDetails?.referralSource || ''
+
+                const activeInventory = overrides.inventory || dbOverrides.inventory || overrides.items_json || dbOverrides.items_json || state.inventory || {}
+                const quotePayload = {
                         client_name: cleanClientName(rawName),
                         client_email: dbOverrides.client_email || contactEmail || overrides.contactEmail || state.moveDetails.contactEmail || '',
                         client_phone: dbOverrides.client_phone || contactPhone || overrides.contactPhone || state.moveDetails.contactPhone || '',
@@ -283,6 +293,11 @@ export const useMoveStore = create(
                             items: activeInventory,
                             extraCollections: state.moveDetails?.extraCollections || [],
                             extraDrops: state.moveDetails?.extraDrops || [],
+                            pickupLatLng: state.moveDetails?.pickupLatLng || null,
+                            dropoffLatLng: state.moveDetails?.dropoffLatLng || null,
+                            pickupAddressComponents: state.moveDetails?.pickupAddressComponents || null,
+                            dropoffAddressComponents: state.moveDetails?.dropoffAddressComponents || null,
+                            breakdown: totals.breakdown || null,
                             rejection_reason: rejectionReason,
                             referral_source: referralSource,
                             custom_products: state.moveDetails?.customProducts || state.moveDetails?.custom_products || [],
@@ -292,7 +307,7 @@ export const useMoveStore = create(
                     total_price: totals.total || 0,
                     total_volume: totals.totalVolume || 0,
                     status: targetStatus,
-                    request_call_back: Boolean(overrides.request_call_back || state.moveDetails.request_call_back || isLocationNotFound),
+                    request_call_back: isCallbackRequired,
                     customer_comments: commentsFinal,
                     access_details: dbOverrides.access_details || state.accessDetails || {},
                     packaging_option: dbOverrides.packaging_option || state.moveDetails.packagingOption || 'none',
@@ -301,6 +316,7 @@ export const useMoveStore = create(
                     insurance_enabled: Boolean(dbOverrides.insurance_enabled !== undefined ? dbOverrides.insurance_enabled : state.moveDetails.insuranceEnabled),
                     payment_method: dbOverrides.payment_method || state.moveDetails.paymentMethod || 'eft'
                 }
+
 
                 console.log('SUBMITTING QUOTE PAYLOAD (clean):', quotePayload)
 
@@ -722,7 +738,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const rawPickupCityCode = detectCityCode(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng);
     const rawDropoffCityCode = detectCityCode(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng);
 
-    // ─── STEP 2: Outline Province / Unknown Location Detection ──────────────────
+    // ─── STEP 2: Outline Area & Cannot Find Address Detection ──────────────────
+    const isLocationNotFound = Boolean(moveDetails.cant_find_address || moveDetails.pickupManualActive || moveDetails.dropoffManualActive);
+
     const haversineKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -734,31 +752,6 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c;
     };
-
-    const isGPSOutline = (latLng) => {
-        if (!latLng || !latLng.lat || !latLng.lng) return false;
-        const lat = parseFloat(latLng.lat);
-        const lng = parseFloat(latLng.lng);
-        if (isNaN(lat) || isNaN(lng)) return false;
-        const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
-        const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
-        const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
-        const resolvedCode = detectCityCode(null, null, latLng);
-        if (resolvedCode === CITY_CODES.GR) return false;
-        return distToJhb > 150 && distToDbn > 150 && distToCpt > 150;
-    };
-
-    const outlineProvinces = [
-        'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
-        'mpumulanga', 'mphumulanga',
-        'potchefstroom', 'klerksdorp', 'rustenburg', 
-        'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
-        'burgersfort', 'middelburg',
-        'kimberley', 'upington',
-        'east london', 'eastlondon', 'buffalo city',
-        'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
-        'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
-    ];
 
     const allLocations = [
         { address: pickupAddress, components: moveDetails.pickupAddressComponents, latLng: moveDetails.pickupLatLng, rawCityCode: rawPickupCityCode },
@@ -783,44 +776,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         });
     }
 
-    const isLocationOutline = (loc) => {
-        // 1. Text-based search
-        if (outlineProvinces.some(prov => {
-            if (prov === 'pe') {
-                return new RegExp('\\bpe\\b', 'i').test(loc.address);
-            }
-            return loc.address.includes(prov);
-        })) return true;
-
-        // 2. Component-based search
-        if (loc.components && Array.isArray(loc.components)) {
-            const hasOutlineComp = loc.components.some(c => {
-                const name = (c.long_name || c.short_name || '').toLowerCase().trim();
-                return outlineProvinces.some(prov => {
-                    if (prov === 'pe') {
-                        return name === 'pe' || new RegExp('\\bpe\\b', 'i').test(name);
-                    }
-                    return name === prov || name.includes(prov);
-                });
-            });
-            if (hasOutlineComp) return true;
-        }
-
-        // 3. Unresolved and GPS outline check
-        if (!loc.rawCityCode) {
-            if (loc.latLng?.lat) {
-                if (isGPSOutline(loc.latLng)) return true;
-            } else {
-                // If no GPS coords are attached and it wasn't matched in outlineProvinces list,
-                // do not falsely flag it as outline. Let city/national routing handle it.
-                return false;
-            }
-        }
-
-        return false;
-    };
-
-    const hasOutlineProvince = allLocations.some(isLocationOutline);
+    // Comprehensive check for outlying provinces and outer regional zip codes / towns
+    const hasOutlineArea = allLocations.some(loc => isOutlyingOrOuterRegional(loc.address, loc.components, loc.latLng));
 
     // ─── STEP 3: Resolve final city codes (fallback after outline check) ─────────
     // Cross-address fallback: if one side is resolved, propagate it to the other.
@@ -833,7 +790,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
     }
     // Absolute fallback — only reached for addresses with no GPS and no text match.
-    // The outline-province flag above will have already caught most real cases.
+    // The outline check above will have already caught most real cases.
     if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
     if (!dropoffCityCode) dropoffCityCode = CITY_CODES.JHB;
 
@@ -844,13 +801,13 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const dropoffProvince = getProvince(dropoffAddress);
     const isInterProvincial = pickupProvince && dropoffProvince && pickupProvince !== dropoffProvince;
 
-    // ─── STEP 5: Total Billable Distance ─────────────────────────────────────────
+    // ─── STEP 5: Total Billable Distance (Round Trip Circuit) ───────────────────
     // Prefer the Google Maps Distance Matrix result (stored as totalBillableDistance).
     // Fallback: use distanceKm + depot legs from tripBreakdown, or a flat 30km estimate.
     const totalDistance = parseFloat(moveDetails.totalBillableDistance) || 
                          ((parseFloat(moveDetails.distanceKm) || 0) + (moveDetails.tripBreakdown 
                              ? (moveDetails.tripBreakdown.depotToPickup || 0) + (moveDetails.tripBreakdown.dropoffToDepot || 0)
-                             : 30))
+                             : 30));
 
     const hasDifferentCityCode = allLocations.some(loc => {
         const cityCode = loc.rawCityCode || detectCityCode(loc.address, loc.components, loc.latLng);
@@ -896,49 +853,71 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             // Fallback for long-distance routes where destination city wasn't explicitly parsed
             if (dropoffAddress.includes('cape town') || dropoffAddress.includes('cpt') || dropoffAddress.includes('western cape') || dropoffAddress.includes('worcester')) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
-            } else if (dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu')) {
+            } else if (
+                dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu') ||
+                dropoffAddress.includes('shaka') || dropoffAddress.includes('ballito') || dropoffAddress.includes('dolphin coast') || dropoffAddress.includes('salt rock') ||
+                dropoffAddress.includes('kwadukuza') || dropoffAddress.includes('umhlanga')
+            ) {
                 nationalDestinationCityCode = CITY_CODES.DBN;
             } else if (pickupCityCode === CITY_CODES.JHB) {
-                nationalDestinationCityCode = totalDistance > 1000 ? CITY_CODES.CPT : CITY_CODES.DBN;
+                const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || (totalDistance / 2);
+                nationalDestinationCityCode = (oneWayDist > 950 || totalDistance > 1800) ? CITY_CODES.CPT : CITY_CODES.DBN;
+            } else if (pickupCityCode === CITY_CODES.DBN) {
+                const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || (totalDistance / 2);
+                nationalDestinationCityCode = (oneWayDist > 1100 || totalDistance > 2200) ? CITY_CODES.CPT : CITY_CODES.JHB;
+            } else if (pickupCityCode === CITY_CODES.CPT) {
+                nationalDestinationCityCode = CITY_CODES.JHB;
             }
         }
     }
 
-    // ─── STEP 7: Local 80km Depot Rule ───────────────────────────────────────────
-    // If this is a local move and either the depot→pickup OR dropoff→depot leg
-    // (per Google Maps) exceeds 80 km, we cannot price it — request a quote.
-    // We use tripBreakdown (Google Maps legs) when available, otherwise fall back to
-    // the haversine distance from the depot coord to the address GPS coords.
-    let isDepotOver80 = false;
-    if (!isNationalMove) {
-        if (moveDetails.tripBreakdown) {
-            const { depotToPickup, dropoffToDepot } = moveDetails.tripBreakdown;
-            if ((depotToPickup || 0) > 80 || (dropoffToDepot || 0) > 80) {
-                isDepotOver80 = true;
-            }
-        } else {
-            // No tripBreakdown yet — use GPS haversine as a conservative estimate.
-            const depotCity = pickupCityCode || 'JHB';
-            const DEPOT_COORDS_LOCAL = {
-                JHB: { lat: -26.2573, lng: 28.1519 },
-                DBN: { lat: -29.5444, lng: 31.2174 },
-                CPT: { lat: -33.9340, lng: 18.5328 },
-            };
-            const depot = DEPOT_COORDS_LOCAL[depotCity] || DEPOT_COORDS_LOCAL.JHB;
-            if (moveDetails.pickupLatLng?.lat) {
-                const d2p = haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.pickupLatLng.lat), parseFloat(moveDetails.pickupLatLng.lng));
-                if (d2p > 80) isDepotOver80 = true;
-            }
-            if (!isDepotOver80 && moveDetails.dropoffLatLng?.lat) {
-                const d2d = haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.dropoffLatLng.lat), parseFloat(moveDetails.dropoffLatLng.lng));
-                if (d2d > 80) isDepotOver80 = true;
-            }
+    // ─── STEP 7: 160km Round Trip & Depot Distance Rule ───────────────────────────
+    // Restrict the automated pricing calculator for outer regional zip codes and round trips
+    // over 160km (or either depot leg exceeding 80km) so those submissions trigger a "Request a Quote"
+    // workflow rather than displaying an estimated rate.
+    let depotToPickupKm = moveDetails.tripBreakdown?.depotToPickup || 0;
+    let dropoffToDepotKm = moveDetails.tripBreakdown?.dropoffToDepot || 0;
+
+    if (!moveDetails.tripBreakdown) {
+        const depotCity = pickupCityCode || 'JHB';
+        const DEPOT_COORDS_LOCAL = {
+            JHB: { lat: -26.2573, lng: 28.1519 },
+            DBN: { lat: -29.5444, lng: 31.2174 },
+            CPT: { lat: -33.9340, lng: 18.5328 },
+        };
+        const depot = DEPOT_COORDS_LOCAL[depotCity] || DEPOT_COORDS_LOCAL.JHB;
+        if (moveDetails.pickupLatLng?.lat) {
+            depotToPickupKm = Math.round(haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.pickupLatLng.lat), parseFloat(moveDetails.pickupLatLng.lng)) * 1.4);
+        }
+        if (moveDetails.dropoffLatLng?.lat) {
+            dropoffToDepotKm = Math.round(haversineKm(depot.lat, depot.lng, parseFloat(moveDetails.dropoffLatLng.lat), parseFloat(moveDetails.dropoffLatLng.lng)) * 1.4);
         }
     }
 
-    const needsQuoteRequest = (!isNationalMove && hasOutlineProvince) || (!isNationalMove && isDepotOver80)
+    const isDepotOver80 = depotToPickupKm > 80 || dropoffToDepotKm > 80;
+    const isRoundTripOver160 = totalDistance > 160 || isDepotOver80;
 
-    const moveProtectionCost = needsQuoteRequest ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
+    // A national move can ONLY be automated if it is between supported hubs (in NATIONAL_RATES)
+    // and neither location is an outlying/outer regional area.
+    const nationalRouteKey = `${pickupCityCode}-${nationalDestinationCityCode}`;
+    const isSupportedNationalRoute = Boolean(NATIONAL_RATES[nationalRouteKey]);
+    const isValidAutomatedNationalMove = isNationalMove && isSupportedNationalRoute && !hasOutlineArea;
+
+    // Trigger Request a Quote / Callback workflow if:
+    // 1. User could not find address or requested manual address assistance
+    // 2. Any location is in an outlying province or outer regional zip code
+    // 3. Round trip exceeds 160km or depot leg exceeds 80km (for non-national moves)
+    // 4. Move is national but route is not a supported hub-to-hub linehaul route
+    const needsQuoteRequest = 
+        isLocationNotFound ||
+        hasOutlineArea ||
+        (!isValidAutomatedNationalMove && isRoundTripOver160) ||
+        (isNationalMove && !isValidAutomatedNationalMove);
+
+    const isCustomRouteSuppressed = needsQuoteRequest && !isAdminEdit;
+
+
+    const moveProtectionCost = isCustomRouteSuppressed ? 0 : (totalVolumeCuFt <= 500 ? 250 : 450)
 
     let transportCost = 0
     let volumeCost = 0
@@ -947,7 +926,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     let volumeRate = 0
     let routeMinCharge = 0
 
-    if (needsQuoteRequest) {
+    if (isCustomRouteSuppressed) {
         transportCost = 0
         volumeCost = 0
         routeMinCharge = 0
@@ -1255,7 +1234,7 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // All rates are EX-VAT. Build the ex-VAT subtotal first.
     const VAT_RATE = 0.15
-    const documentationFee = needsQuoteRequest ? 0 : (PRICING_CONSTANTS.documentationFee || 175)
+    const documentationFee = isCustomRouteSuppressed ? 0 : (PRICING_CONSTANTS.documentationFee || 175)
     const autoPackagingCost = plasticSleeveCost + wrappingCost
 
     // Base move cost (transport, volume, access, crew, distance, boxes, insurance, docs, custom products)

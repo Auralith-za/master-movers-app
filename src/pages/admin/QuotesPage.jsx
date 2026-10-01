@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck } from 'lucide-react'
+import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck, Package } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
+import { normalizeInventory } from '../../utils/inventoryUtils'
 
 export default function QuotesPage() {
     const navigate = useNavigate()
@@ -75,6 +76,7 @@ export default function QuotesPage() {
         const dropoff = (quote.dropoff_address || quote.items_json?.dropoffAddress || '').toLowerCase()
         const moveDate = (quote.move_date || quote.items_json?.moveDate || '').toLowerCase()
         const status = (quote.status || '').toLowerCase()
+        const itemsStr = JSON.stringify(quote.items_json || '').toLowerCase()
 
         return (
             clientName.includes(q) ||
@@ -85,7 +87,8 @@ export default function QuotesPage() {
             pickup.includes(q) ||
             dropoff.includes(q) ||
             moveDate.includes(q) ||
-            status.includes(q)
+            status.includes(q) ||
+            itemsStr.includes(q)
         )
     })
 
@@ -246,6 +249,7 @@ export default function QuotesPage() {
                             <th className="px-6 py-4 font-semibold">Ref #</th>
                             <th className="px-6 py-4 font-semibold">Client</th>
                             <th className="px-6 py-4 font-semibold">Route</th>
+                            <th className="px-6 py-4 font-semibold">Volume & Items</th>
                             <th className="px-6 py-4 font-semibold">Date</th>
                             <th className="px-6 py-4 font-semibold">Value</th>
                             {filter === 'rejected' && <th className="px-6 py-4 font-semibold">Rejection Reason</th>}
@@ -255,13 +259,17 @@ export default function QuotesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
-                            <tr><td colSpan="7" className="text-center py-8 text-slate-400">Loading quotes...</td></tr>
+                            <tr><td colSpan={filter === 'rejected' ? 9 : 8} className="text-center py-8 text-slate-400">Loading quotes...</td></tr>
                         ) : filteredQuotes.length === 0 ? (
-                            <tr><td colSpan="7" className="text-center py-8 text-slate-400">No quotes found for this filter.</td></tr>
+                            <tr><td colSpan={filter === 'rejected' ? 9 : 8} className="text-center py-8 text-slate-400">No quotes found for this filter.</td></tr>
                         ) : (
                             filteredQuotes.map((quote) => (
                                 <tr key={quote.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="px-6 py-4 text-sm font-mono font-bold text-slate-700">{getSimpleQuoteNumber(quote.id)}</td>
+                                    <td className="px-6 py-4 text-sm font-mono font-bold">
+                                        <Link to={`/admin/quotes/${quote.id}`} className="text-slate-900 hover:text-red-600 hover:underline">
+                                            {getSimpleQuoteNumber(quote.id)}
+                                        </Link>
+                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{quote.client_name}</div>
                                         <div className="text-xs text-slate-500">{quote.client_phone}</div>
@@ -269,6 +277,29 @@ export default function QuotesPage() {
                                     <td className="px-6 py-4 text-sm">
                                         <div className="text-slate-900">{quote.pickup_address?.split(',')[0]}</div>
                                         <div className="text-slate-400 text-xs">to {quote.dropoff_address?.split(',')[0]}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm">
+                                        {(() => {
+                                            const normItems = normalizeInventory(quote.items_json)
+                                            const totalQty = Object.values(normItems).reduce((sum, q) => sum + Number(q), 0)
+                                            const volumeVal = quote.total_volume ? Number(quote.total_volume) : null
+
+                                            if (totalQty === 0 && (!volumeVal || volumeVal === 0)) {
+                                                return <span className="text-xs text-slate-400 font-normal italic">No items</span>
+                                            }
+
+                                            return (
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5 whitespace-nowrap">
+                                                        <Package size={13} className="text-red-600 shrink-0" />
+                                                        {volumeVal ? `${volumeVal.toFixed(1)} ft³` : '—'}
+                                                    </span>
+                                                    <span className="text-[11px] text-slate-500 font-medium pl-4 whitespace-nowrap">
+                                                        {totalQty} {totalQty === 1 ? 'item' : 'items'}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })()}
                                     </td>
                                     <td className="px-6 py-4 text-sm">
                                         <div className="text-slate-700 font-medium">

@@ -16,7 +16,10 @@ export default function PayFastCheckout({ quote, onSuccess, onIndexChange }) {
     // Form field variables — mPaymentId must be declared BEFORE the URL constants below
     const nameFirst = quote.client_name?.split(' ')[0] || 'Client'
     const emailAddress = quote.client_email || ''
-    const mPaymentId = quote.id || 'TEST-ID'
+    const isValidUUID = (str) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str)))
+    const mPaymentId = isValidUUID(quote.id)
+        ? quote.id
+        : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0'))
     // Use nullish coalescing (??) not || so that a discounted total of 0 still works correctly
     const amount = Number(quote.total_price ?? quote.total ?? 0).toFixed(2)
     const itemName = `Move: ${quote.pickup_address || 'TBD'} to ${quote.dropoff_address || 'TBD'}${quote.coupon_code ? ` (Coupon: ${quote.coupon_code})` : ''}`

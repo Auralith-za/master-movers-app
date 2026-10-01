@@ -104,9 +104,9 @@ serve(async (req) => {
             // Skip if already abandoned (guard against double-processing)
             if (quote.status === 'abandoned') continue
 
-            // Skip if both email and phone number are not completed yet
-            if (!hasCompletedEmailAndPhone(quote.client_email, quote.client_phone)) {
-                console.log(`Skipping quote ${quote.id}: missing completed email and phone number.`)
+            // Skip if neither email nor phone number are available yet
+            if (!isEmailValid(quote.client_email) && !isPhoneValid(quote.client_phone)) {
+                console.log(`Skipping quote ${quote.id}: missing contact info (no valid email or phone).`)
                 continue
             }
 

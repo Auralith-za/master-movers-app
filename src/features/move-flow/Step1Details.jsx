@@ -7,7 +7,7 @@ import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
 import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2, ChevronDown } from 'lucide-react'
-import { getCityCode, detectCityCode, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
+import { getCityCode, detectCityCode, isOutlyingOrOuterRegional, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
 import { hasCompletedEmailAndPhone, hasContactInfo } from '../../lib/utils'
@@ -146,72 +146,7 @@ export default function Step1Details() {
     const [dropoffHelpSent, setDropoffHelpSent] = React.useState(false)
 
     const isOutlineAddress = (address, components, latLng) => {
-        if (!address && !components && !latLng) return false;
-        
-        const textOrComponentMatchesOutline = (addr, comps) => {
-            const outlineTerms = [
-                'free state', 'limpopo', 'mpumalanga', 'north west', 'northern cape',
-                'mpumulanga', 'mphumulanga',
-                'potchefstroom', 'klerksdorp', 'rustenburg', 
-                'bloemfontein', 'polokwane', 'nelspruit', 'mbombela', 
-                'burgersfort', 'middelburg',
-                'kimberley', 'upington',
-                'east london', 'eastlondon', 'buffalo city',
-                'george', 'knysna', 'mossel bay', 'mosselbay', 'plettenberg bay', 'plett', 'sedgefield', 'wilderness', 'garden route', 'garden route district',
-                'gqeberha', 'port elizabeth', 'portelizabeth', 'pe', 'nelson mandela bay', 'eastern cape'
-            ];
-            
-            const lowerAddr = (addr || '').toLowerCase();
-            if (outlineTerms.some(term => lowerAddr.includes(term))) return true;
-            
-            if (comps && Array.isArray(comps)) {
-                return comps.some(c => {
-                    const val = (c.long_name || c.short_name || '').toLowerCase().trim();
-                    return outlineTerms.some(term => val === term || val.includes(term));
-                });
-            }
-            return false;
-        };
-
-        // 1. Explicit text or component match always flags as outline
-        if (textOrComponentMatchesOutline(address, components)) {
-            return true;
-        }
-
-        const cityCode = detectCityCode(address, components, latLng);
-        
-        // If it resolves to JHB, DBN, or CPT, it's NOT outline
-        if (cityCode === 'JHB' || cityCode === 'DBN' || cityCode === 'CPT') {
-            return false;
-        }
-
-        // GPS check: if it has coordinates but is far from hubs
-        if (latLng && latLng.lat && latLng.lng) {
-            const lat = parseFloat(latLng.lat);
-            const lng = parseFloat(latLng.lng);
-            if (!isNaN(lat) && !isNaN(lng)) {
-                const haversineKm = (lat1, lon1, lat2, lon2) => {
-                    const R = 6371;
-                    const dLat = (lat2 - lat1) * Math.PI / 180;
-                    const dLon = (lon2 - lon1) * Math.PI / 180;
-                    const a = 
-                        Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                    return R * c;
-                };
-                const distToJhb = haversineKm(lat, lng, -26.2573, 28.1519);
-                const distToDbn = haversineKm(lat, lng, -29.5444, 31.2174);
-                const distToCpt = haversineKm(lat, lng, -33.9340, 18.5328);
-                
-                if (distToJhb > 150 && distToDbn > 150 && distToCpt > 150) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return isOutlyingOrOuterRegional(address, components, latLng);
     };
 
     const handleOutlineCallbackSubmit = async () => {
@@ -557,7 +492,7 @@ export default function Step1Details() {
     ])
 
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
 
         // Clear any previous error before re-evaluating form validity
@@ -664,78 +599,64 @@ export default function Step1Details() {
             return
         }
 
-        if (isOutline) {
-            handleOutlineCallbackSubmit()
-            return
-        }
-
         // 🔴 Save/confirm lead in Supabase and send ONE lead email when Step 1 is completed
         if (hasContactInfo(moveDetails.contactEmail, moveDetails.contactPhone)) {
-            submitQuote({ 
-                status: 'lead',
-                lead_email_sent: true,
-                forceNew: !lastSavedQuote?.id
-            }).then(async (res) => {
+            try {
+                const res = await submitQuote({ 
+                    status: 'lead', 
+                    request_call_back: Boolean(isOutline || moveDetails.cant_find_address),
+                    lead_email_sent: true,
+                    forceNew: !lastSavedQuote?.id
+                })
                 const quoteId = res?.data?.id || lastSavedQuote?.id
-                if (quoteId) {
-                    const cleanEmail = (moveDetails.contactEmail || '').trim().toLowerCase()
-                    const cleanPhone = (moveDetails.contactPhone || '').replace(/\D/g, '')
-                    const contactKey = cleanEmail || cleanPhone || String(quoteId)
 
-                    const fullSentKey = `mm_step1_full_sent_${contactKey}`
-                    const fullSentQuoteKey = `mm_step1_full_sent_${quoteId}`
-                    const legacyKey = `mm_step1_lead_sent_${cleanEmail}`
-                    const legacyQuoteKey = `mm_step1_lead_sent_${quoteId}`
+                const cleanEmail = (moveDetails.contactEmail || '').trim().toLowerCase()
+                const cleanPhone = (moveDetails.contactPhone || '').replace(/\D/g, '')
+                const contactKey = cleanEmail || cleanPhone || (quoteId ? String(quoteId) : '')
 
-                    if (
-                        sessionStorage.getItem(fullSentKey) || 
-                        sessionStorage.getItem(fullSentQuoteKey) ||
-                        sessionStorage.getItem(legacyKey) ||
-                        sessionStorage.getItem(legacyQuoteKey)
-                    ) {
-                        console.log(`[Step1] Lead alert already sent for quote ${quoteId} / ${contactKey}, skipping duplicate email.`)
-                        return
-                    }
+                const fullSentKey = `mm_step1_full_sent_${contactKey}`
+                const fullSentQuoteKey = quoteId ? `mm_step1_full_sent_${quoteId}` : null
+                const legacyKey = cleanEmail ? `mm_step1_lead_sent_${cleanEmail}` : null
+                const legacyQuoteKey = quoteId ? `mm_step1_lead_sent_${quoteId}` : null
 
+                const alreadySent = 
+                    sessionStorage.getItem(fullSentKey) || 
+                    (fullSentQuoteKey && sessionStorage.getItem(fullSentQuoteKey)) ||
+                    (legacyKey && sessionStorage.getItem(legacyKey)) ||
+                    (legacyQuoteKey && sessionStorage.getItem(legacyQuoteKey))
+
+                if (!alreadySent) {
                     sessionStorage.setItem(fullSentKey, '1')
-                    sessionStorage.setItem(fullSentQuoteKey, '1')
+                    if (fullSentQuoteKey) sessionStorage.setItem(fullSentQuoteKey, '1')
                     sessionStorage.setItem(`mm_step1_early_sent_${contactKey}`, '1')
-                    sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
-                    sessionStorage.setItem(legacyKey, '1')
-                    sessionStorage.setItem(legacyQuoteKey, '1')
+                    if (quoteId) sessionStorage.setItem(`mm_step1_early_sent_${quoteId}`, '1')
+                    if (legacyKey) sessionStorage.setItem(legacyKey, '1')
+                    if (legacyQuoteKey) sessionStorage.setItem(legacyQuoteKey, '1')
 
-                    try {
-                        const sendRes = await emailService.sendAbandonedLeadAlert({
-                            quoteId: quoteId,
-                            clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
-                            clientEmail: moveDetails.contactEmail || '',
-                            clientPhone: moveDetails.contactPhone || '',
-                            moveDate: moveDetails.moveDate || '',
-                            referralSource: moveDetails.referralSource || '',
-                            pickupAddress: moveDetails.pickupAddress || '',
-                            dropoffAddress: moveDetails.dropoffAddress || '',
-                            moveType: isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move'),
-                            total: 0,
-                            isInstant: true
-                        })
-                        if (sendRes && sendRes.success === false) {
-                            sessionStorage.removeItem(fullSentKey)
-                            sessionStorage.removeItem(fullSentQuoteKey)
-                            sessionStorage.removeItem(legacyKey)
-                            sessionStorage.removeItem(legacyQuoteKey)
-                            console.warn(`[Step1] Lead alert failed:`, sendRes.error)
-                        } else {
-                            console.log(`[Step1] Lead alert sent successfully for quote ${quoteId}`)
-                        }
-                    } catch (e) {
+                    const sendRes = await emailService.sendAbandonedLeadAlert({
+                        quoteId: quoteId || null,
+                        clientName: formatClientName(moveDetails.contactName, moveDetails.surname),
+                        clientEmail: moveDetails.contactEmail || '',
+                        clientPhone: moveDetails.contactPhone || '',
+                        moveDate: moveDetails.moveDate || '',
+                        referralSource: moveDetails.referralSource || '',
+                        pickupAddress: moveDetails.pickupAddress || '',
+                        dropoffAddress: moveDetails.dropoffAddress || '',
+                        moveType: isOutline ? 'Outlying / Outer Regional Route' : (isNational ? 'National Move' : (moveDetails.storageDestination ? 'Storage Move' : 'Local Move')),
+                        total: 0,
+                        isInstant: true
+                    })
+                    if (sendRes && sendRes.success === false) {
                         sessionStorage.removeItem(fullSentKey)
-                        sessionStorage.removeItem(fullSentQuoteKey)
-                        sessionStorage.removeItem(legacyKey)
-                        sessionStorage.removeItem(legacyQuoteKey)
-                        console.error('Step 1 lead email alert error:', e)
+                        if (fullSentQuoteKey) sessionStorage.removeItem(fullSentQuoteKey)
+                        console.warn(`[Step1] Lead alert failed:`, sendRes.error)
+                    } else {
+                        console.log(`[Step1] Lead alert sent successfully for quote ${quoteId || contactKey}`)
                     }
                 }
-            }).catch(err => console.error('Step 1 lead save error:', err))
+            } catch (e) {
+                console.error('Step 1 lead save / email error:', e)
+            }
         }
 
         // 🔴 Google Ads: Step 1 Complete — fires as primary soft-conversion
@@ -988,7 +909,7 @@ export default function Step1Details() {
                                 {moveDetails.pickupAddress && isOutlineAddress(moveDetails.pickupAddress, moveDetails.pickupAddressComponents, moveDetails.pickupLatLng) && (
                                     <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
                                         <div className="flex items-center gap-2">
-                                            <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                            <span>⚠️ Outlying / Outer Regional Area: Live pricing is not available for this area. You can request a callback now, or continue below to enter your inventory for a custom quote.</span>
                                         </div>
                                         <button
                                             type="button"
@@ -1072,7 +993,7 @@ export default function Step1Details() {
                                                  {coll.address && isOutlineAddress(coll.address, coll.addressComponents, coll.latLng) && (
                                                      <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
                                                          <div className="flex items-center gap-2">
-                                                             <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                             <span>⚠️ Outlying / Outer Regional Area: Live pricing is not available for this area. You can request a callback now, or continue below to enter your inventory for a custom quote.</span>
                                                          </div>
                                                          <button
                                                              type="button"
@@ -1231,7 +1152,7 @@ export default function Step1Details() {
                                         {moveDetails.dropoffAddress && isOutlineAddress(moveDetails.dropoffAddress, moveDetails.dropoffAddressComponents, moveDetails.dropoffLatLng) && (
                                             <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                    <span>⚠️ Outlying / Outer Regional Area: Live pricing is not available for this area. You can request a callback now, or continue below to enter your inventory for a custom quote.</span>
                                                 </div>
                                                 <button
                                                     type="button"
@@ -1317,7 +1238,7 @@ export default function Step1Details() {
                                                  {drop.address && isOutlineAddress(drop.address, drop.addressComponents, drop.latLng) && (
                                                      <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-2xl text-amber-800 text-xs font-bold mt-2 animate-in fade-in space-y-3">
                                                          <div className="flex items-center gap-2">
-                                                             <span>⚠️ Outlaying Area: Live pricing is not available for this area. We will request a callback to quote you manually.</span>
+                                                             <span>⚠️ Outlying / Outer Regional Area: Live pricing is not available for this area. You can request a callback now, or continue below to enter your inventory for a custom quote.</span>
                                                          </div>
                                                          <button
                                                              type="button"
@@ -1499,14 +1420,13 @@ export default function Step1Details() {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.1em]">Request a Call Back</p>
                     </button>
                     <Button 
-                        type={isOutline ? "button" : "submit"}
-                        onClick={isOutline ? handleOutlineCallbackSubmit : undefined}
+                        type="submit"
                         size="lg" 
                         disabled={(!!addressError && !isOutline) || isValidating || isSubmittingLead}
                         className="w-full md:w-auto px-16 py-8 text-base uppercase tracking-[0.2em] font-black shadow-2xl shadow-red-600/20 bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isValidating ? 'Verifying...' : isOutline ? (isSubmittingLead ? 'Sending...' : 'Request Custom Quote') : 'Next Step'} 
-                        {isOutline ? <Phone className="ml-3" size={20} /> : <Truck className="ml-3" size={20} />}
+                        {isValidating ? 'Verifying...' : (isSubmittingLead ? 'Processing...' : 'Next Step')} 
+                        <Truck className="ml-3" size={20} />
                     </Button>
                 </div>
 

@@ -369,7 +369,7 @@ export const emailService = {
      * Send urgent callback notification to ALL admins
      * Called from Step 1, 2, 3 and 4 when customer requests a call back
      */
-    sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate, referralSource, referral_source }) => {
+    sendCallbackEmail: async ({ name, email, phone, step, pickup, dropoff, moveDate, referralSource, referral_source, quoteId, inventory, totalVolume, total, breakdown, accessDetails, notes }) => {
         try {
             if (!hasCompletedEmailAndPhone(email, phone)) {
                 console.warn("Skipping callback email: both email and phone number are required.")
@@ -385,7 +385,23 @@ export const emailService = {
                 },
                 body: JSON.stringify({
                     type: 'callback_notification',
-                    contactData: { name, email, phone, step, pickup, dropoff, moveDate, referral_source: referralSource || referral_source || '' }
+                    contactData: { 
+                        name, 
+                        email, 
+                        phone, 
+                        step, 
+                        pickup, 
+                        dropoff, 
+                        moveDate, 
+                        referral_source: referralSource || referral_source || '',
+                        quoteId,
+                        inventory,
+                        totalVolume,
+                        total,
+                        breakdown,
+                        accessDetails,
+                        notes
+                    }
                 })
             })
             const result = await response.json()

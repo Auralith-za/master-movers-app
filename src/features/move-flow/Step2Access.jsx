@@ -9,7 +9,7 @@ import { LeadCaptureModal } from './Step1Details'
 import { emailService } from '../../services/emailService'
 import clsx from 'clsx'
 import { PACKAGING_RATES } from '../inventory/data/pricingRates'
-import { trackCallbackRequest } from '../../lib/gtag'
+import { trackCallbackRequest, trackMetaStep2Reached } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
 import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
@@ -40,7 +40,7 @@ const Tooltip = ({ text }) => (
 
 export default function Step2Access() {
     const navigate = useNavigate()
-    const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails, submitQuote } = useMoveStore()
+    const { accessDetails, setAccessDetails, moveDetails, setPackagingOption, setMoveDetails, submitQuote, lastSavedQuote } = useMoveStore()
     const location = useLocation()
     const basePath = location.pathname.startsWith('/quote-test') ? '/quote-test' : 
                      location.pathname.startsWith('/admin/quotes/new') ? '/admin/quotes/new' : '/quote';
@@ -48,6 +48,13 @@ export default function Step2Access() {
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [addedBoxes, setAddedBoxes] = React.useState(false)
     const [isSavingBoxes, setIsSavingBoxes] = React.useState(false)
+
+    // 🔴 Meta Pixel: Track Step 2 reached on Plan Your Move (exclude internal admin quotes)
+    React.useEffect(() => {
+        if (!basePath.includes('/admin')) {
+            trackMetaStep2Reached({ quoteId: lastSavedQuote?.id })
+        }
+    }, [basePath, lastSavedQuote?.id])
 
     const isStorageDropoff = Boolean(
         (moveDetails?.storageDestination && moveDetails.storageDestination !== '') ||

@@ -18,7 +18,9 @@ export default function PayflexCheckout({ quote }) {
                     'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
                 },
                 body: JSON.stringify({
-                    quoteId: quote.id || 'TEST-' + Date.now(),
+                    quoteId: (quote.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(quote.id)))
+                        ? quote.id
+                        : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0')),
                     amount: Number(quote.total_price || quote.total).toFixed(2),
                     customer: {
                         name: quote.client_name || 'Client',

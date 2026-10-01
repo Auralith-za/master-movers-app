@@ -1,5 +1,6 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { pageview } from './lib/gtag'
 import AdminLayout from './layouts/AdminLayout'
 import WebsiteLayout from './layouts/WebsiteLayout'
 import TestModeLayout from './layouts/TestModeLayout'
@@ -47,9 +48,19 @@ function ExternalRedirect({ to }) {
   return null
 }
 
+// Tracks route transitions for Google Analytics and Meta Pixel
+function RouteTracker() {
+  const location = useLocation()
+  React.useEffect(() => {
+    pageview(location.pathname + location.search)
+  }, [location.pathname, location.search])
+  return null
+}
+
 function App() {
   return (
     <Router>
+      <RouteTracker />
       <Routes>
         {/* Website Routes */}
         <Route element={<WebsiteLayout />}>

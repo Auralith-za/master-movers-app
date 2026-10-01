@@ -452,8 +452,18 @@ serve(async (req) => {
     try {
         const { type, to, quoteData, contactData, pdfBase64, pdfFilename, paymentLink } = await req.json()
 
-        // Strict Lead Validation: For lead notifications, require both email and phone number
-        if (['outline_area_alert', 'callback_notification', 'location_not_found_alert', 'abandoned_lead_alert', 'contact_message'].includes(type)) {
+        // Lead Validation: For abandoned leads, require at least email or phone. For callback/contact requests, require both.
+        if (type === 'abandoned_lead_alert') {
+            const leadEmail = contactData?.email || quoteData?.client_email
+            const leadPhone = contactData?.phone || quoteData?.client_phone
+            if (!isEmailValid(leadEmail) && !isPhoneValid(leadPhone)) {
+                console.warn(`[Lead Validation Rejected] Abandoned lead alert requires at least an email address or phone number. Received email: '${leadEmail}', phone: '${leadPhone}'`)
+                return new Response(
+                    JSON.stringify({ error: "A valid email address or phone number is required to capture an email lead." }),
+                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                )
+            }
+        } else if (['outline_area_alert', 'callback_notification', 'location_not_found_alert', 'contact_message'].includes(type)) {
             const leadEmail = contactData?.email || quoteData?.client_email
             const leadPhone = contactData?.phone || quoteData?.client_phone
             if (!hasCompletedEmailAndPhone(leadEmail, leadPhone)) {
@@ -805,6 +815,33 @@ serve(async (req) => {
             subject = `📞 URGENT: Call Back Request — ${contactData?.name || 'Customer'}`
             recipients = adminEmails // Admin-only alert
 
+            let inventoryData = contactData?.items_json || contactData?.inventory || contactData?.items || quoteData?.items_json || quoteData?.inventory
+            let totalVolume = contactData?.totalVolume || contactData?.total_volume || quoteData?.total_volume || quoteData?.totalVolume
+            const quoteId = contactData?.quoteId || contactData?.id || quoteData?.id
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteId) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteId)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback in callback notification:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+
             innerHtml = `
                 <h1 style="color:#e31837;">📞 Callback Request</h1>
                 <p>A customer has requested a call back via the website. Please contact them as soon as possible.</p>
@@ -815,6 +852,7 @@ serve(async (req) => {
                 </div>
 
                 ${buildStandardDetailsTable({
+                    ref: quoteId ? quoteId.toString().substring(0, 8).toUpperCase() : undefined,
                     name: contactData?.name,
                     phone: contactData?.phone,
                     email: contactData?.email,
@@ -826,17 +864,55 @@ serve(async (req) => {
                     notes: contactData?.notes || contactData?.comments
                 })}
 
+                ${inventoryHtml}
+
+                ${quoteId ? `
+                <div style="text-align:center;margin:24px 0;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteId}" class="btn" style="background:#e31837;">
+                        View Quote in Admin →
+                    </a>
+                </div>
+                ` : ''}
+
                 <p>Call them back immediately on <strong>${contactData?.phone || '—'}</strong> or reply to this email.</p>
             `
         } else if (type === 'outline_area_alert') {
             subject = `🚛 Outline area request for quote (${contactData?.name || 'Customer'})`
             recipients = adminEmails
 
+            let inventoryData = contactData?.items_json || contactData?.inventory || contactData?.items || quoteData?.items_json || quoteData?.inventory
+            let totalVolume = contactData?.totalVolume || contactData?.total_volume || quoteData?.total_volume || quoteData?.totalVolume
+            const quoteId = contactData?.quoteId || contactData?.id || quoteData?.id
+
+            if ((!inventoryData || (typeof inventoryData === 'object' && Object.keys(inventoryData).length === 0)) && quoteId) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('items_json, total_volume')
+                            .eq('id', quoteId)
+                            .maybeSingle()
+                        if (qData) {
+                            if (qData.items_json) inventoryData = qData.items_json
+                            if (qData.total_volume) totalVolume = qData.total_volume
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote inventory fallback in outline alert:', e)
+                }
+            }
+
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+
             innerHtml = `
                 <h1 style="color:#e31837;">🚛 Outline Area Custom Quote Request</h1>
                 <p>A customer has selected an outline area that our trucks don't regularly service. They have requested a custom quote.</p>
                 
                 ${buildStandardDetailsTable({
+                    ref: quoteId ? quoteId.toString().substring(0, 8).toUpperCase() : undefined,
                     name: contactData?.name,
                     phone: contactData?.phone,
                     email: contactData?.email,
@@ -845,6 +921,16 @@ serve(async (req) => {
                     step: 'Outlaying Area Custom Quote Request',
                     notes: contactData?.notes || contactData?.comments
                 })}
+
+                ${inventoryHtml}
+
+                ${quoteId ? `
+                <div style="text-align:center;margin:24px 0;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteId}" class="btn" style="background:#e31837;">
+                        View Quote in Admin →
+                    </a>
+                </div>
+                ` : ''}
 
                 <p>Please contact them on <strong>${contactData?.phone || '—'}</strong> to discuss their requirements and prepare a custom quote.</p>
             `
@@ -863,6 +949,7 @@ serve(async (req) => {
 
                 <table class="details-table">
                     <tr><td class="label">Candidate Name:</td><td class="value"><strong>${contactData?.name || '—'}</strong></td></tr>
+                    <tr><td class="label">Region / Branch:</td><td class="value"><strong style="color:#e31837;">${contactData?.region || 'Not Specified'}</strong></td></tr>
                     <tr><td class="label">Position:</td><td class="value"><strong>${contactData?.position || '—'}</strong></td></tr>
                     <tr><td class="label">Phone:</td><td class="value"><a href="tel:${contactData?.phone || ''}"><strong>${contactData?.phone || '—'}</strong></a></td></tr>
                     <tr><td class="label">Email:</td><td class="value"><a href="mailto:${contactData?.email || ''}">${contactData?.email || '—'}</a></td></tr>
@@ -901,7 +988,10 @@ serve(async (req) => {
             `
         } else if (type === 'abandoned_lead_alert') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
-            subject = `⭐️ NEW LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
+            const isLeadUpdate = Boolean(quoteData?.is_update || quoteData?.isUpdate)
+            subject = isLeadUpdate 
+                ? `📍 LEAD UPDATE (Addresses Added) — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
+                : `⭐️ NEW LEAD — ${quoteData?.client_name || 'Unknown Customer'} [MM-${ref}]`
             recipients = adminEmails // Admin-only
 
             // Build inventory HTML from items_json
@@ -1119,12 +1209,45 @@ serve(async (req) => {
                         request_call_back: true,
                         total_price: quoteData?.total_price || 0,
                         total_volume: quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume || 0,
-                        items_json: itemsJson
+                        items_json: itemsJson,
+                        lead_email_sent: true
                     }
 
                     if (quoteData?.id) {
-                        // Update existing quote instead of creating a duplicate row!
-                        await supabaseAdmin.from('quotes').update(leadPayload).eq('id', quoteData.id)
+                        // Update existing quote SAFELY: Never overwrite existing non-empty inventory, price, or volume with empty or zero values!
+                        const updatePayload: Record<string, unknown> = {
+                            lead_email_sent: true
+                        }
+                        if (clientName && clientName !== 'Valued Client') updatePayload.client_name = clientName
+                        if (clientEmail) updatePayload.client_email = clientEmail
+                        if (clientPhone) updatePayload.client_phone = clientPhone
+                        if (pickup && pickup !== 'Outlaying Area') updatePayload.pickup_address = pickup
+                        if (dropoff && dropoff !== 'Outlaying Area') updatePayload.dropoff_address = dropoff
+                        if (moveDate) updatePayload.move_date = moveDate
+                        
+                        // Only set request_call_back and comments if this is an explicit callback/outline/location request
+                        if (['callback_notification', 'outline_area_alert', 'location_not_found_alert'].includes(type)) {
+                            updatePayload.request_call_back = true
+                            updatePayload.customer_comments = comments
+                        }
+
+                        // Only update items_json if non-empty items are provided! NEVER wipe out existing items with {}!
+                        if (itemsJson && typeof itemsJson === 'object' && Object.keys(itemsJson).length > 0) {
+                            updatePayload.items_json = itemsJson
+                        }
+
+                        // Only update total_price if a real non-zero total is provided!
+                        if (quoteData?.total_price && Number(quoteData.total_price) > 0) {
+                            updatePayload.total_price = Number(quoteData.total_price)
+                        }
+
+                        // Only update total_volume if a real non-zero volume is provided!
+                        const inVolume = quoteData?.total_volume || quoteData?.totalVolume || quoteData?.items_json?.total_volume
+                        if (inVolume && Number(inVolume) > 0) {
+                            updatePayload.total_volume = Number(inVolume)
+                        }
+
+                        await supabaseAdmin.from('quotes').update(updatePayload).eq('id', quoteData.id)
                     } else {
                         leadPayload.status = 'lead'
                         await supabaseAdmin.from('quotes').insert([leadPayload])

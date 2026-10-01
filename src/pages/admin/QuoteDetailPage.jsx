@@ -377,6 +377,10 @@ export default function QuoteDetailPage() {
         const moveDetails = {
             pickupAddress: srcPickup,
             dropoffAddress: srcDropoff,
+            pickupAddressComponents: editForm.pickup_address_components || quote?.items_json?.pickupAddressComponents || null,
+            dropoffAddressComponents: editForm.dropoff_address_components || quote?.items_json?.dropoffAddressComponents || null,
+            pickupLatLng: editForm.pickup_lat_lng || quote?.items_json?.pickupLatLng || null,
+            dropoffLatLng: editForm.dropoff_lat_lng || quote?.items_json?.dropoffLatLng || null,
             extraCollections: srcExtraColls,
             extraDrops: srcExtraDrops,
             pickupCity: srcPickup,

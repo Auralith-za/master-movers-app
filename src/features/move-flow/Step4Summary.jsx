@@ -14,7 +14,7 @@ import { event, trackLeadConversion, trackQuoteSubmit } from '../../lib/gtag'
 import clsx from 'clsx'
 import { LeadCaptureModal } from './Step1Details'
 import { supabase } from '../../lib/supabaseClient'
-import { formatClientName, cleanClientName } from '../../utils/quoteHelpers'
+import { formatClientName, cleanClientName, getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import { hasCompletedEmailAndPhone } from '../../lib/utils'
 
 const SERVICE_KEYS = [
@@ -442,7 +442,14 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     step: 'Step 4 - Custom Quote Redirect (>80km or Outline)',
                     pickup: moveDetails.pickupAddress,
                     dropoff: moveDetails.dropoffAddress,
-                    moveDate: moveDetails.moveDate
+                    moveDate: moveDetails.moveDate,
+                    quoteId: savedQuote.id,
+                    inventory: inventory,
+                    totalVolume: totalVolume,
+                    total: discountedTotal || total,
+                    breakdown: breakdown,
+                    accessDetails: accessDetails,
+                    notes: moveDetails.generalNotes || ''
                 })
             }
         } catch (error) {
@@ -485,6 +492,22 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     const savedQuote = (result.data && !Array.isArray(result.data)) ? result.data : (result.data?.[0] || lastSavedQuote)
                     if (savedQuote) {
                         sendProposalEmail(savedQuote)
+                        emailService.sendCallbackEmail({
+                            name: formatClientName(moveDetails.contactName, moveDetails.surname),
+                            email: moveDetails.contactEmail,
+                            phone: moveDetails.contactPhone,
+                            step: 'Step 4 — Quote Summary (Callback Requested)',
+                            pickup: moveDetails.pickupAddress || '',
+                            dropoff: moveDetails.dropoffAddress || '',
+                            moveDate: moveDetails.moveDate || '',
+                            quoteId: savedQuote.id,
+                            inventory: inventory,
+                            totalVolume: totalVolume,
+                            total: discountedTotal || total,
+                            breakdown: breakdown,
+                            accessDetails: accessDetails,
+                            notes: moveDetails.generalNotes || ''
+                        }).catch(err => console.error('Callback email error:', err))
                     }
                 } else {
                     console.warn("Callback update failed:", result.error)
@@ -523,7 +546,14 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     step: 'Step 4 — Quote Summary',
                     pickup: moveDetails.pickupAddress || '',
                     dropoff: moveDetails.dropoffAddress || '',
-                    moveDate: moveDetails.moveDate || ''
+                    moveDate: moveDetails.moveDate || '',
+                    quoteId: savedQuote.id,
+                    inventory: inventory,
+                    totalVolume: totalVolume,
+                    total: discountedTotal || total,
+                    breakdown: breakdown,
+                    accessDetails: accessDetails,
+                    notes: moveDetails.generalNotes || ''
                 }).catch(err => console.error('Callback email error:', err))
             }
 
@@ -723,12 +753,17 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 <Phone size={32} />
                             </div>
                             <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Custom Rate Required</h2>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest leading-none mt-1">Extended Depot Logistics</p>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest leading-none mt-1">
+                                {moveDetails.cant_find_address ? 'Address Verification Required' : 'Extended Logistics / Outlying Route'}
+                            </p>
                         </div>
                         
                         <div className="p-8 space-y-6 flex-grow text-left">
                             <p className="text-sm text-slate-300 leading-relaxed">
-                                Because your move involves outline provinces/regions or collection/delivery logistics extending over 80km from our central depots, we require custom route scheduling to offer you the most accurate and competitive price.
+                                {moveDetails.cant_find_address 
+                                    ? "Because your move involves a custom suburb or manual location assistance, our logistics team will verify your address to offer you an accurate and competitive quote."
+                                    : "Because your move involves outer regional areas, outlying provinces, or round-trip logistics extending beyond 160km, we require custom route scheduling to offer you the most accurate and competitive price."
+                                }
                             </p>
                             
                             <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/40 text-xs text-slate-400 space-y-2">
@@ -742,12 +777,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                 </div>
                                 <div className="flex justify-between">
                                     <span>Logistics Type:</span>
-                                    <strong className="text-red-400">Outline / Long Distance (&gt;80km)</strong>
+                                    <strong className="text-red-400">
+                                        {moveDetails.cant_find_address 
+                                            ? "Custom Suburb / Address Verification Requested"
+                                            : ((moveDetails.totalBillableDistance > 160 || moveDetails.distanceKm > 160)
+                                                ? "Outlying / Outer Regional Route (>160km round trip)"
+                                                : "Outlying Area / Custom Quote Required")
+                                        }
+                                    </strong>
                                 </div>
                             </div>
                             
                             <div className="bg-red-500/10 border border-red-500/20 text-red-200 text-xs p-4 rounded-xl">
-                                <strong>No Payment Required Now:</strong> Submit your details below, and one of our dedicated coordinators will email your professional quote shortly.
+                                <strong>No Payment Required Now:</strong> Submit your details below, and one of our dedicated coordinators will review your inventory and contact you with your custom quote.
                             </div>
                         </div>
 
@@ -1157,7 +1199,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         </div>
                                         <div>
                                             <p className="text-emerald-900 font-black uppercase tracking-widest text-[10px]">Quote Secured</p>
-                                            <p className="text-emerald-700 text-sm font-medium">Reference: <span className="font-bold">MM-{Math.floor(Math.random() * 10000)}</span></p>
+                                            <p className="text-emerald-700 text-sm font-medium">Reference: <span className="font-bold">{lastSavedQuote?.id ? getSimpleQuoteNumber(lastSavedQuote.id) : (lastSavedQuote?.quote_ref || 'MM-PENDING')}</span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -1168,46 +1210,54 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">100% Secure Checkout</p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-6">
-                                        {/* PayFast Option */}
-                                        {moveDetails.paymentMethod === 'eft' && (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-2 px-2">
-                                                    <div className="w-1 h-4 bg-red-600 rounded-full" />
-                                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Card / Instant EFT</h4>
-                                                </div>
-                                                <PayFastCheckout
-                                                    quote={{
-                                                        id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                        total_price: discountedTotal,
-                                                        pickup_address: moveDetails.pickupAddress,
-                                                        dropoff_address: moveDetails.dropoffAddress,
-                                                        client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
-                                                        client_email: moveDetails.contactEmail
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
+                                    {(() => {
+                                        const checkoutQuoteId = (lastSavedQuote?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lastSavedQuote.id))
+                                            ? lastSavedQuote.id
+                                            : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0'));
+                                        
+                                        return (
+                                            <div className="grid grid-cols-1 gap-6">
+                                                {/* PayFast Option */}
+                                                {moveDetails.paymentMethod === 'eft' && (
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center gap-2 px-2">
+                                                            <div className="w-1 h-4 bg-red-600 rounded-full" />
+                                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Card / Instant EFT</h4>
+                                                        </div>
+                                                        <PayFastCheckout
+                                                            quote={{
+                                                                id: checkoutQuoteId,
+                                                                total_price: discountedTotal,
+                                                                pickup_address: moveDetails.pickupAddress,
+                                                                dropoff_address: moveDetails.dropoffAddress,
+                                                                client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
+                                                                client_email: moveDetails.contactEmail
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
 
-                                        {/* Payflex Option */}
-                                        {moveDetails.paymentMethod === 'payflex' && (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-2 px-2">
-                                                    <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-                                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Interest-Free Credit</h4>
-                                                </div>
-                                                <PayflexCheckout
-                                                    quote={{
-                                                        id: lastSavedQuote?.id || 'QUOTE-' + Date.now(),
-                                                        total_price: discountedTotal,
-                                                        client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
-                                                        client_email: moveDetails.contactEmail,
-                                                        client_phone: moveDetails.contactPhone
-                                                    }}
-                                                />
+                                                {/* Payflex Option */}
+                                                {moveDetails.paymentMethod === 'payflex' && (
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center gap-2 px-2">
+                                                            <div className="w-1 h-4 bg-indigo-600 rounded-full" />
+                                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Interest-Free Credit</h4>
+                                                        </div>
+                                                        <PayflexCheckout
+                                                            quote={{
+                                                                id: checkoutQuoteId,
+                                                                total_price: discountedTotal,
+                                                                client_name: formatClientName(moveDetails.contactName, moveDetails.surname) || 'Anonymous',
+                                                                client_email: moveDetails.contactEmail,
+                                                                client_phone: moveDetails.contactPhone
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         )}
