@@ -30,8 +30,8 @@ export default function TermsModal({ isOpen, onClose, onAccept }) {
                         <p>The quote is based on the inventory list provided. Master Movers reserves the right to adjust final pricing on move day if the actual volume significantly exceeds the quoted volume.</p>
                     </section>
                     <section>
-                        <h3 className="font-bold text-slate-900 mb-2">3. Insurance & Liability</h3>
-                        <p>Standard Goods in Transit (GIT) insurance is included. This covers fire, collision, and hijacking. For breakage cover, a "Platinum" all-risk insurance package must be selected separately.</p>
+                        <h3 className="font-bold text-slate-900 mb-2">3. Protection Cover & Liability</h3>
+                        <p>Standard Goods in Transit (GIT) Protection Cover is included. This covers fire, collision, and hijacking. For breakage cover, a "Platinum" all-risk Protection Cover package must be selected separately.</p>
                     </section>
                     <section>
                         <h3 className="font-bold text-slate-900 mb-2">4. Access & Surcharges</h3>

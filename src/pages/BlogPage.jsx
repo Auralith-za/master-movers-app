@@ -24,8 +24,8 @@ export default function BlogPage() {
         },
         {
             id: 3,
-            title: 'Understanding Moving Insurance',
-            excerpt: 'What does moving insurance actually cover? We break down the different types of valuation and coverage options.',
+            title: 'Understanding Moving Protection Cover',
+            excerpt: 'What does moving Protection Cover actually cover? We break down the different types of valuation and coverage options.',
             date: 'March 5, 2024',
             author: 'David Chen',
             category: 'Moving Resources',

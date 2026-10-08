@@ -513,7 +513,7 @@ export const generateProfessionalQuote = (data) => {
                 '- We accept PayFast, Payflex (Pay in 4), and Direct Bank EFT.',
                 '- Pricing provided is valid for 7 days from the date of issue and is subject to change thereafter.',
                 '- Items not listed in the inventory may incur additional charges on move day.',
-                '- Standard liability insurance is included. Platinum cover available on request.',
+                '- Standard liability Protection Cover is included. Platinum cover available on request.',
                 ...(hasStorageInQuote ? ['- STORAGE NOTE: Delivery out of storage is not included in this quote.'] : [])
             ];
 

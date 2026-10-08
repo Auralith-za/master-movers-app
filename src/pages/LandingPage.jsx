@@ -62,7 +62,7 @@ export default function LandingPage() {
                                 <div className="p-1 rounded-full bg-red-100 text-red-600">
                                     <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 </div>
-                                Insured
+                                Protection Cover
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="p-1 rounded-full bg-red-100 text-red-600">
@@ -123,8 +123,8 @@ export default function LandingPage() {
                             },
                             {
                                 icon: Shield,
-                                title: 'Fully Insured',
-                                desc: 'Goods in transit cover included with every move for your peace of mind.'
+                                title: 'Protection Cover',
+                                desc: 'Goods in transit protection cover included with every move for your peace of mind.'
                             },
                             {
                                 icon: Clock,

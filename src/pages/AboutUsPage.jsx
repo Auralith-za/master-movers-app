@@ -42,7 +42,7 @@ export default function AboutUsPage() {
         },
         {
             tag: "Security",
-            title: 'Fully Insured & Protected',
+            title: 'Full Protection & Cover',
             description: 'Your peace of mind is our top priority. Goods in transit cover is included with every move, and our highly trained specialists handle your items with the utmost care and respect.',
             icon: Shield,
             iconTitle: 'Total Protection',

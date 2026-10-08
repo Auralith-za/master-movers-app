@@ -1395,7 +1395,7 @@ export default function QuoteDetailPage() {
                                             onChange={e => setEditForm({...editForm, insurance_enabled: e.target.checked})}
                                             disabled={!isEditing}
                                         />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Add MasterCare Insurance</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Add MasterCare Protection Cover</span>
                                     </label>
                                 </div>
                                 <div className="pt-2 border-t border-slate-100 mt-2">

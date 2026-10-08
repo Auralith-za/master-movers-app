@@ -804,10 +804,22 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     // ─── STEP 5: Total Billable Distance (Round Trip Circuit) ───────────────────
     // Prefer the Google Maps Distance Matrix result (stored as totalBillableDistance).
     // Fallback: use distanceKm + depot legs from tripBreakdown, or a flat 30km estimate.
-    const totalDistance = parseFloat(moveDetails.totalBillableDistance) || 
-                         ((parseFloat(moveDetails.distanceKm) || 0) + (moveDetails.tripBreakdown 
-                             ? (moveDetails.tripBreakdown.depotToPickup || 0) + (moveDetails.tripBreakdown.dropoffToDepot || 0)
-                             : 30));
+    let totalDistance = parseFloat(moveDetails.totalBillableDistance);
+    if (!totalDistance) {
+        const rawDist = parseFloat(moveDetails.distanceKm) || 0;
+        if (moveDetails.tripBreakdown) {
+            const depotLegs = (moveDetails.tripBreakdown.depotToPickup || 0) + (moveDetails.tripBreakdown.dropoffToDepot || 0);
+            const fullCircuit = (moveDetails.tripBreakdown.pickupToDropoff || 0) + depotLegs;
+            // If distanceKm already represents the full circuit (depot legs included), don't double-add!
+            if (fullCircuit > 0 && Math.abs(rawDist - fullCircuit) < 2) {
+                totalDistance = fullCircuit;
+            } else {
+                totalDistance = rawDist + depotLegs;
+            }
+        } else {
+            totalDistance = rawDist > 0 ? (rawDist + 30) : 30;
+        }
+    }
 
     const hasDifferentCityCode = allLocations.some(loc => {
         const cityCode = loc.rawCityCode || detectCityCode(loc.address, loc.components, loc.latLng);

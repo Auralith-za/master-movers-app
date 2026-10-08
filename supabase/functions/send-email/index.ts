@@ -568,7 +568,8 @@ serve(async (req) => {
             `
         } else if (type === 'quote_proposal') {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'MM-NEW'
-            subject = `Your Master Movers Move Proposal [Ref: ${ref}]`
+            const clientName = quoteData?.client_name ? quoteData.client_name.trim() : 'Customer'
+            subject = `Your Master Movers Move Proposal — ${clientName} [Ref: ${ref}]`
             
             // Add all admin emails to recipient list to ensure notification
             for (const email of adminEmails) {
@@ -617,6 +618,10 @@ serve(async (req) => {
                     <tr>
                         <td class="label">Booking Ref:</td>
                         <td class="value">MM-${ref}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Client Name:</td>
+                        <td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td>
                     </tr>
                     <tr>
                         <td class="label">Proposed Date:</td>
@@ -753,6 +758,7 @@ serve(async (req) => {
                 <!-- Quote Summary -->
                 <table class="details-table">
                     <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-size:16px;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Client Name:</td><td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td></tr>
                     <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
                     <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
                     <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
@@ -1087,6 +1093,7 @@ serve(async (req) => {
 
                 <table class="details-table">
                     <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
+                    <tr><td class="label">Client Name:</td><td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td></tr>
                     <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
                     <tr><td class="label">From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
                     <tr><td class="label">To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>

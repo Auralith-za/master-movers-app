@@ -42,7 +42,7 @@ export default function ServicesPage() {
             tag: "Service 05",
             title: 'Vehicle Transport',
             description: 'Safe and reliable transportation for your car, motorcycle, or boat. We use specialized carriers to ensure your vehicle arrives in pristine condition.',
-            features: ['Door-to-Door', 'Enclosed & Open Carriers', 'Full Insurance'],
+            features: ['Door-to-Door', 'Enclosed & Open Carriers', 'Full Protection Cover'],
             icon: Truck,
             iconTitle: 'Auto Transport',
             iconText: 'Dedicated carriers for ultimate protection.',

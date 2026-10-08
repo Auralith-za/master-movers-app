@@ -55,10 +55,10 @@ export default function CarMovingPage() {
                                     <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
                                         <ShieldCheck className="h-6 w-6 text-white" aria-hidden="true" />
                                     </div>
-                                    Fully Insured Transit
+                                    Full Protection Cover Transit
                                 </dt>
                                 <dd className="mt-2 text-base leading-7 text-slate-600">
-                                    Every vehicle we transport is covered by comprehensive goods-in-transit insurance, giving you total peace of mind.
+                                    Every vehicle we transport is covered by comprehensive goods-in-transit Protection Cover, giving you total peace of mind.
                                 </dd>
                             </div>
                             <div className="relative pl-16">

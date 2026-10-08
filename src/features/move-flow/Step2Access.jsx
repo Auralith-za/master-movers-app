@@ -520,7 +520,7 @@ export default function Step2Access() {
                         )}
                     </div>
 
-                    {/* Insurance Section */}
+                    {/* Protection Cover Section */}
                     <div className="pt-8 border-t border-gray-100">
                         <div className="flex items-center gap-2 mb-6">
                             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
@@ -538,11 +538,11 @@ export default function Step2Access() {
                         >
                             <div className="flex-1 text-center md:text-left">
                                 <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                                    <h4 className="font-black text-slate-900 uppercase tracking-tight text-xl">All Risk Insurance</h4>
+                                    <h4 className="font-black text-slate-900 uppercase tracking-tight text-xl">All Risk Protection Cover</h4>
                                     <Tooltip text="Contact our office for details." />
                                 </div>
                                 <p className="text-base text-slate-500 max-w-md">
-                                    Contact our office for details on All Risk Insurance cover. 
+                                    Contact our office for details on All Risk Protection Cover. 
                                     <span className="block mt-1 text-sm font-medium text-slate-600">
                                         *Please note: This will be added after the quote has been submitted and requires wrapping of goods.
                                     </span>

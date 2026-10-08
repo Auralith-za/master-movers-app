@@ -453,7 +453,7 @@ export default function QuoteReviewPage() {
                                         <ShieldCheck size={32} />
                                     </div>
                                     <h3 className="font-black text-slate-900 uppercase tracking-tight">Accept Terms</h3>
-                                    <p className="text-slate-500 text-xs mt-2 leading-relaxed">Please review and accept our contract terms and insurance policy to proceed.</p>
+                                    <p className="text-slate-500 text-xs mt-2 leading-relaxed">Please review and accept our contract terms and Protection Cover policy to proceed.</p>
                                     <button 
                                         onClick={() => setIsTermsOpen(true)}
                                         className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-red-700 transition-all shadow-xl shadow-red-600/20"

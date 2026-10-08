@@ -122,7 +122,7 @@ export const ADDITIONAL_COSTS = {
     // Additional crew required for heavy/awkward items (flat fee per 2-person crew)
     heavyItemCrew: { perPerson: 550, count: 2 },
 
-    // Insurance is not auto-calculated — sales team provides custom quote
+    // Protection Cover is not auto-calculated — sales team provides custom quote
     insurance: 'contact_sales',
 
     // Extra distance fees: if depot→pickup OR dropoff→depot exceed 80km on a local move
@@ -401,6 +401,8 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             const types = Array.isArray(c.types) ? c.types : [];
             // Do not use administrative_area (province) alone to classify as a local city hub
             if (types.includes('administrative_area_level_1')) continue;
+            // Ignore street-level components so street names don't collide with city/suburb names
+            if (types.includes('route') || types.includes('street_number') || types.includes('premise') || types.includes('street_address')) continue;
 
             const val = (c.long_name || c.short_name || "").toLowerCase().trim();
             if (!val) continue;
@@ -413,12 +415,25 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 return CITY_CODES.GR;
             }
 
+            // Check Core Gauteng / JHB / Pretoria
+            if (
+                val === "johannesburg" || val === "joburg" || val === "jhb" ||
+                val === "pretoria" || val === "tshwane" || val === "sandton" || val === "midrand" ||
+                val === "centurion" || val === "randburg" || val === "roodepoort" ||
+                val === "ekurhuleni" || val === "boksburg" || val === "benoni" || val === "brakpan" ||
+                val === "germiston" || val === "alberton" || val === "kempton park" || val === "krugersdorp" ||
+                val === "noordheuwel" || val === "bedfordview" || val === "edenvale" || val === "fourways"
+            ) {
+                return CITY_CODES.JHB;
+            }
+
             // Check Core Cape Town
             if (
                 val === "cape town" || val === "capetown" || val === "cpt" ||
                 val.includes("city of cape town") || val === "bellville" || val === "stellenbosch" ||
                 val === "somerset west" || val === "paarl" || val === "durbanville" || val === "parow" ||
-                val === "goodwood" || val === "milnerton" || val === "bloubergstrand" || val === "table view" ||
+                val === "goodwood" || val === "milnerton" || val === "bloubergstrand" || val === "blouberg sands" ||
+                val === "blouberg rise" || val === "bloubergrant" || val === "table view" ||
                 val === "strand" || val === "franschhoek" || val === "gordons bay" || val === "gordon's bay"
             ) {
                 return CITY_CODES.CPT;
@@ -436,17 +451,6 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 val.includes("umdloti") || val.includes("stanger")
             ) {
                 return CITY_CODES.DBN;
-            }
-
-            // Check Core Gauteng / JHB / Pretoria
-            if (
-                val === "johannesburg" || val === "joburg" || val === "jhb" ||
-                val === "pretoria" || val === "tshwane" || val === "sandton" || val === "midrand" ||
-                val === "centurion" || val === "randburg" || val === "roodepoort" ||
-                val === "ekurhuleni" || val === "boksburg" || val === "benoni" || val === "brakpan" ||
-                val === "germiston" || val === "alberton" || val === "kempton park" || val === "krugersdorp"
-            ) {
-                return CITY_CODES.JHB;
             }
         }
     }
@@ -490,59 +494,117 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             }
         }
 
-        // Garden Route
-        if (GARDEN_ROUTE_TOWNS.some(t => name.includes(t))) {
-            return CITY_CODES.GR;
-        }
+        // Helper: Check if a keyword is merely part of a street name (e.g. "Blouberg St", "George Street", "Strand Rd")
+        const isStreetMention = (term, str) => {
+            const regex = new RegExp(`\\b${term}\\s+(st|street|rd|road|ave|avenue|dr|drive|cres|crescent|way|lane|blvd|boulevard|close|cl|ct|court)\\b`, 'i');
+            return regex.test(str);
+        };
 
-        // Core Cape Town / Western Cape Metro
-        if (
+        // Core Gauteng / JHB Markers
+        const hasGautengMarker = 
+            name.includes('johannesburg') || name.includes('joburg') || name.includes('jhb') ||
+            name.includes('gauteng') || name.includes('pretoria') || name.includes('tshwane') ||
+            name.includes('sandton') || name.includes('midrand') || name.includes('centurion') ||
+            name.includes('randburg') || name.includes('roodepoort') || name.includes('krugersdorp') ||
+            name.includes('noordheuwel') || name.includes('fourways') || name.includes('bryanston') ||
+            name.includes('sunninghill') || name.includes('rosebank') || name.includes('melrose') ||
+            name.includes('germiston') || name.includes('edenvale') || name.includes('kempton park') ||
+            name.includes('alberton') || name.includes('boksburg') || name.includes('benoni') ||
+            name.includes('brakpan') || name.includes('springs') || name.includes('nigel') ||
+            name.includes('bedfordview') || name.includes('florida') || name.includes('constantia kloof') ||
+            name.includes('ruimsig') || name.includes('honeydew') || name.includes('northcliff') ||
+            name.includes('linden') || name.includes('hydepark') || name.includes('hyde park') ||
+            name.includes('woodmead') || name.includes('waterkloof') || name.includes('menlyn') ||
+            name.includes('garsfontein') || name.includes('faerie glen') || name.includes('hatfield') ||
+            name.includes('lynnwood') || name.includes('silverton') || name.includes('akasia') ||
+            name.includes('montana') || name.includes('sinoville') || name.includes('wonderboom') ||
+            name.includes('meyerton') || name.includes('vereeniging') || name.includes('vanderbijlpark');
+
+        // Core Western Cape / CPT Markers
+        const hasCptMarker = 
             name.includes('cape town') || name.includes('capetown') || name.includes('cpt') ||
+            name.includes('city of cape town') || name.includes('western cape') ||
             name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') ||
-            name.includes('milnerton') || name.includes('tableview') || name.includes('table view') || name.includes('blouberg') ||
-            name.includes('durbanville') || name.includes('brackenfell') || name.includes('parow') ||
-            name.includes('goodwood') || name.includes('constantia') || name.includes('hout bay') ||
+            name.includes('milnerton') || name.includes('tableview') || name.includes('table view') ||
+            name.includes('bloubergstrand') || name.includes('blouberg sands') || name.includes('blouberg rise') ||
+            name.includes('bloubergrant') || name.includes('durbanville') || name.includes('brackenfell') ||
+            name.includes('parow') || name.includes('goodwood') || name.includes('hout bay') ||
             name.includes('sea point') || name.includes('green point') || name.includes('camps bay') ||
-            name.includes('wynberg') || name.includes('claremont') || name.includes('rondebosch') ||
-            name.includes('paarl') || name.includes('franschhoek') || name.includes('strand') ||
-            name.includes('gordon\'s bay') || name.includes('gordons bay')
-        ) {
-            return CITY_CODES.CPT;
-        }
+            name.includes('claremont') || name.includes('rondebosch') || name.includes('paarl') ||
+            name.includes('franschhoek') || name.includes('gordon\'s bay') || name.includes('gordons bay') ||
+            name.includes('fish hoek') || name.includes('simon\'s town') || name.includes('simonstown') ||
+            name.includes('muizenberg') || name.includes('melkbosstrand') || name.includes('kuils river') ||
+            name.includes('kuilsriver') || name.includes('kraaifontein') || name.includes('pinelands');
 
-        // Core Durban / North Coast Hub
-        if (
+        // Core Durban / KZN Markers
+        const hasDbnMarker = 
             name.includes('durban') || name.includes('dbn') || name.includes('ethekwini') ||
+            name.includes('kwazulu-natal') || name.includes('kwazulu natal') || name.includes('kzn') ||
             name.includes('shaka') || name.includes('dolphin coast') || name.includes('kwadukuza') ||
             name.includes('zimbali') || name.includes('sheffield beach') || name.includes('tinley manor') ||
             name.includes('westbrook') || name.includes('tongaat') || name.includes('stanger') ||
             name.includes('blythedale') || name.includes('zinkwazi') ||
             name.includes('kingsburgh') || name.includes('astra park') || name.includes('amanzimtoti') ||
             name.includes('umhlanga') || name.includes('pinetown') || name.includes('ballito') ||
-            name.includes('salt rock') || name.includes('hillcrest') || name.includes('kloof') ||
+            name.includes('salt rock') || name.includes('hillcrest') ||
             name.includes('westville') || name.includes('kwamashu') || name.includes('umdloti') ||
-            name.includes('mount edgecombe') || name.includes('la lucia') || name.includes('morningside') ||
+            name.includes('mount edgecombe') || name.includes('la lucia') ||
             name.includes('queensburgh') || name.includes('berea') || name.includes('glenwood') ||
             name.includes('chatsworth') || name.includes('phoenix') || name.includes('gillitts') ||
             name.includes('assagay') || name.includes('bothas hill') || name.includes('cowies hill') ||
-            name.includes('warner beach') || name.includes('winklespruit')
-        ) {
+            name.includes('warner beach') || name.includes('winklespruit');
+
+        // Garden Route Markers
+        const isGardenRouteTown = GARDEN_ROUTE_TOWNS.some(t => {
+            if (t === 'george') {
+                if (isStreetMention('george', name)) return false;
+                return /,\s*george\b/i.test(name) || /\bgeorge,\s*(western cape|wc|garden route|65\d\d)\b/i.test(name) || /\bgeorge\s+65\d\d\b/i.test(name);
+            }
+            return name.includes(t);
+        });
+
+        // Resolve definitive unambiguous markers first
+        if (hasGautengMarker && !hasCptMarker && !hasDbnMarker) {
+            return CITY_CODES.JHB;
+        }
+        if (hasCptMarker && !hasGautengMarker && !hasDbnMarker) {
+            return CITY_CODES.CPT;
+        }
+        if (hasDbnMarker && !hasGautengMarker && !hasCptMarker) {
             return CITY_CODES.DBN;
         }
+        if (isGardenRouteTown && !hasGautengMarker) {
+            return CITY_CODES.GR;
+        }
 
-        // Core Johannesburg / Gauteng Metro Hub
-        if (
-            name.includes('johannesburg') || name.includes('joburg') || name.includes('jhb') ||
-            name.includes('sandton') || name.includes('midrand') || name.includes('pretoria') ||
-            name.includes('centurion') || name.includes('randburg') || name.includes('roodepoort') ||
-            name.includes('fourways') || name.includes('bryanston') || name.includes('sunninghill') ||
-            name.includes('morningside') || name.includes('melrose') || name.includes('rosebank') ||
-            name.includes('germiston') || name.includes('edenvale') || name.includes('kempton park') ||
-            name.includes('alberton') || name.includes('boksburg') || name.includes('benoni') ||
-            name.includes('brakpan') || name.includes('springs') || name.includes('nigel') ||
-            name.includes('krugersdorp') || name.includes('bedfordview') || name.includes('florida')
-        ) {
+        // Suburbs with name overlap across metros:
+        // - Morningside (Sandton JHB vs Durban KZN)
+        if (name.includes('morningside')) {
+            if (hasDbnMarker) return CITY_CODES.DBN;
             return CITY_CODES.JHB;
+        }
+        // - Wynberg (Sandton JHB vs Cape Town WC)
+        if (name.includes('wynberg')) {
+            if (hasGautengMarker) return CITY_CODES.JHB;
+            return CITY_CODES.CPT;
+        }
+        // - Constantia (Constantia Kloof Roodepoort JHB vs Constantia Cape Town WC)
+        if (name.includes('constantia')) {
+            if (name.includes('kloof') || hasGautengMarker) return CITY_CODES.JHB;
+            return CITY_CODES.CPT;
+        }
+        // - Kloof (Constantia Kloof JHB vs Kloof DBN)
+        if (name.includes('kloof')) {
+            if (hasGautengMarker) return CITY_CODES.JHB;
+            return CITY_CODES.DBN;
+        }
+        // - Blouberg (only Cape Town if not a street name and not located in Gauteng)
+        if (name.includes('blouberg') && !isStreetMention('blouberg', name) && !hasGautengMarker) {
+            return CITY_CODES.CPT;
+        }
+        // - Strand (only Cape Town if not a street name and not located in Gauteng/KZN)
+        if (name.includes('strand') && !isStreetMention('strand', name) && !hasGautengMarker) {
+            return CITY_CODES.CPT;
         }
     }
 
