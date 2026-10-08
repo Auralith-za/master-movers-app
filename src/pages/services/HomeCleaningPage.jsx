@@ -10,7 +10,7 @@ export default function HomeCleaningPage() {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-teal-900 via-teal-800 to-slate-900 opacity-90" />
                     <img
-                        src="https://images.unsplash.com/photo-1581578731117-10d52b43b232?q=80&w=2000&auto=format&fit=crop"
+                        src="/images/hero_cleaning.jpg"
                         alt="Clean Living Room"
                         className="absolute inset-0 -z-10 h-full w-full object-cover opacity-30"
                     />

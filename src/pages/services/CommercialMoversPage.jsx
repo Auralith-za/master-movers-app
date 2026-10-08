@@ -36,7 +36,7 @@ export default function CommercialMoversPage() {
             tag: "Confidentiality",
             title: 'Security & Privacy',
             description: 'Your documents and assets are safe with us. Our team is vetted and trained to handle sensitive business information with care.',
-            image: "https://images.unsplash.com/photo-1556761175-5973dc0f32b7?auto=format&fit=crop&q=80&w=1200",
+            image: "/images/service_security.jpg",
         }
     ];
 

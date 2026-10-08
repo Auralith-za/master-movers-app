@@ -177,7 +177,7 @@ export default function MoversDurban() {
 
             {/* CTA SECTION - MATCHING HOME */}
             <div className="py-24 bg-slate-900 text-white relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1605218427368-35b81a3dd64c?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-10 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-[url('/images/hero_durban.jpg')] bg-cover bg-center opacity-10 mix-blend-overlay" />
                 <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
                     <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to Move in Durban?</h2>
                     <p className="text-xl text-slate-400 mb-10">
