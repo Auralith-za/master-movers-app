@@ -29,14 +29,14 @@ export default function ServicesPage() {
             icon: Globe,
             iconTitle: 'Global Reach',
             iconText: 'Connecting you to over 150 countries safely.',
-            image: "https://images.unsplash.com/photo-1454165833767-13a69a48f060?auto=format&fit=crop&q=80&w=1200"
+            image: "/images/service_international.jpg"
         },
         {
             tag: "Service 04",
             title: 'Storage Solutions',
             description: 'Secure, climate-controlled storage facilities for your short-term or long-term needs. 24/7 security and easy access options available.',
             features: ['Climate Controlled', '24/7 Monitoring', 'Flexible Terms'],
-            image: "https://images.unsplash.com/photo-1581452174360-1e582e0571f1?auto=format&fit=crop&q=80&w=1200",
+            image: "/images/service_storage.jpg",
         },
         {
             tag: "Service 05",
@@ -46,7 +46,7 @@ export default function ServicesPage() {
             icon: Truck,
             iconTitle: 'Auto Transport',
             iconText: 'Dedicated carriers for ultimate protection.',
-            image: "https://images.unsplash.com/photo-1542361345-89e58247f2d5?auto=format&fit=crop&q=80&w=1200"
+            image: "/images/service_vehicle.jpg"
         },
         {
             tag: "Service 06",
