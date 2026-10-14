@@ -669,12 +669,14 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     // Add custom products volume, wrapping, sleeves, and price if provided in moveDetails
     const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
     let customProductsCost = 0;
+    let customProductsVolume = 0;
     if (Array.isArray(customProductsList)) {
         customProductsList.forEach(prod => {
             const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
             const unitVol = parseFloat(prod.cubes || prod.cuft || 0);
             const pVol = unitVol * qty;
             totalVolume += pVol;
+            customProductsVolume += pVol;
             let appliesWrap = Boolean(prod.wrap);
             let sleeveQty = parseInt(prod.sleeves) || 0;
 
@@ -724,8 +726,16 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         totalOrderedLinen = moveDetails.linenBoxes || 0
     }
 
-    const orderedSt7Volume = boxesConfirmed ? totalOrderedSt7 * 4.25 : 0
-    const orderedLinenVolume = boxesConfirmed ? totalOrderedLinen * 8 : 0
+    // Determine whether ordered boxes should add to the total volume:
+    // If includeBoxVolume is explicitly specified, follow it.
+    // If custom products with volume exist (e.g. custom cubes = 1837), default to false
+    // so box volume does not inflate the specified custom cubes.
+    const shouldAddBoxVolume = moveDetails.includeBoxVolume !== undefined
+        ? Boolean(moveDetails.includeBoxVolume)
+        : (customProductsVolume === 0);
+
+    const orderedSt7Volume = (boxesConfirmed && shouldAddBoxVolume) ? totalOrderedSt7 * 4.25 : 0
+    const orderedLinenVolume = (boxesConfirmed && shouldAddBoxVolume) ? totalOrderedLinen * 8 : 0
     totalVolume += orderedSt7Volume + orderedLinenVolume
 
     const totalVolumeCuFt = totalVolume
@@ -789,10 +799,39 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         if (pickupCityCode && !dropoffCityCode) dropoffCityCode = pickupCityCode;
         if (dropoffCityCode && !pickupCityCode) pickupCityCode = dropoffCityCode;
     }
-    // Absolute fallback — only reached for addresses with no GPS and no text match.
-    // The outline check above will have already caught most real cases.
-    if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
-    if (!dropoffCityCode) dropoffCityCode = CITY_CODES.JHB;
+
+    const inferCityFromAddress = (addr) => {
+        if (!addr) return null;
+        const a = addr.toLowerCase();
+        if (
+            a.includes('cape town') || a.includes('capetown') || a.includes('cpt') || a.includes('western cape') ||
+            a.includes('stellenryk') || a.includes('durbanville') || a.includes('bellville') || a.includes('stellenbosch') ||
+            a.includes('paarl') || a.includes('somerset west') || a.includes('blouberg') || a.includes('milnerton') ||
+            a.includes('sea point') || a.includes('camps bay') || a.includes('table view')
+        ) {
+            return CITY_CODES.CPT;
+        }
+        if (
+            a.includes('durban') || a.includes('dbn') || a.includes('ethekwini') || a.includes('kwazulu') || a.includes('kzn') ||
+            a.includes('berea') || a.includes('windermere') || a.includes('umhlanga') || a.includes('ballito') ||
+            a.includes('pinetown') || a.includes('hillcrest') || a.includes('westville') || a.includes('kloof')
+        ) {
+            return CITY_CODES.DBN;
+        }
+        if (
+            a.includes('johannesburg') || a.includes('joburg') || a.includes('jhb') || a.includes('gauteng') ||
+            a.includes('pretoria') || a.includes('tshwane') || a.includes('sandton') || a.includes('centurion') ||
+            a.includes('randburg') || a.includes('roodepoort') || a.includes('midrand') || a.includes('germiston') ||
+            a.includes('bedfordview') || a.includes('edenvale') || a.includes('kempton park') || a.includes('boksburg')
+        ) {
+            return CITY_CODES.JHB;
+        }
+        return null;
+    };
+
+    // Fallback: check address string before defaulting to JHB
+    if (!pickupCityCode) pickupCityCode = inferCityFromAddress(pickupAddress) || CITY_CODES.JHB;
+    if (!dropoffCityCode) dropoffCityCode = inferCityFromAddress(dropoffAddress) || CITY_CODES.JHB;
 
     // ─── STEP 4: Province text cross-check (fail-safe) ───────────────────────────
     const provinces = ['gauteng', 'western cape', 'kwazulu-natal', 'kzn', 'eastern cape', 'free state', 'limpopo', 'mpumalanga', 'mpumulanga', 'mphumulanga', 'north west', 'northern cape'];
@@ -861,17 +900,26 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const firstDiff = sequence.find(code => code && code !== pickupCityCode);
         if (firstDiff) {
             nationalDestinationCityCode = firstDiff;
+        }
+
+        // Explicit destination sanity check: Ensure dropoff address text takes precedence over any generic fallback
+        if (
+            dropoffAddress.includes('cape town') || dropoffAddress.includes('capetown') || dropoffAddress.includes('cpt') ||
+            dropoffAddress.includes('western cape') || dropoffAddress.includes('stellenryk') || dropoffAddress.includes('durbanville')
+        ) {
+            if (pickupCityCode !== CITY_CODES.CPT) {
+                nationalDestinationCityCode = CITY_CODES.CPT;
+            }
+        } else if (
+            dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu') ||
+            dropoffAddress.includes('ethekwini') || dropoffAddress.includes('berea') || dropoffAddress.includes('umhlanga') || dropoffAddress.includes('ballito')
+        ) {
+            if (pickupCityCode !== CITY_CODES.DBN) {
+                nationalDestinationCityCode = CITY_CODES.DBN;
+            }
         } else if (pickupCityCode === nationalDestinationCityCode) {
             // Fallback for long-distance routes where destination city wasn't explicitly parsed
-            if (dropoffAddress.includes('cape town') || dropoffAddress.includes('cpt') || dropoffAddress.includes('western cape') || dropoffAddress.includes('worcester')) {
-                nationalDestinationCityCode = CITY_CODES.CPT;
-            } else if (
-                dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu') ||
-                dropoffAddress.includes('shaka') || dropoffAddress.includes('ballito') || dropoffAddress.includes('dolphin coast') || dropoffAddress.includes('salt rock') ||
-                dropoffAddress.includes('kwadukuza') || dropoffAddress.includes('umhlanga')
-            ) {
-                nationalDestinationCityCode = CITY_CODES.DBN;
-            } else if (pickupCityCode === CITY_CODES.JHB) {
+            if (pickupCityCode === CITY_CODES.JHB) {
                 const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || (totalDistance / 2);
                 nationalDestinationCityCode = (oneWayDist > 950 || totalDistance > 1800) ? CITY_CODES.CPT : CITY_CODES.DBN;
             } else if (pickupCityCode === CITY_CODES.DBN) {
@@ -1013,6 +1061,10 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     let shuttleCost = 0
     let detailedAccess = []
 
+    // Shuttle overrides (e.g. backend admin controls)
+    const isShuttleDisabled = moveDetails?.disableShuttle === true || moveDetails?.shuttleOverride === false || moveDetails?.overrideShuttle === false
+    const isShuttleForced = moveDetails?.shuttleOverride === true || moveDetails?.overrideShuttle === true
+
     // Additional Costs: Shuttle & Long Carry logic
     const addAccess = (loc, prefix) => {
         if (!loc) return;
@@ -1060,9 +1112,21 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
         let locationHasShuttle = false
         // Shuttle: Track if needed — shuttle checkbox, panhandle, weight restriction, or parkingType shuttle
-        if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle || loc?.shuttle || loc?.specialConditions?.panhandle || loc?.specialConditions?.weightRestriction) {
-            locationHasShuttle = true
-            hasShuttle = true
+        const shuttleExplicitlyOff = loc?.specialConditions?.shuttle === false || loc?.shuttle === false || isShuttleDisabled
+
+        if (!shuttleExplicitlyOff) {
+            if (loc?.parkingType === 'shuttle' || loc?.specialConditions?.shuttle === true || loc?.shuttle === true) {
+                locationHasShuttle = true
+                hasShuttle = true
+            } else if (!isAdminEdit && (loc?.specialConditions?.panhandle || loc?.specialConditions?.weightRestriction)) {
+                // Frontend default behavior preserved
+                locationHasShuttle = true
+                hasShuttle = true
+            } else if (isAdminEdit && (loc?.specialConditions?.panhandle || loc?.specialConditions?.weightRestriction)) {
+                // In backend edit, panhandle/weight restriction flags shuttle only if not explicitly turned off
+                locationHasShuttle = true
+                hasShuttle = true
+            }
         }
 
         // Long Carry / Shuttle based on distance:
@@ -1071,8 +1135,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         if (loc?.specialConditions?.longCarry) {
             const dist = parseFloat(loc?.longCarryDistance || loc?.longCarryMeters) || 0
             appliedLongCarryCost = 750
-            // Shuttle applied if 90m or greater
-            if (dist >= 90) {
+            // Shuttle applied if 90m or greater (unless shuttle is explicitly turned off)
+            if (dist >= 90 && !shuttleExplicitlyOff) {
                 locationHasShuttle = true
                 hasShuttle = true
             }
@@ -1099,6 +1163,12 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         }
         addAccess(loc, prefix);
     });
+
+    if (isShuttleDisabled) {
+        hasShuttle = false
+    } else if (isShuttleForced) {
+        hasShuttle = true
+    }
 
     if (hasShuttle) {
         shuttleCost = ADDITIONAL_COSTS.shuttle.flatRate

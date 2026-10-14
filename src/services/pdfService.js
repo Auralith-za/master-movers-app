@@ -78,9 +78,25 @@ export const generateProfessionalQuote = (data) => {
             const customProductsList = data.customProducts || data.custom_products || data.quote?.custom_products || data.items_json?.custom_products || [];
             const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0);
 
+            const st7Count = st7Boxes || data.st7Boxes || data.moveDetails?.st7Boxes || 0;
+            const linenCount = linenBoxes || data.linenBoxes || data.moveDetails?.linenBoxes || 0;
+            const potentialBoxVol = (st7Count * 4.25) + (linenCount * 8);
+
+            const includeBoxVolume = data.includeBoxVolume !== undefined
+                ? Boolean(data.includeBoxVolume)
+                : (data.items_json?.include_box_volume !== undefined
+                    ? Boolean(data.items_json?.include_box_volume)
+                    : (customVolSum === 0));
+
             // Calculate total volume / cubes robustly
             const { breakdown: bd } = data;
-            let displayVolume = Number(totalVolume || bd?.totalVolume || bd?.totalVolumeCuFt || data.total_volume || data.quote?.total_volume || 0);
+            let displayVolume = Number(bd?.totalVolume || bd?.totalVolumeCuFt || totalVolume || data.total_volume || data.quote?.total_volume || 0);
+
+            // Reconcile if displayVolume was inflated with box volume on a custom cubes quote
+            if (customVolSum > 0 && !includeBoxVolume && displayVolume > customVolSum && Math.abs(displayVolume - (customVolSum + potentialBoxVol)) < 0.1) {
+                displayVolume = customVolSum;
+            }
+
             if (!displayVolume && inventory && typeof inventory === 'object') {
                 Object.entries(inventory).forEach(([idKey, qty]) => {
                     if (!qty || qty <= 0) return;
@@ -90,9 +106,9 @@ export const generateProfessionalQuote = (data) => {
                         displayVolume += item.volume * qty;
                     }
                 });
-                const st7Count = st7Boxes || data.st7Boxes || data.moveDetails?.st7Boxes || 0;
-                const linenCount = linenBoxes || data.linenBoxes || data.moveDetails?.linenBoxes || 0;
-                displayVolume += (st7Count * 4.25) + (linenCount * 8);
+                if (includeBoxVolume) {
+                    displayVolume += potentialBoxVol;
+                }
                 displayVolume += customVolSum;
             }
 

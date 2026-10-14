@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabaseClient'
 import { 
     ArrowLeft, MessageCircle, Mail, MapPin, Calendar, Box, Truck, 
     Building, Package, Download, Save, X, Edit2, AlertCircle, RefreshCw,
-    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search, Tag
+    Plus, Trash2, Send, History, User, Lock, ExternalLink, ShieldCheck, Copy, CreditCard, Search, Tag,
+    CheckCircle, XCircle, Clock, FileCheck
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { INVENTORY_ITEMS, CATEGORIES } from '../../features/inventory/data/mockItems'
@@ -18,6 +19,7 @@ import { PACKAGING_RATES, detectCityCode } from '../../features/inventory/data/p
 import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import CouponInput from '../../features/payment/CouponInput'
 import { normalizeInventory } from '../../utils/inventoryUtils'
+import { generateSignedTermsCertificatePng, downloadCertificatePng } from '../../utils/termsCertificate'
 import clsx from 'clsx'
 
 const orderedCategories = (() => {
@@ -100,6 +102,7 @@ export default function QuoteDetailPage() {
                 insurance_enabled: false,
                 is_shared_load: false,
                 custom_products: [],
+                include_box_volume: undefined,
                 payment_method: 'eft',
                 access_details: { 
                     origin: { type: 'house', floorLevel: 0, parkingType: 'driveway', specialConditions: {} }, 
@@ -272,16 +275,24 @@ export default function QuoteDetailPage() {
                 }
             }
 
+            const hasCustomVol = (data.custom_products || []).some(p => parseFloat(p.cubes || p.cuft || 0) > 0);
+            const initialIncludeBoxVolume = data.items_json?.include_box_volume !== undefined
+                ? Boolean(data.items_json.include_box_volume)
+                : !hasCustomVol;
+
             setEditForm({
                 ...data,
                 distance_km: initialDistance,
                 items_json: rawItems,
                 special_wrapping: rawSpecialWrapping,
                 custom_products: data.custom_products || [],
+                include_box_volume: initialIncludeBoxVolume,
                 extraCollections: extraColls,
                 extraDrops: extraDrops,
                 send_me_boxes: initialSendMeBoxes,
-                boxes_and_packing: initialBoxesAndPacking
+                boxes_and_packing: initialBoxesAndPacking,
+                disable_shuttle: Boolean(data.items_json?.disable_shuttle),
+                shuttle_override: data.items_json?.shuttle_override
             })
         } catch (error) {
             console.error('Error fetching quote:', error)
@@ -398,7 +409,10 @@ export default function QuoteDetailPage() {
             isSharedLoad: editForm.is_shared_load || false,
             paymentMethod: editForm.payment_method || 'eft',
             storageDestination: editForm.storage_destination || quote?.storage_destination || null,
-            customProducts: editForm.custom_products || []
+            customProducts: editForm.custom_products || [],
+            includeBoxVolume: editForm.include_box_volume,
+            disableShuttle: Boolean(editForm.disable_shuttle),
+            shuttleOverride: editForm.shuttle_override !== undefined ? editForm.shuttle_override : (editForm.disable_shuttle ? false : undefined)
         }
 
         const manualServiceCharges = { ...(editForm.manual_service_charges || {}) }
@@ -424,12 +438,15 @@ export default function QuoteDetailPage() {
         editForm.linen_boxes,
         editForm.send_me_boxes,
         editForm.boxes_and_packing,
+        editForm.include_box_volume,
         editForm.insurance_enabled,
         editForm.is_shared_load,
         editForm.access_details,
         editForm.special_wrapping,
         editForm.manual_service_charges,
-        editForm.custom_products
+        editForm.custom_products,
+        editForm.disable_shuttle,
+        editForm.shuttle_override
     ])
 
 
@@ -501,6 +518,44 @@ export default function QuoteDetailPage() {
         setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
         setCustomProductForm({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0 })
         setShowCustomProductModal(false)
+    }
+
+    const handleRemoveShuttle = () => {
+        const details = { ...(editForm.access_details || {}) }
+        Object.keys(details).forEach(loc => {
+            const cond = { ...(details[loc]?.specialConditions || {}) }
+            cond.shuttle = false
+            details[loc] = {
+                ...details[loc],
+                shuttle: false,
+                specialConditions: cond,
+                parkingType: details[loc]?.parkingType === 'shuttle' ? 'driveway' : (details[loc]?.parkingType || 'driveway')
+            }
+        })
+        setEditForm(prev => ({
+            ...prev,
+            access_details: details,
+            disable_shuttle: true,
+            shuttle_override: false
+        }))
+    }
+
+    const handleAddShuttle = () => {
+        const details = { ...(editForm.access_details || {}) }
+        const targetLoc = details.origin ? 'origin' : (Object.keys(details)[0] || 'origin')
+        const cond = { ...(details[targetLoc]?.specialConditions || {}) }
+        cond.shuttle = true
+        details[targetLoc] = {
+            ...(details[targetLoc] || {}),
+            shuttle: true,
+            specialConditions: cond
+        }
+        setEditForm(prev => ({
+            ...prev,
+            access_details: details,
+            disable_shuttle: false,
+            shuttle_override: true
+        }))
     }
 
     const handleApplyManualCoupon = () => {
@@ -671,11 +726,15 @@ export default function QuoteDetailPage() {
             ? ((recalculatedData?.subTotal || 0) + (priceOffset / 1.15))
             : ((Number(quote?.total_price) || 0) / 1.15));
 
+    const computedVolume = (recalculatedData?.totalVolume !== undefined && !recalculatedData.error)
+        ? Number(recalculatedData.totalVolume)
+        : Number(quote?.total_volume || 0);
+
     const handleSave = async () => {
         try {
             const basePrice = recalculatedData?.total || editForm.total_price || 0
             const finalPrice = basePrice + priceOffset
-            const finalVolume = recalculatedData?.totalVolume || editForm.total_volume || 0
+            const finalVolume = computedVolume || editForm.total_volume || 0
 
             const sendMeBoxes = editForm.send_me_boxes || { enabled: false, st7: 0, linen: 0, delivery_fee: 500 }
             const boxesAndPacking = editForm.boxes_and_packing || { enabled: false, st7: 0, linen: 0 }
@@ -715,7 +774,10 @@ export default function QuoteDetailPage() {
                     packaging_details: {
                         send_me_boxes: sendMeBoxes,
                         boxes_and_packing: boxesAndPacking
-                    }
+                    },
+                    include_box_volume: editForm.include_box_volume,
+                    disable_shuttle: editForm.disable_shuttle || false,
+                    shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null
                 },
                 total_price: finalPrice,
                 total_volume: finalVolume,
@@ -792,7 +854,9 @@ export default function QuoteDetailPage() {
                         packaging_details: {
                             send_me_boxes: sendMeBoxes,
                             boxes_and_packing: boxesAndPacking
-                        }
+                        },
+                        disable_shuttle: editForm.disable_shuttle || false,
+                        shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null
                     },
                     total_price: finalPrice, 
                     total_volume: finalVolume 
@@ -849,9 +913,9 @@ export default function QuoteDetailPage() {
                 subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
-                extraCollections: extraCollections || quote.items_json?.extraCollections || [],
-                extraDrops: extraDrops || quote.items_json?.extraDrops || [],
-                accessDetails: accessDetails || quote.access_details || {},
+                extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
+                extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || []),
+                accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
                 customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             })
             
@@ -899,9 +963,9 @@ export default function QuoteDetailPage() {
                 subTotal: finalSubTotal,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
-                extraCollections: extraCollections || quote.items_json?.extraCollections || [],
-                extraDrops: extraDrops || quote.items_json?.extraDrops || [],
-                accessDetails: accessDetails || quote.access_details || {},
+                extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
+                extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || []),
+                accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
                 customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             });
 
@@ -920,7 +984,72 @@ export default function QuoteDetailPage() {
     const copyPaymentLink = () => {
         const link = `https://mastermovers.co.za/quote-review?id=${id}`
         navigator.clipboard.writeText(link)
-        alert('Payment link copied to clipboard!')
+        alert('Payment & Terms link copied to clipboard!')
+    }
+
+    const handleSendPaymentLink = async () => {
+        if (!quote) return
+        let clientEmail = quote.client_email || editForm.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email
+        const SITE_URL = 'https://mastermovers.co.za'
+        const paymentLink = `${SITE_URL}/quote-review?id=${quote.id}`
+
+        if (!clientEmail) {
+            try {
+                await navigator.clipboard.writeText(paymentLink)
+                alert(`No client email on file, but the Payment & Terms link has been copied to your clipboard!\n\nLink:\n${paymentLink}`)
+            } catch {
+                alert(`No client email on file. Payment & Terms link:\n\n${paymentLink}`)
+            }
+            return
+        }
+
+        const confirmed = confirm(
+            `Send payment & terms link to ${clientEmail}?\n\nLink: ${paymentLink}\n\nThe customer will be able to review terms, sign electronically, and pay via PayFast or Payflex.`
+        )
+        if (!confirmed) return
+
+        try {
+            const result = await emailService.sendEmail({
+                type: 'payment_link',
+                to: clientEmail,
+                quoteData: quote,
+                paymentLink
+            })
+
+            if (result.success) {
+                await logActivity('email', `Payment & Terms link sent to ${clientEmail}.`)
+                alert(`✅ Payment & Terms link sent to ${clientEmail}!`)
+            } else {
+                alert('Failed to send payment email: ' + (result.error || 'Unknown error'))
+            }
+        } catch (error) {
+            console.error('Send payment link error:', error)
+            try {
+                await navigator.clipboard.writeText(paymentLink)
+                alert(`Email failed — but the payment link has been copied to your clipboard!\n\n${paymentLink}`)
+            } catch {
+                alert(`Payment link (copy manually):\n${paymentLink}`)
+            }
+        }
+    }
+
+    const [downloadingCert, setDownloadingCert] = useState(false)
+    const handleDownloadSignedCert = async () => {
+        if (!quote) return
+        setDownloadingCert(true)
+        try {
+            const cert = await generateSignedTermsCertificatePng({
+                quote,
+                signatureName: quote.signature_json?.name || quote.client_name,
+                signatureDate: quote.signature_json?.date || quote.created_at
+            })
+            downloadCertificatePng(cert.dataUrl, `MasterMovers_Signed_Terms_${quote.id.toString().slice(0, 8)}.png`)
+        } catch (err) {
+            console.error('Error generating certificate PNG:', err)
+            alert('Failed to generate certificate PNG: ' + err.message)
+        } finally {
+            setDownloadingCert(false)
+        }
     }
 
     const filteredItems = useMemo(() => {
@@ -933,7 +1062,6 @@ export default function QuoteDetailPage() {
     const downloadInventoryPDF = async () => {
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
-            const computedVolume = (isEditing ? (recalculatedData?.totalVolume || 0) : (quote?.total_volume || recalculatedData?.totalVolume || 0))
             const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             await generateProfessionalQuote({
                 quoteId: quote.id,
@@ -954,6 +1082,7 @@ export default function QuoteDetailPage() {
                 breakdown: recalculatedData?.breakdown || null,
                 boxQty: recalculatedData?.boxQty,
                 totalVolume: computedVolume,
+                includeBoxVolume: isEditing ? editForm.include_box_volume : quote?.items_json?.include_box_volume,
                 packagingOption: isEditing ? (editForm.packaging_option || 'none') : (quote.packaging_option || 'none'),
                 packagingDetails: recalculatedData?.breakdown?.packagingDetails || (isEditing ? { sendMeBoxes: editForm.send_me_boxes, boxesAndPacking: editForm.boxes_and_packing } : quote.items_json?.packaging_details),
                 st7Boxes: isEditing ? editForm.st7_boxes : (quote.st7_boxes || 0),
@@ -1017,9 +1146,17 @@ export default function QuoteDetailPage() {
                         )}>
                             {isEditing ? editForm.status : quote.status}
                         </span>
-                        {quote.terms_accepted && (
-                            <span className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-                                <ShieldCheck size={12} /> Terms Accepted
+                        {quote.terms_accepted ? (
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                <ShieldCheck size={12} /> Terms Signed: {quote.signature_json?.name || quote.client_name || 'Yes'}
+                            </span>
+                        ) : (quote.status === 'rejected' || quote.rejection_reason || quote.items_json?.rejection_reason) ? (
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                <XCircle size={12} /> Terms / Quote Declined
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200">
+                                <Clock size={12} /> Terms Pending
                             </span>
                         )}
                     </div>
@@ -1342,6 +1479,23 @@ export default function QuoteDetailPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {(editForm.send_me_boxes?.enabled || editForm.boxes_and_packing?.enabled) && (
+                                                <div className="pt-2 px-1 flex items-center justify-between border-t border-slate-200">
+                                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={Boolean(editForm.include_box_volume)}
+                                                            onChange={e => setEditForm(prev => ({ ...prev, include_box_volume: e.target.checked }))}
+                                                            className="rounded text-indigo-600 focus:ring-indigo-500"
+                                                        />
+                                                        <span>Add box volume to quote total cubes</span>
+                                                    </label>
+                                                    <span className="text-[10px] text-slate-500 font-bold">
+                                                        {editForm.include_box_volume ? `+${((((editForm.send_me_boxes?.enabled ? (Number(editForm.send_me_boxes.st7) || 0) : 0) + (editForm.boxes_and_packing?.enabled ? (Number(editForm.boxes_and_packing.st7) || 0) : 0)) * 4.25) + (((editForm.send_me_boxes?.enabled ? (Number(editForm.send_me_boxes.linen) || 0) : 0) + (editForm.boxes_and_packing?.enabled ? (Number(editForm.boxes_and_packing.linen) || 0) : 0)) * 8)).toFixed(2)} ft³` : 'Excluded from quote cubes'}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
@@ -1379,6 +1533,14 @@ export default function QuoteDetailPage() {
                                                                     <span>{packSt7 || 0}x ST7 Boxes</span>
                                                                     <span>{packLinen || 0}x Linen Boxes</span>
                                                                 </div>
+                                                            </div>
+                                                        )}
+                                                        {(hasSend || hasPack) && (
+                                                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                                                                <span>Box Volume in Move Cubes:</span>
+                                                                <span className={clsx("font-bold", (quote?.items_json?.include_box_volume ?? (customProductsVolume === 0)) ? "text-indigo-600" : "text-slate-500")}>
+                                                                    {(quote?.items_json?.include_box_volume ?? (customProductsVolume === 0)) ? "Included in total cubes" : "Excluded from total cubes (Custom volume used)"}
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </>
@@ -2309,18 +2471,66 @@ export default function QuoteDetailPage() {
                                     <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-200/50">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase">Shuttle Required?</span>
-                                            <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.shuttle || false} onChange={e => {
-                                                const details = { ...editForm.access_details };
-                                                const cond = details[loc].specialConditions || {};
-                                                details[loc] = { ...details[loc], specialConditions: { ...cond, shuttle: e.target.checked } };
-                                                setEditForm({...editForm, access_details: details});
-                                            }} disabled={!isEditing} />
+                                            <input 
+                                                type="checkbox" 
+                                                checked={Boolean(editForm.access_details?.[loc]?.specialConditions?.shuttle || editForm.access_details?.[loc]?.shuttle)} 
+                                                onChange={e => {
+                                                    const checked = e.target.checked;
+                                                    const details = { ...editForm.access_details };
+                                                    const cond = { ...(details[loc]?.specialConditions || {}) };
+                                                    cond.shuttle = checked;
+                                                    details[loc] = { 
+                                                        ...details[loc], 
+                                                        shuttle: checked, 
+                                                        specialConditions: cond,
+                                                        ...(checked ? {} : (details[loc]?.parkingType === 'shuttle' ? { parkingType: 'driveway' } : {}))
+                                                    };
+                                                    const anyShuttle = Object.values(details).some(l => l?.specialConditions?.shuttle || l?.shuttle || l?.parkingType === 'shuttle');
+                                                    setEditForm(prev => ({
+                                                        ...prev, 
+                                                        access_details: details,
+                                                        disable_shuttle: !anyShuttle,
+                                                        shuttle_override: anyShuttle ? true : false
+                                                    }));
+                                                }} 
+                                                disabled={!isEditing} 
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Pan Handle?</span>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={Boolean(editForm.access_details?.[loc]?.specialConditions?.panhandle)} 
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details };
+                                                    const cond = { ...(details[loc]?.specialConditions || {}) };
+                                                    cond.panhandle = e.target.checked;
+                                                    details[loc] = { ...details[loc], specialConditions: cond };
+                                                    setEditForm(prev => ({ ...prev, access_details: details }));
+                                                }} 
+                                                disabled={!isEditing} 
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Weight Limits?</span>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={Boolean(editForm.access_details?.[loc]?.specialConditions?.weightRestriction)} 
+                                                onChange={e => {
+                                                    const details = { ...editForm.access_details };
+                                                    const cond = { ...(details[loc]?.specialConditions || {}) };
+                                                    cond.weightRestriction = e.target.checked;
+                                                    details[loc] = { ...details[loc], specialConditions: cond };
+                                                    setEditForm(prev => ({ ...prev, access_details: details }));
+                                                }} 
+                                                disabled={!isEditing} 
+                                            />
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase">Hoisting Req?</span>
                                             <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.hoisting || false} onChange={e => {
                                                 const details = { ...editForm.access_details };
-                                                const cond = details[loc].specialConditions || {};
+                                                const cond = details[loc]?.specialConditions || {};
                                                 details[loc] = { ...details[loc], specialConditions: { ...cond, hoisting: e.target.checked } };
                                                 setEditForm({...editForm, access_details: details});
                                             }} disabled={!isEditing} />
@@ -2329,7 +2539,7 @@ export default function QuoteDetailPage() {
                                             <span className="text-[9px] font-bold text-slate-400 uppercase">Narrow Passage?</span>
                                             <input type="checkbox" checked={editForm.access_details?.[loc]?.specialConditions?.narrowPassage || false} onChange={e => {
                                                 const details = { ...editForm.access_details };
-                                                const cond = details[loc].specialConditions || {};
+                                                const cond = details[loc]?.specialConditions || {};
                                                 details[loc] = { ...details[loc], specialConditions: { ...cond, narrowPassage: e.target.checked } };
                                                 setEditForm({...editForm, access_details: details});
                                             }} disabled={!isEditing} />
@@ -2365,7 +2575,7 @@ export default function QuoteDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">
                                     <span>Total Cubes / Volume</span>
-                                    <span className="text-white font-bold tracking-wide">{(isEditing ? (recalculatedData?.totalVolume || 0) : (quote?.total_volume || recalculatedData?.totalVolume || 0))?.toFixed(2)} ft³ (Cubes)</span>
+                                    <span className="text-white font-bold tracking-wide">{computedVolume.toFixed(2)} ft³ (Cubes)</span>
                                 </div>
 
                                 <div className="flex justify-between text-xs text-slate-300 font-bold pt-2 border-t border-white/5">
@@ -2434,11 +2644,37 @@ export default function QuoteDetailPage() {
                                         <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.plasticSleeveCost || quote?.plastic_sleeve_cost || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                 )}
-                                {(recalculatedData?.breakdown?.shuttleCost > 0 || quote?.shuttle_cost > 0) && (
-                                    <div className="flex justify-between text-xs text-amber-400">
-                                        <span>Shuttle Vehicle</span>
-                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.shuttleCost || quote?.shuttle_cost || 2500)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                {recalculatedData?.breakdown?.shuttleCost > 0 ? (
+                                    <div className="flex justify-between items-center text-xs text-amber-400">
+                                        <div className="flex items-center gap-2">
+                                            <span>Shuttle Vehicle</span>
+                                            {isEditing && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveShuttle}
+                                                    className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white rounded transition-colors"
+                                                    title="Remove shuttle vehicle surcharge"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                        <span className="font-bold whitespace-nowrap">+ R {(Number(recalculatedData?.breakdown?.shuttleCost || 2500)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
+                                ) : (
+                                    isEditing && (
+                                        <div className="flex justify-between items-center text-xs text-slate-400 py-1">
+                                            <span className="text-[11px] text-slate-500">Shuttle Vehicle</span>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddShuttle}
+                                                className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500 hover:text-white rounded transition-colors"
+                                                title="Add shuttle vehicle surcharge"
+                                            >
+                                                + Add Shuttle (R2,500)
+                                            </button>
+                                        </div>
+                                    )
                                 )}
                                 {(recalculatedData?.breakdown?.access > 0 || quote?.access_fees > 0) && (
                                     <div className="flex justify-between text-xs text-amber-400/80">
@@ -2579,17 +2815,148 @@ export default function QuoteDetailPage() {
                                 <p className="text-[11px] text-slate-400 font-bold uppercase">{quote?.client_email || 'No Email'}</p>
                             </div>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
+                            <button 
+                                onClick={handleSendPaymentLink} 
+                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-md cursor-pointer"
+                                title="Send Payment & Terms Link via Email"
+                            >
+                                <CreditCard size={15} /> Send Payment &amp; Terms Link
+                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button 
+                                    onClick={copyPaymentLink} 
+                                    className="flex items-center justify-center gap-1.5 w-full py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all cursor-pointer"
+                                    title="Copy link to clipboard"
+                                >
+                                    <Copy size={13} /> Copy Link
+                                </button>
+                                <a 
+                                    href={`https://mastermovers.co.za/quote-review?id=${quote.id}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="flex items-center justify-center gap-1.5 w-full py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all cursor-pointer"
+                                    title="Open customer view in new tab"
+                                >
+                                    <ExternalLink size={13} /> View Link
+                                </a>
+                            </div>
                             <button 
                                 onClick={handleSendEmailUpdate} 
-                                className="flex items-center justify-center gap-2 w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all shadow-md"
+                                className="flex items-center justify-center gap-2 w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm cursor-pointer"
                             >
-                                <Mail size={16} /> Email Client Update
+                                <Mail size={14} /> Email Proposal PDF
                             </button>
                             <a href={`tel:${quote.client_phone}`} className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all">
-                                <User size={14} /> Call Client
+                                <User size={14} /> Call Client ({quote.client_phone || '—'})
                             </a>
                         </div>
+                    </div>
+
+                    {/* TERMS & CONDITIONS CONTRACT STATUS CARD */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
+                                <ShieldCheck size={18} className="text-red-600" /> Terms &amp; Conditions Status
+                            </h3>
+                            {quote.terms_accepted ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Signed
+                                </span>
+                            ) : (quote.status === 'rejected' || quote.rejection_reason || quote.items_json?.rejection_reason) ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-800 border border-red-200">
+                                    Declined
+                                </span>
+                            ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                                    Pending
+                                </span>
+                            )}
+                        </div>
+
+                        {quote.terms_accepted ? (
+                            /* CASE 1: TERMS ACCEPTED - Visual Card matching media_1791869915234.png */
+                            <div className="space-y-4">
+                                <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-5 text-center">
+                                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+                                        <CheckCircle size={24} />
+                                    </div>
+                                    <h4 className="font-black text-emerald-800 text-sm uppercase tracking-wide">Terms Accepted</h4>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">Electronically Signed By</p>
+                                    <p className="font-serif text-xl text-slate-900 italic font-bold mt-0.5">
+                                        {quote.signature_json?.name || quote.client_name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                                        {quote.signature_json?.date ? new Date(quote.signature_json.date).toLocaleString('en-ZA') : 'Signed Digitally'}
+                                    </p>
+                                    <div className="mt-3 pt-2.5 border-t border-emerald-200/60 text-[10px] text-emerald-800 italic leading-snug">
+                                        &ldquo;I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above.&rdquo;
+                                    </div>
+                                </div>
+
+                                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-2 text-xs">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Agreed Contract Clauses</span>
+                                    <p className="text-slate-600 text-[11px] leading-relaxed space-y-1">
+                                        <span>✓ <strong>1. Booking &amp; Payment:</strong> 48h pre-payment required.</span><br/>
+                                        <span>✓ <strong>2. Inventory Accuracy:</strong> Quoted price matches inventory list.</span><br/>
+                                        <span>✓ <strong>3. Protection Cover:</strong> Standard Goods in Transit included.</span><br/>
+                                        <span>✓ <strong>4. Access &amp; Surcharges:</strong> Standard access assumptions confirmed.</span>
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={handleDownloadSignedCert}
+                                    disabled={downloadingCert}
+                                    className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                                >
+                                    <Download size={14} />
+                                    {downloadingCert ? 'Generating PNG...' : 'Download Signed Terms Certificate (PNG)'}
+                                </button>
+                            </div>
+                        ) : (quote.status === 'rejected' || quote.rejection_reason || quote.items_json?.rejection_reason) ? (
+                            /* CASE 2: TERMS / QUOTE DECLINED */
+                            <div className="space-y-4">
+                                <div className="bg-red-50/80 border border-red-200 rounded-2xl p-5 text-center">
+                                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+                                        <XCircle size={24} />
+                                    </div>
+                                    <h4 className="font-black text-red-800 text-sm uppercase tracking-wide">Quote &amp; Terms Declined</h4>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">Client Reason for Decline</p>
+                                    <div className="mt-1 p-3 bg-white/90 rounded-xl border border-red-100 text-xs font-semibold text-slate-800 italic text-left whitespace-pre-wrap">
+                                        &ldquo;{quote.rejection_reason || quote.items_json?.rejection_reason || 'No specific reason provided'}&rdquo;
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleSendPaymentLink}
+                                    className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                                >
+                                    <CreditCard size={14} />
+                                    Re-Send Quote &amp; Payment Link
+                                </button>
+                            </div>
+                        ) : (
+                            /* CASE 3: TERMS PENDING */
+                            <div className="space-y-4">
+                                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-5 text-center">
+                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+                                        <Clock size={24} />
+                                    </div>
+                                    <h4 className="font-black text-amber-800 text-sm uppercase tracking-wide">Awaiting Client Acceptance</h4>
+                                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                        The customer has not yet reviewed or electronically signed their moving agreement.
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={handleSendPaymentLink}
+                                    className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                                >
+                                    <CreditCard size={14} />
+                                    Send Payment &amp; Terms Link to Client
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* ACTIVITY TIMELINE SECTION */}

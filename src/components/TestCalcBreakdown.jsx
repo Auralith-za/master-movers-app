@@ -145,18 +145,26 @@ export default function TestCalcBreakdown() {
         }
     })
 
-    // Add ordered boxes from moveDetails
-    const orderedSt7Boxes = moveDetails.st7Boxes || 0;
-    const orderedLinenBoxes = moveDetails.linenBoxes || 0;
-    totalVolume += (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8);
     // Add custom products volume
     const customProductsList = moveDetails.customProducts || moveDetails.custom_products || [];
+    let customVol = 0;
     if (Array.isArray(customProductsList)) {
         customProductsList.forEach(prod => {
             const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
             const unitVol = parseFloat(prod.cubes || prod.cuft || 0);
-            totalVolume += (unitVol * qty);
+            customVol += (unitVol * qty);
         });
+    }
+    totalVolume += customVol;
+
+    // Add ordered boxes from moveDetails
+    const orderedSt7Boxes = moveDetails.st7Boxes || 0;
+    const orderedLinenBoxes = moveDetails.linenBoxes || 0;
+    const shouldAddBoxVolume = moveDetails.includeBoxVolume !== undefined
+        ? Boolean(moveDetails.includeBoxVolume)
+        : (customVol === 0);
+    if (shouldAddBoxVolume) {
+        totalVolume += (orderedSt7Boxes * 4.25) + (orderedLinenBoxes * 8);
     }
 
     // Vehicle selection (mirroring moveStore logic)

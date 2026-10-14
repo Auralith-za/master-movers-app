@@ -8,6 +8,7 @@ import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
 import { emailService } from '../services/emailService';
 import { normalizeInventory, parseInventoryKey } from '../utils/inventoryUtils';
+import { generateSignedTermsCertificatePng } from '../utils/termsCertificate';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -106,7 +107,20 @@ export default function QuoteReviewPage() {
 
     const handleAcceptTerms = async (sig) => {
         try {
-            // Use edge function (service role) to bypass RLS on the public quote page
+            // 1. Generate high-resolution Signed Terms PNG Certificate
+            let signedPngBase64 = null
+            try {
+                const cert = await generateSignedTermsCertificatePng({
+                    quote,
+                    signatureName: sig.name,
+                    signatureDate: sig.date
+                })
+                signedPngBase64 = cert.base64
+            } catch (certErr) {
+                console.warn('Canvas certificate generation warning:', certErr)
+            }
+
+            // 2. Use edge function (service role) to bypass RLS on the public quote page
             const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-terms`, {
                 method: 'POST',
                 headers: {
@@ -115,12 +129,32 @@ export default function QuoteReviewPage() {
                 },
                 body: JSON.stringify({
                     quoteId: id,
-                    signatureName: sig.name
+                    signatureName: sig.name,
+                    signatureDate: sig.date
                 })
             })
 
             const result = await response.json()
             if (!response.ok) throw new Error(result.error || 'Failed to save acceptance')
+
+            // 3. Send email to admin with attached PNG certificate
+            try {
+                await emailService.sendTermsAcceptedAlert({
+                    quoteId: quote.id,
+                    clientName: quote.client_name,
+                    clientEmail: quote.client_email,
+                    clientPhone: quote.client_phone,
+                    pickupAddress: quote.pickup_address,
+                    dropoffAddress: quote.dropoff_address,
+                    moveDate: quote.move_date,
+                    total: quote.total_price || 0,
+                    signatureName: sig.name,
+                    signatureDate: sig.date,
+                    signedPngBase64: signedPngBase64
+                })
+            } catch (emailErr) {
+                console.warn('Failed to dispatch admin terms accepted alert email:', emailErr)
+            }
 
             setAccepted(true);
             setSignatureData(sig);
@@ -149,8 +183,25 @@ export default function QuoteReviewPage() {
 
     const inventory = normalizeInventory(quote.items_json || quote.inventory);
 
+    const customProductsList = quote.custom_products || quote.items_json?.custom_products || [];
+    const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0);
+
+    const st7Count = quote.st7_boxes || quote.items_json?.st7Boxes || 0;
+    const linenCount = quote.linen_boxes || quote.items_json?.linenBoxes || 0;
+    const potentialBoxVol = (st7Count * 4.25) + (linenCount * 8);
+
+    const includeBoxVolume = quote.items_json?.include_box_volume !== undefined 
+        ? Boolean(quote.items_json?.include_box_volume)
+        : (customVolSum === 0);
+
     // Calculate total volume / cubes
     let quoteVolume = Number(quote.total_volume || quote.items_json?.total_volume || 0);
+
+    // Reconcile if quoteVolume was inflated with box volume on a custom cubes quote
+    if (customVolSum > 0 && !includeBoxVolume && quoteVolume > customVolSum && Math.abs(quoteVolume - (customVolSum + potentialBoxVol)) < 0.1) {
+        quoteVolume = customVolSum;
+    }
+
     if (!quoteVolume && inventory && typeof inventory === 'object') {
         Object.entries(inventory).forEach(([idKey, qty]) => {
             if (!qty || qty <= 0) return;
@@ -158,17 +209,14 @@ export default function QuoteReviewPage() {
             const item = INVENTORY_ITEMS.find(i => i.id === cleanId);
             if (item && item.volume) quoteVolume += item.volume * qty;
         });
-        const st7Count = quote.st7_boxes || quote.items_json?.st7Boxes || 0;
-        const linenCount = quote.linen_boxes || quote.items_json?.linenBoxes || 0;
-        quoteVolume += (st7Count * 4.25) + (linenCount * 8);
-
-        const customProductsList = quote.custom_products || quote.items_json?.custom_products || [];
-        const customVolSum = (Array.isArray(customProductsList) ? customProductsList : []).reduce((sum, p) => sum + (parseFloat(p.cubes || p.cuft || 0) * (parseInt(p.quantity || p.qty || 1) || 1)), 0);
+        if (includeBoxVolume) {
+            quoteVolume += potentialBoxVol;
+        }
         quoteVolume += customVolSum;
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20">
+        <div className="min-h-screen bg-slate-50 pb-36 sm:pb-24">
             <div className="bg-slate-900 overflow-hidden relative">
                 <div className="max-w-4xl mx-auto px-6 py-16 text-white relative z-10">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
