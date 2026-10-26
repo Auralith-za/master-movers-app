@@ -9,6 +9,7 @@ import PayflexCheckout from '../features/payment/PayflexCheckout';
 import { emailService } from '../services/emailService';
 import { normalizeInventory, parseInventoryKey } from '../utils/inventoryUtils';
 import { generateSignedTermsCertificatePng } from '../utils/termsCertificate';
+import { getBranchDetails } from '../utils/branchDetails';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -27,6 +28,7 @@ export default function QuoteReviewPage() {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const branch = quote ? getBranchDetails(quote) : null;
 
     const handleRejectQuote = async () => {
         if (!quote) return;
@@ -263,18 +265,71 @@ export default function QuoteReviewPage() {
                         
                         {/* Route Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-                            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
-                                <span className="flex items-center gap-2">
-                                    <Truck size={20} className="text-red-500" /> Logistics Information
-                                </span>
-                                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                                    {quoteVolume.toFixed(2)} ft³ Cubes
-                                </span>
-                            </h2>
+                            {(() => {
+                                const originType = (quote.access_details?.origin?.type || 'house').toUpperCase();
+                                const destType = (quote.access_details?.destination?.type || 'house').toUpperCase();
+                                const compDetails = quote.items_json?.company_details || quote.company_details || {};
+                                return (
+                                    <>
+                                        <h2 className="text-lg font-black text-slate-900 mb-6 flex flex-wrap items-center justify-between gap-2">
+                                            <span className="flex items-center gap-2">
+                                                <Truck size={20} className="text-red-500" /> Logistics Information
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                                    {originType === 'OFFICE' ? '🏢' : '🏠'} {originType} → {destType === 'OFFICE' ? '🏢' : '🏠'} {destType}
+                                                </span>
+                                                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                                                    {quoteVolume.toFixed(2)} ft³ Cubes
+                                                </span>
+                                            </div>
+                                        </h2>
+
+                                        {(compDetails.companyName || compDetails.companyVat || compDetails.companyDetails) && (
+                                            <div className="mb-6 p-4 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1">
+                                                <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest block">
+                                                    🏢 Corporate / Company Move Details
+                                                </span>
+                                                {compDetails.companyName && (
+                                                    <p className="text-sm font-black text-slate-900">{compDetails.companyName}</p>
+                                                )}
+                                                {compDetails.companyVat && (
+                                                    <p className="text-xs font-semibold text-slate-600">VAT / Reg No: {compDetails.companyVat}</p>
+                                                )}
+                                                {compDetails.companyDetails && (
+                                                    <p className="text-xs text-slate-600">{compDetails.companyDetails}</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {branch && (
+                                            <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-slate-600">
+                                                <div>
+                                                    <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-0.5">
+                                                        📍 Issuing Branch
+                                                    </span>
+                                                    <p className="font-bold text-slate-900 text-sm">{branch.name}</p>
+                                                    <p className="text-slate-600 mt-0.5">{branch.fullAddress}</p>
+                                                </div>
+                                                <div className="text-left md:text-right shrink-0 space-y-0.5 text-[11px]">
+                                                    <p className="font-semibold text-slate-700">Tel: <a href={`tel:${branch.telLink}`} className="text-red-600 hover:underline">{branch.telDisplay}</a></p>
+                                                    <p><a href={`mailto:${branch.email}`} className="text-slate-600 hover:underline">{branch.email}</a></p>
+                                                    <p className="text-[10px] text-slate-400">VAT: {branch.vatRegNo} · Co Reg: {branch.coRegNo}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Pickup Address</label>
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Pickup Address</label>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                {(quote.access_details?.origin?.type || 'house').toUpperCase()}
+                                            </span>
+                                        </div>
                                         <p className="text-slate-900 font-bold leading-snug mt-1">{quote.pickup_address}</p>
                                     </div>
                                     {(quote.items_json?.extraCollections || quote.extra_collections || []).map((coll, idx) => (
@@ -285,12 +340,23 @@ export default function QuoteReviewPage() {
                                     ))}
                                     <div className="flex items-center gap-2 text-slate-500 text-sm">
                                         <Calendar size={16} />
-                                        <span>Scheduled for: <strong className="text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</strong></span>
+                                        <span>Move Date: <strong className="text-slate-800">{new Date(quote.move_date).toLocaleDateString()}</strong></span>
                                     </div>
+                                    {(quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate) && (
+                                        <div className="flex items-center gap-2 text-indigo-700 text-sm bg-indigo-50/80 px-2.5 py-1.5 rounded-lg border border-indigo-100">
+                                            <Package size={16} className="text-indigo-600" />
+                                            <span>Pack / Wrap Date: <strong className="text-indigo-900">{new Date(quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate).toLocaleDateString()}</strong></span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Dropoff Address</label>
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Dropoff Address</label>
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                {(quote.access_details?.destination?.type || 'house').toUpperCase()}
+                                            </span>
+                                        </div>
                                         <p className="text-slate-900 font-bold leading-snug mt-1">{quote.dropoff_address}</p>
                                     </div>
                                     {(quote.items_json?.extraDrops || quote.extra_drops || []).map((drop, idx) => (
@@ -299,10 +365,12 @@ export default function QuoteReviewPage() {
                                             <p className="text-xs font-bold text-slate-800">{drop.address}</p>
                                         </div>
                                     ))}
-                                    <div className="flex items-center gap-2 text-slate-500 text-sm">
-                                        <Truck size={16} />
-                                        <span>Distance: <strong className="text-slate-800">{quote.distance_km} km</strong> {quote.is_shared_load && <span className="ml-2 text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Shared Load</span>}</span>
-                                    </div>
+                                    {quote.is_shared_load && (
+                                        <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                            <Truck size={16} />
+                                            <span className="text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Shared Load</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -464,28 +532,81 @@ export default function QuoteReviewPage() {
                                     Total Cubes: {quoteVolume.toFixed(2)} ft³
                                 </span>
                             </h2>
-                            <div className="space-y-3">
-                                {Object.entries(inventory).map(([idKey, qty]) => {
-                                    const { itemId, variation, room } = parseInventoryKey(idKey);
-                                    const item = INVENTORY_ITEMS.find(i => i.id === itemId);
-                                    const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                                    return (
-                                        <div key={idKey} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 px-2 rounded transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
-                                                    {item?.image
-                                                        ? <img src={item.image} alt={itemName} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
-                                                        : <span className="text-lg">📦</span>
-                                                    }
-                                                </div>
-                                                <span className="text-sm font-bold text-slate-700">
-                                                    {itemName} {variation ? <span className="text-slate-400 font-normal">({variation})</span> : ''} {room ? <span className="text-xs text-slate-400 font-normal ml-1">· {room}</span> : ''}
+                            <div className="space-y-5">
+                                {(() => {
+                                    const groupedRooms = {};
+                                    Object.entries(inventory).forEach(([idKey, qty]) => {
+                                        if (!qty || qty <= 0) return;
+                                        const { itemId, variation, room } = parseInventoryKey(idKey);
+                                        const item = INVENTORY_ITEMS.find(i => i.id === itemId);
+                                        const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                        const roomName = room || item?.category || 'General Furniture';
+                                        if (!groupedRooms[roomName]) groupedRooms[roomName] = [];
+                                        groupedRooms[roomName].push({
+                                            key: idKey,
+                                            name: itemName,
+                                            variation,
+                                            qty,
+                                            image: item?.image,
+                                            isCustom: false
+                                        });
+                                    });
+
+                                    const customProds = quote.custom_products || quote.items_json?.custom_products || [];
+                                    const unassignedCustom = [];
+                                    (Array.isArray(customProds) ? customProds : []).forEach((prod, idx) => {
+                                        const qty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
+                                        const vol = parseFloat(prod.cubes || prod.cuft || 0);
+                                        const entry = {
+                                            key: prod.id || `custom_${idx}`,
+                                            name: prod.name,
+                                            variation: vol > 0 ? `${vol.toFixed(2)} ft³` : null,
+                                            qty,
+                                            isCustom: true
+                                        };
+                                        if (prod.room && prod.room !== 'Custom Products & Manual Items') {
+                                            if (!groupedRooms[prod.room]) groupedRooms[prod.room] = [];
+                                            groupedRooms[prod.room].push(entry);
+                                        } else {
+                                            unassignedCustom.push(entry);
+                                        }
+                                    });
+
+                                    if (unassignedCustom.length > 0) {
+                                        groupedRooms['Custom Products & Manual Items'] = unassignedCustom;
+                                    }
+
+                                    return Object.entries(groupedRooms).map(([roomLabel, items]) => (
+                                        <div key={roomLabel} className="space-y-1.5">
+                                            <div className="flex items-center justify-between bg-slate-100/80 px-3 py-1.5 rounded-lg">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">
+                                                    {roomLabel === 'Custom Products & Manual Items' ? '📦 ' : '🏠 '}{roomLabel}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-500">
+                                                    {items.reduce((s, i) => s + i.qty, 0)} item(s)
                                                 </span>
                                             </div>
-                                            <span className="text-slate-900 font-black">x{qty}</span>
+                                            <div className="divide-y divide-slate-50 pl-1">
+                                                {items.map(entry => (
+                                                    <div key={entry.key} className="flex justify-between items-center py-2 hover:bg-slate-50/50 px-2 rounded transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+                                                                {entry.image
+                                                                    ? <img src={entry.image} alt={entry.name} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
+                                                                    : <span className="text-lg">📦</span>
+                                                                }
+                                                            </div>
+                                                            <span className="text-sm font-bold text-slate-700">
+                                                                {entry.name} {entry.variation ? <span className="text-slate-400 font-normal">({entry.variation})</span> : ''}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-slate-900 font-black">x{entry.qty}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    );
-                                })}
+                                    ));
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -588,7 +709,7 @@ export default function QuoteReviewPage() {
                                     <p className="text-[11px] opacity-80 mt-0.5">Reason: "{quote.rejection_reason || 'No reason provided'}"</p>
                                 </div>
                             )}
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1">Office: +27 11 493 7569</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-1">Office: {branch ? branch.telDisplay : '+27 11 493 7569'}</p>
                         </div>
                     </div>
                 </div>

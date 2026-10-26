@@ -8,7 +8,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], totalVolume }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -16,6 +16,13 @@ export const emailService = {
             }
 
             console.log(`Generating in-memory PDF for email type: ${type}...`)
+
+            const resolvedCompanyDetails = companyDetails || moveDetails?.company_details || (moveDetails ? {
+                isCompanyMove: Boolean(moveDetails.isCompanyMove || moveDetails.companyName),
+                companyName: moveDetails.companyName || '',
+                companyVat: moveDetails.companyVat || '',
+                companyDetails: moveDetails.companyDetails || ''
+            } : {});
 
             // 1. Generate the PDF instance silently (shouldSave = false)
             const doc = await generateProfessionalQuote({
@@ -35,6 +42,7 @@ export const emailService = {
                 inventoryItems,
                 accessDetails,
                 moveDetails,
+                companyDetails: resolvedCompanyDetails,
                 generalNotes,
                 extraCollections,
                 extraDrops,
@@ -60,6 +68,9 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 extra_collections: extraCollections || moveDetails?.extraCollections || [],
                 extra_drops: extraDrops || moveDetails?.extraDrops || [],
+                access_details: accessDetails || moveDetails?.accessDetails || {},
+                company_details: resolvedCompanyDetails,
+                custom_products: customProducts || moveDetails?.customProducts || [],
                 total_price: total,
                 payment_method: paymentMethod,
                 referral_source: moveDetails?.referralSource || '',
@@ -140,9 +151,16 @@ export const emailService = {
      * Admin-only booking confirmed alert — no PDF, fires instantly after payment
      * Separate from the customer email so admins always get notified
      */
-    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'card/eft', totalVolume }) => {
+    sendBookingConfirmedAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, moveDetails = {}, companyDetails = null, customProducts = [], paymentMethod = 'card/eft', totalVolume }) => {
         try {
             console.log(`Generating in-memory PDF for booking confirmed alert...`)
+
+            const resolvedCompanyDetails = companyDetails || moveDetails?.company_details || (moveDetails ? {
+                isCompanyMove: Boolean(moveDetails.isCompanyMove || moveDetails.companyName),
+                companyName: moveDetails.companyName || '',
+                companyVat: moveDetails.companyVat || '',
+                companyDetails: moveDetails.companyDetails || ''
+            } : {});
 
             const doc = await generateProfessionalQuote({
                 quoteId,
@@ -161,6 +179,9 @@ export const emailService = {
                 extraCollections,
                 extraDrops,
                 accessDetails,
+                moveDetails,
+                companyDetails: resolvedCompanyDetails,
+                customProducts: customProducts || moveDetails?.customProducts || [],
                 isSharedLoad: breakdown?.isSharedLoad || false,
                 shouldSave: false
             })
@@ -180,6 +201,9 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 extra_collections: extraCollections,
                 extra_drops: extraDrops,
+                access_details: accessDetails || moveDetails?.accessDetails || {},
+                company_details: resolvedCompanyDetails,
+                custom_products: customProducts || moveDetails?.customProducts || [],
                 total_price: total,
                 payment_method: paymentMethod,
                 referral_source: referralSource || referral_source || '',
@@ -210,9 +234,16 @@ export const emailService = {
      * Send instant admin-only alert when a customer reaches Step 4 (pending quote)
      * No PDF needed — fires immediately so sales team can follow up
      */
-    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, paymentMethod = 'not selected' }) => {
+    sendPendingQuoteAlert: async ({ quoteId, clientName, clientEmail, clientPhone, moveDate, referralSource, referral_source, pickupAddress, dropoffAddress, moveType, total, vat, subTotal, inventory, breakdown, inventoryItems, extraCollections = [], extraDrops = [], accessDetails = {}, moveDetails = {}, companyDetails = null, customProducts = [], paymentMethod = 'not selected', totalVolume }) => {
         try {
             console.log(`Generating in-memory PDF for pending quote alert...`)
+
+            const resolvedCompanyDetails = companyDetails || moveDetails?.company_details || (moveDetails ? {
+                isCompanyMove: Boolean(moveDetails.isCompanyMove || moveDetails.companyName),
+                companyName: moveDetails.companyName || '',
+                companyVat: moveDetails.companyVat || '',
+                companyDetails: moveDetails.companyDetails || ''
+            } : {});
 
             const doc = await generateProfessionalQuote({
                 quoteId,
@@ -231,6 +262,9 @@ export const emailService = {
                 extraCollections,
                 extraDrops,
                 accessDetails,
+                moveDetails,
+                companyDetails: resolvedCompanyDetails,
+                customProducts: customProducts || moveDetails?.customProducts || [],
                 isSharedLoad: breakdown?.isSharedLoad || false,
                 shouldSave: false
             })
@@ -248,6 +282,9 @@ export const emailService = {
                 dropoff_address: dropoffAddress,
                 extra_collections: extraCollections,
                 extra_drops: extraDrops,
+                access_details: accessDetails || moveDetails?.accessDetails || {},
+                company_details: resolvedCompanyDetails,
+                custom_products: customProducts || moveDetails?.customProducts || [],
                 total_price: total,
                 total_volume: totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || 0,
                 items_json: inventory || {},
@@ -608,6 +645,63 @@ export const emailService = {
             return { success: true }
         } catch (error) {
             console.error('sendJobApplicationEmail error:', error)
+            return { success: false, error: error.message }
+        }
+    },
+
+    /**
+     * Send alert to admin when a customer signs and accepts terms & conditions
+     */
+    sendTermsAcceptedAlert: async ({
+        quoteId,
+        clientName,
+        clientEmail,
+        clientPhone,
+        pickupAddress,
+        dropoffAddress,
+        moveDate,
+        total,
+        signatureName,
+        signatureDate,
+        signedPngBase64
+    }) => {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+            const url = `${supabaseUrl}/functions/v1/send-email`
+
+            const quoteData = {
+                id: quoteId,
+                client_name: clientName,
+                client_email: clientEmail,
+                client_phone: clientPhone,
+                pickup_address: pickupAddress,
+                dropoff_address: dropoffAddress,
+                move_date: moveDate,
+                total_price: total || 0
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    type: 'terms_accepted_alert',
+                    quoteData,
+                    signatureName,
+                    signatureDate,
+                    pngBase64: signedPngBase64 || null,
+                    pngFilename: `MasterMovers_Signed_Terms_${quoteId || 'Agreement'}.png`
+                })
+            })
+
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Terms accepted email alert failed')
+            console.log('✅ Terms accepted alert sent to admin with signed certificate PNG')
+            return { success: true, messageId: result.messageId }
+        } catch (error) {
+            console.error('sendTermsAcceptedAlert error:', error)
             return { success: false, error: error.message }
         }
     }

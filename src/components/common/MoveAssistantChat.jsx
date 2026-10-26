@@ -89,8 +89,7 @@ export default function MoveAssistantChat() {
                     quoteData: {
                         type: 'locations',
                         pickup: activeQuote.pickup_address,
-                        dropoff: activeQuote.dropoff_address,
-                        distance: activeQuote.distance_km
+                        dropoff: activeQuote.dropoff_address
                     },
                     options: ['View Inventory', 'Latest Updates', 'Exit']
                 }
@@ -270,9 +269,6 @@ export default function MoveAssistantChat() {
                                                 <span className="text-slate-400 text-[10px] uppercase font-bold">Destination</span>
                                                 <p className="font-medium text-slate-800">{msg.quoteData.dropoff}</p>
                                             </div>
-                                        </div>
-                                        <div className="pt-2 border-t border-slate-50 text-right text-slate-400">
-                                            Est. Distance: {msg.quoteData.distance}km
                                         </div>
                                     </div>
                                 )}

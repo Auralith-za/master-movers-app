@@ -184,7 +184,7 @@ ${formData.notes || 'No extra notes provided.'}`
     return (
         <>
             {/* FLOATING LEFT CAREERS BUTTON */}
-            <div className="fixed left-0 top-1/2 -translate-y-1/2 z-[9999] flex items-center">
+            <div className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex items-center">
                 <button
                     onClick={() => setIsOpen(true)}
                     className="bg-slate-900 hover:bg-red-600 text-white py-3.5 px-3 sm:px-4 rounded-r-2xl border-y border-r border-slate-700/80 shadow-2xl transition-all duration-300 flex items-center gap-2.5 group cursor-pointer border-l-0 hover:pl-5 hover:pr-5 active:scale-95"

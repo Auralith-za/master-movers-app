@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/Input'
 import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { emailService } from '../../services/emailService'
 import { calculateTripDistances } from '../../services/googleMaps'
-import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Calendar, MapPin, Truck, Phone, User, Sparkles, Loader2, X, CheckCircle, Warehouse, Plus, Trash2, ChevronDown, Building2, Home } from 'lucide-react'
 import { getCityCode, detectCityCode, isOutlyingOrOuterRegional, PRICING_CONSTANTS } from '../inventory/data/pricingRates'
 import { trackStep1Complete, trackCallbackRequest } from '../../lib/gtag'
 import { formatClientName } from '../../utils/quoteHelpers'
@@ -135,7 +135,7 @@ export const LeadCaptureModal = ({ isOpen, onClose, onSubmit, isLoading, initial
 
 export default function Step1Details() {
     const navigate = useNavigate()
-    const { moveDetails, setMoveDetails, submitQuote, lastSavedQuote } = useMoveStore()
+    const { moveDetails, setMoveDetails, accessDetails, setAccessDetails, submitQuote, lastSavedQuote } = useMoveStore()
     const location = useLocation()
     const [isSubmittingLead, setIsSubmittingLead] = React.useState(false)
     const [showLeadModal, setShowLeadModal] = React.useState(false)
@@ -822,6 +822,166 @@ export default function Step1Details() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Optional Company & Office Move Details */}
+                            <div className="md:col-span-2 pt-2">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextVal = !Boolean(moveDetails.isCompanyMove || moveDetails.companyName || accessDetails?.origin?.type === 'office' || accessDetails?.destination?.type === 'office')
+                                            setMoveDetails({ isCompanyMove: nextVal })
+                                        }}
+                                        className={`inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${
+                                            (moveDetails.isCompanyMove || moveDetails.companyName || accessDetails?.origin?.type === 'office' || accessDetails?.destination?.type === 'office')
+                                                ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/15'
+                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-red-600 hover:text-red-600'
+                                        }`}
+                                    >
+                                        <Building2 size={16} className={(moveDetails.isCompanyMove || moveDetails.companyName || accessDetails?.origin?.type === 'office' || accessDetails?.destination?.type === 'office') ? 'text-red-400' : 'text-red-600'} />
+                                        {(moveDetails.isCompanyMove || moveDetails.companyName || accessDetails?.origin?.type === 'office' || accessDetails?.destination?.type === 'office')
+                                            ? 'Company / Office Move Details Enabled'
+                                            : '+ Moving an Office or Booking as a Company? (Optional)'}
+                                    </button>
+
+                                    {/* Live Move Property Route Indicator Badge */}
+                                    <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                                        <span className="text-slate-400">Move Type:</span>
+                                        <span className={accessDetails?.origin?.type === 'office' ? 'text-red-600' : 'text-slate-900'}>
+                                            {accessDetails?.origin?.type === 'office' ? '🏢 Office' : `🏠 ${(accessDetails?.origin?.type || 'house').replace('_', ' ')}`}
+                                        </span>
+                                        <span className="text-slate-400">→</span>
+                                        <span className={accessDetails?.destination?.type === 'office' ? 'text-red-600' : 'text-slate-900'}>
+                                            {moveDetails.storageDestination ? '🏭 Storage' : (accessDetails?.destination?.type === 'office' ? '🏢 Office' : `🏠 ${(accessDetails?.destination?.type || 'house').replace('_', ' ')}`)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {(moveDetails.isCompanyMove || moveDetails.companyName || moveDetails.companyVat || moveDetails.companyDetails || accessDetails?.origin?.type === 'office' || accessDetails?.destination?.type === 'office') && (
+                                    <div className="mt-4 p-5 md:p-6 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                            <div>
+                                                <h4 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                                                    <Building2 size={16} className="text-red-600" />
+                                                    Company & Office Move Details (Optional)
+                                                </h4>
+                                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                                    Add your company billing details and specify if you are moving from or to an office.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMoveDetails({ isCompanyMove: false, companyName: '', companyVat: '', companyDetails: '' })
+                                                    if (accessDetails?.origin?.type === 'office') setAccessDetails('origin', { type: 'house' })
+                                                    if (accessDetails?.destination?.type === 'office') setAccessDetails('destination', { type: 'house' })
+                                                }}
+                                                className="text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                                            >
+                                                Clear & Close
+                                            </button>
+                                        </div>
+
+                                        {/* Quick Office Route Toggles */}
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                                                Is Pickup or Drop-off an Office?
+                                            </label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const isOffice = accessDetails?.origin?.type === 'office'
+                                                        setAccessDetails('origin', { type: isOffice ? 'house' : 'office' })
+                                                        if (!isOffice) setMoveDetails({ isCompanyMove: true })
+                                                    }}
+                                                    className={`p-3.5 rounded-xl border-2 text-left transition-all flex items-center justify-between cursor-pointer ${
+                                                        accessDetails?.origin?.type === 'office'
+                                                            ? 'bg-red-50 border-red-600 text-red-900 shadow-sm'
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accessDetails?.origin?.type === 'office' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                            <Building2 size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-black uppercase tracking-wide">Moving FROM an Office</p>
+                                                            <p className="text-[10px] font-bold text-slate-500">
+                                                                Pickup is currently: <span className="uppercase text-slate-900">{accessDetails?.origin?.type === 'office' ? 'OFFICE' : 'HOUSE / RESIDENTIAL'}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        readOnly
+                                                        checked={accessDetails?.origin?.type === 'office'}
+                                                        className="w-4 h-4 accent-red-600 rounded pointer-events-none"
+                                                    />
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const isOffice = accessDetails?.destination?.type === 'office'
+                                                        setAccessDetails('destination', { type: isOffice ? 'house' : 'office' })
+                                                        if (!isOffice) setMoveDetails({ isCompanyMove: true })
+                                                    }}
+                                                    className={`p-3.5 rounded-xl border-2 text-left transition-all flex items-center justify-between cursor-pointer ${
+                                                        accessDetails?.destination?.type === 'office'
+                                                            ? 'bg-red-50 border-red-600 text-red-900 shadow-sm'
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accessDetails?.destination?.type === 'office' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                            <Building2 size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-black uppercase tracking-wide">Moving TO an Office</p>
+                                                            <p className="text-[10px] font-bold text-slate-500">
+                                                                Drop-off is currently: <span className="uppercase text-slate-900">{accessDetails?.destination?.type === 'office' ? 'OFFICE' : 'HOUSE / RESIDENTIAL'}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        readOnly
+                                                        checked={accessDetails?.destination?.type === 'office'}
+                                                        className="w-4 h-4 accent-red-600 rounded pointer-events-none"
+                                                    />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input
+                                                label="Company Name (Optional)"
+                                                name="companyName"
+                                                placeholder="e.g. Acme Holdings (Pty) Ltd"
+                                                value={moveDetails.companyName || ''}
+                                                onChange={handleChange}
+                                            />
+                                            <Input
+                                                label="Company VAT / Reg Number (Optional)"
+                                                name="companyVat"
+                                                placeholder="e.g. VAT 4123456789"
+                                                value={moveDetails.companyVat || ''}
+                                                onChange={handleChange}
+                                            />
+                                            <div className="md:col-span-2">
+                                                <Input
+                                                    label="Additional Company / Billing Details (Optional)"
+                                                    name="companyDetails"
+                                                    placeholder="e.g. PO Number, Billing Address, or Department"
+                                                    value={moveDetails.companyDetails || ''}
+                                                    onChange={handleChange}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -872,8 +1032,35 @@ export default function Step1Details() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Pickup Group */}
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Primary Pickup Location</span>
+                                    <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAccessDetails('origin', { type: 'house' })}
+                                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                                                accessDetails?.origin?.type !== 'office'
+                                                    ? 'bg-white text-slate-900 shadow-sm'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            <Home size={11} /> Residential
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAccessDetails('origin', { type: 'office' })
+                                                setMoveDetails({ isCompanyMove: true })
+                                            }}
+                                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                                                accessDetails?.origin?.type === 'office'
+                                                    ? 'bg-red-600 text-white shadow-sm'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            <Building2 size={11} /> Office
+                                        </button>
+                                    </div>
                                 </div>
                                 {moveDetails.pickupManualActive ? (
                                     <div className="space-y-1.5">
@@ -1035,8 +1222,37 @@ export default function Step1Details() {
 
                             {/* Dropoff Group */}
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Primary Drop-off Location</span>
+                                    {!isStorageMode && (
+                                        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAccessDetails('destination', { type: 'house' })}
+                                                className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                                                    accessDetails?.destination?.type !== 'office'
+                                                        ? 'bg-white text-slate-900 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                <Home size={11} /> Residential
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAccessDetails('destination', { type: 'office' })
+                                                    setMoveDetails({ isCompanyMove: true })
+                                                }}
+                                                className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                                                    accessDetails?.destination?.type === 'office'
+                                                        ? 'bg-red-600 text-white shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                <Building2 size={11} /> Office
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Toggle: Deliver to address vs Store with Master Movers */}
                                 <div className="flex items-center gap-2 mb-1">

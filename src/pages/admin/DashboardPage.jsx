@@ -213,6 +213,8 @@ export default function DashboardPage() {
                 discount: quote.items_json?.breakdown?.discount || 0,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: quote.items_json?.breakdown || null,
+                is_manual_price: Boolean(quote.is_manual_price),
+                isManualPrice: Boolean(quote.is_manual_price),
                 accessDetails: quote.access_details || {},
                 generalNotes: quote.general_notes || quote.notes || quote.customer_comments || '',
                 customProducts: quote.custom_products || quote.items_json?.custom_products || [],

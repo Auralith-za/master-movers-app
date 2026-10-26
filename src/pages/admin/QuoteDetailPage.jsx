@@ -17,6 +17,7 @@ import AddressAutocomplete from '../../components/ui/AddressAutocomplete'
 import { calculateTripDistances } from '../../services/googleMaps'
 import { PACKAGING_RATES, detectCityCode } from '../../features/inventory/data/pricingRates'
 import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
+import { getBranchDetails } from '../../utils/branchDetails'
 import CouponInput from '../../features/payment/CouponInput'
 import { normalizeInventory } from '../../utils/inventoryUtils'
 import { generateSignedTermsCertificatePng, downloadCertificatePng } from '../../utils/termsCertificate'
@@ -67,10 +68,14 @@ export default function QuoteDetailPage() {
     const [selectedItemForVariation, setSelectedItemForVariation] = useState(null)
     const [roomModalItem, setRoomModalItem] = useState(null)
     const [newNote, setNewNote] = useState('')
-    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0 })
+    const [customProductForm, setCustomProductForm] = useState({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0, room: '', customRoomInput: '' })
     const [showCustomProductModal, setShowCustomProductModal] = useState(false)
     const [showManualCouponModal, setShowManualCouponModal] = useState(false)
     const [manualCouponForm, setManualCouponForm] = useState({ name: '', discountType: 'fixed', amount: '' })
+    const [newCustomRoomInput, setNewCustomRoomInput] = useState('')
+    const [showNewRoomInput, setShowNewRoomInput] = useState(false)
+    const [editingRoomName, setEditingRoomName] = useState({ oldName: null, newName: '' })
+    const [modalNewRoomName, setModalNewRoomName] = useState('')
 
     useEffect(() => {
         if (id === 'new') {
@@ -86,10 +91,16 @@ export default function QuoteDetailPage() {
                 client_name: '',
                 client_email: '',
                 client_phone: '',
+                company_name: '',
+                company_vat: '',
+                company_details: '',
+                is_company_move: false,
+                custom_rooms: [],
                 pickup_address: '',
                 dropoff_address: '',
                 distance_km: 0,
                 move_date: new Date().toISOString().split('T')[0],
+                packing_date: '',
                 status: 'lead',
                 items_json: {},
                 total_price: 0,
@@ -245,6 +256,7 @@ export default function QuoteDetailPage() {
 
             setQuote({
                 ...data,
+                packing_date: data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '',
                 send_me_boxes: initialSendMeBoxes,
                 boxes_and_packing: initialBoxesAndPacking
             })
@@ -280,19 +292,28 @@ export default function QuoteDetailPage() {
                 ? Boolean(data.items_json.include_box_volume)
                 : !hasCustomVol;
 
+            const savedCompany = data.items_json?.company_details || {};
+            const savedCustomRooms = Array.isArray(data.items_json?.custom_rooms) ? data.items_json.custom_rooms : [];
+
             setEditForm({
                 ...data,
+                packing_date: data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '',
                 distance_km: initialDistance,
                 items_json: rawItems,
                 special_wrapping: rawSpecialWrapping,
-                custom_products: data.custom_products || [],
+                custom_products: data.custom_products || data.items_json?.custom_products || [],
                 include_box_volume: initialIncludeBoxVolume,
                 extraCollections: extraColls,
                 extraDrops: extraDrops,
                 send_me_boxes: initialSendMeBoxes,
                 boxes_and_packing: initialBoxesAndPacking,
                 disable_shuttle: Boolean(data.items_json?.disable_shuttle),
-                shuttle_override: data.items_json?.shuttle_override
+                shuttle_override: data.items_json?.shuttle_override,
+                company_name: savedCompany.companyName || data.items_json?.companyName || '',
+                company_vat: savedCompany.companyVat || data.items_json?.companyVat || '',
+                company_details: savedCompany.companyDetails || data.items_json?.companyDetails || '',
+                is_company_move: Boolean(savedCompany.isCompanyMove || savedCompany.companyName || data.access_details?.origin?.type === 'office' || data.access_details?.destination?.type === 'office'),
+                custom_rooms: savedCustomRooms
             })
         } catch (error) {
             console.error('Error fetching quote:', error)
@@ -408,7 +429,7 @@ export default function QuoteDetailPage() {
             insuranceEnabled: editForm.insurance_enabled || false,
             isSharedLoad: editForm.is_shared_load || false,
             paymentMethod: editForm.payment_method || 'eft',
-            storageDestination: editForm.storage_destination || quote?.storage_destination || null,
+            storageDestination: editForm.storage_destination || quote?.storage_destination || quote?.items_json?.breakdown?.storageDestination || quote?.items_json?.storageDestination || null,
             customProducts: editForm.custom_products || [],
             includeBoxVolume: editForm.include_box_volume,
             disableShuttle: Boolean(editForm.disable_shuttle),
@@ -476,9 +497,14 @@ export default function QuoteDetailPage() {
         const idKey = `${baseKey}__room:${targetRoom}`
         const updatedItems = { ...editForm.items_json }
         updatedItems[idKey] = (updatedItems[idKey] || 0) + 1
-        setEditForm({ ...editForm, items_json: updatedItems })
+        const nextCustomRooms = [...(editForm.custom_rooms || [])]
+        if (targetRoom && !orderedCategories.includes(targetRoom) && !nextCustomRooms.includes(targetRoom)) {
+            nextCustomRooms.push(targetRoom)
+        }
+        setEditForm({ ...editForm, items_json: updatedItems, custom_rooms: nextCustomRooms })
         setSelectedItemForVariation(null)
         setRoomModalItem(null)
+        setModalNewRoomName('')
         setSearchQuery('')
     }
 
@@ -490,17 +516,107 @@ export default function QuoteDetailPage() {
         const qty = updatedItems[oldIdKey] || 1
         delete updatedItems[oldIdKey]
         updatedItems[newIdKey] = (updatedItems[newIdKey] || 0) + qty
-        setEditForm({ ...editForm, items_json: updatedItems })
+        const updatedWrapping = { ...(editForm.special_wrapping || {}) }
+        if (updatedWrapping[oldIdKey]) {
+            updatedWrapping[newIdKey] = updatedWrapping[oldIdKey]
+            delete updatedWrapping[oldIdKey]
+        }
+        const nextCustomRooms = [...(editForm.custom_rooms || [])]
+        if (newRoom && !orderedCategories.includes(newRoom) && !nextCustomRooms.includes(newRoom)) {
+            nextCustomRooms.push(newRoom)
+        }
+        setEditForm({ ...editForm, items_json: updatedItems, special_wrapping: updatedWrapping, custom_rooms: nextCustomRooms })
         setRoomModalItem(null)
+        setModalNewRoomName('')
     }
 
-    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg, quantityArg, priceArg) => {
+    const handleChangeCustomProductRoom = (productId, newRoom) => {
+        const cleanRoom = (!newRoom || newRoom === 'Custom Products & Manual Items') ? '' : newRoom.trim()
+        const nextCustomRooms = [...(editForm.custom_rooms || [])]
+        if (cleanRoom && !orderedCategories.includes(cleanRoom) && !nextCustomRooms.includes(cleanRoom)) {
+            nextCustomRooms.push(cleanRoom)
+        }
+        setEditForm(prev => ({
+            ...prev,
+            custom_rooms: nextCustomRooms,
+            custom_products: (prev.custom_products || []).map(p => p.id === productId ? { ...p, room: cleanRoom } : p)
+        }))
+        setRoomModalItem(null)
+        setModalNewRoomName('')
+    }
+
+    const handleAddCustomRoom = (roomNameRaw) => {
+        const cleanName = (roomNameRaw || newCustomRoomInput || '').trim()
+        if (!cleanName) return
+        setEditForm(prev => {
+            const existing = prev.custom_rooms || []
+            if (existing.includes(cleanName)) return prev
+            return { ...prev, custom_rooms: [...existing, cleanName] }
+        })
+        setSelectedCategory(cleanName)
+        setNewCustomRoomInput('')
+        setShowNewRoomInput(false)
+    }
+
+    const handleRenameRoom = (oldRoomName, newRoomNameRaw) => {
+        const newRoomName = (newRoomNameRaw || '').trim()
+        if (!newRoomName || newRoomName === oldRoomName) {
+            setEditingRoomName({ oldName: null, newName: '' })
+            return
+        }
+        const updatedItems = {}
+        const updatedWrapping = { ...(editForm.special_wrapping || {}) }
+        Object.entries(editForm.items_json || {}).forEach(([itemIdKey, qty]) => {
+            const parsed = parseInventoryKey(itemIdKey)
+            const item = INVENTORY_ITEMS.find(i => i.id === parsed.itemId)
+            const currentRoom = parsed.room || item?.category || 'General Furniture'
+            if (currentRoom === oldRoomName) {
+                const baseKey = parsed.variation ? `${parsed.itemId}_${parsed.variation}` : parsed.itemId
+                const newIdKey = `${baseKey}__room:${newRoomName}`
+                updatedItems[newIdKey] = (updatedItems[newIdKey] || 0) + qty
+                if (updatedWrapping[itemIdKey]) {
+                    updatedWrapping[newIdKey] = updatedWrapping[itemIdKey]
+                    delete updatedWrapping[itemIdKey]
+                }
+            } else {
+                updatedItems[itemIdKey] = (updatedItems[itemIdKey] || 0) + qty
+            }
+        })
+
+        const updatedCustomProducts = (editForm.custom_products || []).map(p => {
+            if ((p.room || '') === oldRoomName) {
+                return { ...p, room: newRoomName }
+            }
+            return p
+        })
+
+        const nextCustomRooms = (editForm.custom_rooms || []).filter(r => r !== oldRoomName)
+        if (!orderedCategories.includes(newRoomName) && !nextCustomRooms.includes(newRoomName)) {
+            nextCustomRooms.push(newRoomName)
+        }
+
+        setEditForm(prev => ({
+            ...prev,
+            items_json: updatedItems,
+            special_wrapping: updatedWrapping,
+            custom_products: updatedCustomProducts,
+            custom_rooms: nextCustomRooms
+        }))
+        if (selectedCategory === oldRoomName) {
+            setSelectedCategory(newRoomName)
+        }
+        setEditingRoomName({ oldName: null, newName: '' })
+    }
+
+    const handleAddCustomProduct = (nameArg, cubesArg, wrapArg, sleevesArg, quantityArg, priceArg, roomArg) => {
         const name = (typeof nameArg === 'string' ? nameArg : customProductForm.name).trim()
         const cubesVal = typeof cubesArg === 'number' || typeof cubesArg === 'string' ? cubesArg : customProductForm.cubes
         const wrap = typeof wrapArg === 'boolean' ? wrapArg : Boolean(customProductForm.wrap)
         const sleeves = typeof sleevesArg === 'number' ? sleevesArg : (parseInt(customProductForm.sleeves) || 0)
         const qtyVal = typeof quantityArg === 'number' || typeof quantityArg === 'string' ? quantityArg : customProductForm.quantity
         const priceVal = typeof priceArg === 'number' || typeof priceArg === 'string' ? priceArg : customProductForm.price
+        const rawRoom = typeof roomArg === 'string' ? roomArg : (customProductForm.room === '__NEW_ROOM__' ? customProductForm.customRoomInput : customProductForm.room)
+        const assignedRoom = (rawRoom || '').trim()
         const cubes = parseFloat(cubesVal) || 0
         const quantity = Math.max(1, parseInt(qtyVal) || 1)
         const price = priceVal !== '' && priceVal !== null && priceVal !== undefined ? (parseFloat(priceVal) || 0) : 0
@@ -513,10 +629,21 @@ export default function QuoteDetailPage() {
             quantity, 
             wrap: sleeves > 0 ? false : wrap, 
             sleeves, 
-            price 
+            price,
+            room: assignedRoom || ''
         }
-        setEditForm(prev => ({ ...prev, custom_products: [...(prev.custom_products || []), newProduct] }))
-        setCustomProductForm({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0 })
+        setEditForm(prev => {
+            const nextCustomRooms = [...(prev.custom_rooms || [])]
+            if (assignedRoom && assignedRoom !== 'Custom Products & Manual Items' && !orderedCategories.includes(assignedRoom) && !nextCustomRooms.includes(assignedRoom)) {
+                nextCustomRooms.push(assignedRoom)
+            }
+            return { 
+                ...prev, 
+                custom_rooms: nextCustomRooms,
+                custom_products: [...(prev.custom_products || []), newProduct] 
+            }
+        })
+        setCustomProductForm({ name: '', cubes: '', price: '', quantity: 1, wrap: false, sleeves: 0, room: '', customRoomInput: '' })
         setShowCustomProductModal(false)
     }
 
@@ -752,6 +879,14 @@ export default function QuoteDetailPage() {
                 resolvedPackagingOption = editForm.packaging_option
             }
 
+            const companyDetailsPayload = {
+                isCompanyMove: Boolean(editForm.is_company_move || editForm.company_name || editForm.company_vat || editForm.company_details || editForm.access_details?.origin?.type === 'office' || editForm.access_details?.destination?.type === 'office'),
+                companyName: (editForm.company_name || '').trim(),
+                companyVat: (editForm.company_vat || '').trim(),
+                companyDetails: (editForm.company_details || '').trim()
+            }
+            const customRoomsPayload = Array.isArray(editForm.custom_rooms) ? editForm.custom_rooms : []
+
             const payload = {
                 client_name: editForm.client_name,
                 client_phone: editForm.client_phone,
@@ -763,6 +898,7 @@ export default function QuoteDetailPage() {
                 distance_km: Number(editForm.distance_km || 0),
                 trip_breakdown: editForm.trip_breakdown || null,
                 move_date: editForm.move_date,
+                packing_date: editForm.packing_date || null,
                 status: editForm.status,
                 rejection_reason: editForm.rejection_reason,
                 team_notes: editForm.team_notes,
@@ -777,7 +913,12 @@ export default function QuoteDetailPage() {
                     },
                     include_box_volume: editForm.include_box_volume,
                     disable_shuttle: editForm.disable_shuttle || false,
-                    shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null
+                    shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null,
+                    referral_source: editForm.referral_source || quote?.items_json?.referral_source || '',
+                    company_details: companyDetailsPayload,
+                    custom_rooms: customRoomsPayload,
+                    custom_products: editForm.custom_products || [],
+                    packing_date: editForm.packing_date || null
                 },
                 total_price: finalPrice,
                 total_volume: finalVolume,
@@ -809,12 +950,13 @@ export default function QuoteDetailPage() {
                 error = err
             }
 
-            // Fallback: If DB table is missing extra_collections or extra_drops columns, retry without top-level keys (data is preserved in items_json)
-            if (error && (error.code === 'PGRST204' || error.message?.includes('extra_collections') || error.message?.includes('extra_drops'))) {
-                console.warn('Supabase DB missing extra_collections/extra_drops columns. Retrying with fallback payload...')
+            // Fallback: If DB table is missing extra_collections, extra_drops, or packing_date columns, retry without top-level keys (data is preserved in items_json)
+            if (error && (error.code === 'PGRST204' || error.message?.includes('extra_collections') || error.message?.includes('extra_drops') || error.message?.includes('packing_date'))) {
+                console.warn('Supabase DB missing extra_collections/extra_drops/packing_date columns. Retrying with fallback payload...')
                 const safePayload = { ...payload }
                 delete safePayload.extra_collections
                 delete safePayload.extra_drops
+                delete safePayload.packing_date
                 if (id === 'new') {
                     const { data, error: err } = await supabase
                         .from('quotes')
@@ -855,8 +997,13 @@ export default function QuoteDetailPage() {
                             send_me_boxes: sendMeBoxes,
                             boxes_and_packing: boxesAndPacking
                         },
+                        include_box_volume: editForm.include_box_volume,
                         disable_shuttle: editForm.disable_shuttle || false,
-                        shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null
+                        shuttle_override: editForm.shuttle_override !== undefined ? editForm.shuttle_override : null,
+                        referral_source: editForm.referral_source || quote?.items_json?.referral_source || '',
+                        company_details: companyDetailsPayload,
+                        custom_rooms: customRoomsPayload,
+                        custom_products: editForm.custom_products || []
                     },
                     total_price: finalPrice, 
                     total_volume: finalVolume 
@@ -870,12 +1017,31 @@ export default function QuoteDetailPage() {
                     boxes_and_packing: boxesAndPacking
                 }))
                 await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+                setEditingRoomName({ oldName: null, newName: '' })
                 setIsEditing(false)
                 alert('Quote updated successfully!')
             }
         } catch (error) {
             console.error('Error saving quote:', error)
             alert('Failed to save quote: ' + error.message)
+        }
+    }
+
+    const getActiveCompanyDetails = () => {
+        if (isEditing) {
+            return {
+                isCompanyMove: Boolean(editForm.is_company_move || editForm.company_name || editForm.company_vat || editForm.company_details || editForm.access_details?.origin?.type === 'office' || editForm.access_details?.destination?.type === 'office'),
+                companyName: (editForm.company_name || '').trim(),
+                companyVat: (editForm.company_vat || '').trim(),
+                companyDetails: (editForm.company_details || '').trim()
+            }
+        }
+        const saved = quote?.items_json?.company_details || {}
+        return {
+            isCompanyMove: Boolean(saved.isCompanyMove || saved.companyName || quote?.access_details?.origin?.type === 'office' || quote?.access_details?.destination?.type === 'office'),
+            companyName: saved.companyName || quote?.items_json?.companyName || '',
+            companyVat: saved.companyVat || quote?.items_json?.companyVat || '',
+            companyDetails: saved.companyDetails || quote?.items_json?.companyDetails || ''
         }
     }
 
@@ -895,7 +1061,8 @@ export default function QuoteDetailPage() {
         if (!confirmSend) return
 
         try {
-            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json?.items || quote.items_json || {}))
+            const companyInfo = getActiveCompanyDetails()
             
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
@@ -916,7 +1083,9 @@ export default function QuoteDetailPage() {
                 extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
                 extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || []),
                 accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
-                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
+                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || [],
+                companyDetails: companyInfo,
+                moveDetails: { ...companyInfo }
             })
             
             if (result.success) {
@@ -944,8 +1113,9 @@ export default function QuoteDetailPage() {
         if (!confirm(`Regenerate and email quote PDF to ${emailTo}?`)) return
         
         try {
-            const inventoryForPdf = quote.items_json?.items || quote.items_json || {}
+            const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json?.items || quote.items_json || {}))
             const reviewLink = `https://mastermovers.co.za/quote-review?id=${id}`
+            const companyInfo = getActiveCompanyDetails()
             
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
@@ -957,6 +1127,7 @@ export default function QuoteDetailPage() {
                 pickupAddress: quote.pickup_address,
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
+                packingDate: quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || '',
                 inventory: inventoryForPdf,
                 total: finalPrice,
                 vat: finalVat,
@@ -966,7 +1137,9 @@ export default function QuoteDetailPage() {
                 extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
                 extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || []),
                 accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
-                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
+                customProducts: editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || [],
+                companyDetails: companyInfo,
+                moveDetails: { ...companyInfo }
             });
 
             if (result.success) {
@@ -1063,6 +1236,7 @@ export default function QuoteDetailPage() {
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
             const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
+            const companyInfo = getActiveCompanyDetails()
             await generateProfessionalQuote({
                 quoteId: quote.id,
                 clientName: isEditing ? editForm.client_name : quote.client_name,
@@ -1071,6 +1245,7 @@ export default function QuoteDetailPage() {
                 pickupAddress: isEditing ? editForm.pickup_address : quote.pickup_address,
                 dropoffAddress: isEditing ? editForm.dropoff_address : quote.dropoff_address,
                 moveDate: isEditing ? editForm.move_date : quote.move_date,
+                packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
                 createdAt: quote.created_at,
                 inventory: inventoryForPdf,
                 // Always prefer live recalculated values so PDF matches sidebar
@@ -1080,6 +1255,8 @@ export default function QuoteDetailPage() {
                 discount: recalculatedData?.discount || quote.items_json?.breakdown?.discount || 0,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || null,
+                is_manual_price: Boolean(quote?.is_manual_price || (priceOffset && Math.abs(priceOffset) >= 0.01)),
+                isManualPrice: Boolean(quote?.is_manual_price || (priceOffset && Math.abs(priceOffset) >= 0.01)),
                 boxQty: recalculatedData?.boxQty,
                 totalVolume: computedVolume,
                 includeBoxVolume: isEditing ? editForm.include_box_volume : quote?.items_json?.include_box_volume,
@@ -1090,6 +1267,8 @@ export default function QuoteDetailPage() {
                 accessDetails: isEditing ? editForm.access_details : (quote.access_details || recalculatedData?.accessDetails || {}),
                 generalNotes: isEditing ? (editForm.general_notes || editForm.notes || editForm.customer_comments || '') : (quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || ''),
                 customProducts: activeCustomProds,
+                companyDetails: companyInfo,
+                moveDetails: { ...companyInfo },
                 isMinQuote: recalculatedData?.isMinQuote || false,
                 extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
                 extraDrops: isEditing ? (editForm.extraDrops || editForm.extra_drops || []) : (quote.items_json?.extraDrops || quote.extra_drops || [])
@@ -1104,6 +1283,25 @@ export default function QuoteDetailPage() {
     if (!quote) return <div className="p-8 text-center"><p className="text-red-500">Quote not found</p></div>
 
     const displayInventory = normalizeInventory(isEditing ? editForm.items_json : (quote?.items_json || quote?.inventory))
+    const activeCustomProductsList = (isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []
+    const activeCustomRoomsList = (isEditing ? editForm.custom_rooms : (quote?.items_json?.custom_rooms)) || []
+    const activeCompanyDetails = getActiveCompanyDetails()
+
+    const allRoomCategories = (() => {
+        const set = new Set(orderedCategories)
+        activeCustomRoomsList.forEach(r => {
+            if (r && r.trim() && r !== 'Custom Products & Manual Items') set.add(r.trim())
+        })
+        Object.keys(displayInventory || {}).forEach(k => {
+            const p = parseInventoryKey(k)
+            if (p.room && p.room.trim()) set.add(p.room.trim())
+        })
+        activeCustomProductsList.forEach(p => {
+            if (p.room && p.room.trim() && p.room !== 'Custom Products & Manual Items') set.add(p.room.trim())
+        })
+        return Array.from(set)
+    })()
+
     const isManualEditable = true
 
     return (
@@ -1177,7 +1375,7 @@ export default function QuoteDetailPage() {
                 <div className="flex gap-2">
                     {isEditing ? (
                         <>
-                            <button onClick={() => setIsEditing(false)} className="flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium">
+                            <button onClick={() => { setIsEditing(false); setEditingRoomName({ oldName: null, newName: '' }); }} className="flex items-center px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium">
                                 <X size={18} className="mr-2" /> Discard
                             </button>
                             <button onClick={handleSave} className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium shadow-sm hover:bg-emerald-700">
@@ -1243,6 +1441,102 @@ export default function QuoteDetailPage() {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Company & Office Move Details (Optional) */}
+                                <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                                            <Building size={13} /> Company &amp; Office Move Details
+                                        </label>
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                            {(((isEditing ? editForm.access_details : quote?.access_details)?.origin?.type || 'house').replace('_', ' ')).toUpperCase()} → {(((isEditing ? editForm.access_details : quote?.access_details)?.destination?.type || 'house').replace('_', ' ')).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    {isEditing ? (
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(editForm.access_details?.origin?.type || 'house') === 'office'}
+                                                        onChange={e => {
+                                                            const nextType = e.target.checked ? 'office' : 'house'
+                                                            setEditForm(prev => ({
+                                                                ...prev,
+                                                                is_company_move: e.target.checked ? true : prev.is_company_move,
+                                                                access_details: {
+                                                                    ...(prev.access_details || {}),
+                                                                    origin: { ...(prev.access_details?.origin || {}), type: nextType }
+                                                                }
+                                                            }))
+                                                        }}
+                                                        className="rounded text-indigo-600"
+                                                    />
+                                                    <span>Pickup is an Office</span>
+                                                </label>
+                                                <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(editForm.access_details?.destination?.type || 'house') === 'office'}
+                                                        onChange={e => {
+                                                            const nextType = e.target.checked ? 'office' : 'house'
+                                                            setEditForm(prev => ({
+                                                                ...prev,
+                                                                is_company_move: e.target.checked ? true : prev.is_company_move,
+                                                                access_details: {
+                                                                    ...(prev.access_details || {}),
+                                                                    destination: { ...(prev.access_details?.destination || {}), type: nextType }
+                                                                }
+                                                            }))
+                                                        }}
+                                                        className="rounded text-indigo-600"
+                                                    />
+                                                    <span>Drop-off is an Office</span>
+                                                </label>
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Company Name (Optional)</label>
+                                                <input
+                                                    className="w-full text-xs border border-gray-200 bg-white rounded px-2.5 py-1.5 focus:border-indigo-500 outline-none"
+                                                    placeholder="e.g. Acme Holdings (Pty) Ltd"
+                                                    value={editForm.company_name || ''}
+                                                    onChange={e => setEditForm({ ...editForm, company_name: e.target.value, is_company_move: Boolean(e.target.value || editForm.is_company_move) })}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Company VAT / Reg #</label>
+                                                    <input
+                                                        className="w-full text-xs border border-gray-200 bg-white rounded px-2.5 py-1.5 focus:border-indigo-500 outline-none"
+                                                        placeholder="e.g. VAT 4123456789"
+                                                        value={editForm.company_vat || ''}
+                                                        onChange={e => setEditForm({ ...editForm, company_vat: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Billing / Dept Details</label>
+                                                    <input
+                                                        className="w-full text-xs border border-gray-200 bg-white rounded px-2.5 py-1.5 focus:border-indigo-500 outline-none"
+                                                        placeholder="PO #, Billing Address..."
+                                                        value={editForm.company_details || ''}
+                                                        onChange={e => setEditForm({ ...editForm, company_details: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        (activeCompanyDetails.companyName || activeCompanyDetails.companyVat || activeCompanyDetails.companyDetails) ? (
+                                            <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-100 text-xs space-y-1">
+                                                {activeCompanyDetails.companyName && <p className="font-bold text-slate-900">🏢 {activeCompanyDetails.companyName}</p>}
+                                                {activeCompanyDetails.companyVat && <p className="text-slate-600 font-medium">VAT / Reg: {activeCompanyDetails.companyVat}</p>}
+                                                {activeCompanyDetails.companyDetails && <p className="text-slate-600">{activeCompanyDetails.companyDetails}</p>}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic">No company details specified (Residential / Personal Move)</p>
+                                        )
+                                    )}
+                                </div>
+
                                 <div className="pt-2 border-t border-slate-100">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Quote Status</label>
                                     {isEditing ? (
@@ -1695,29 +1989,113 @@ export default function QuoteDetailPage() {
                         {/* Catalog / Room Selector */}
                         {isEditing && (
                             <div className="p-6 bg-slate-50/50 border-b border-gray-100 space-y-4">
-                                <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
-                                    {orderedCategories.map(cat => (
+                                <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                                    {allRoomCategories.map(cat => {
+                                        const isCustomCat = !orderedCategories.includes(cat);
+                                        return (
+                                            <button
+                                                key={cat}
+                                                type="button"
+                                                onClick={() => setSelectedCategory(cat)}
+                                                className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all flex items-center gap-1 ${
+                                                    selectedCategory === cat
+                                                        ? 'bg-primary-600 text-white shadow-sm shadow-primary-900/10'
+                                                        : isCustomCat
+                                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {isCustomCat && <span>✨</span>}
+                                                {cat}
+                                            </button>
+                                        );
+                                    })}
+
+                                    {/* Add Custom Room Pill / Inline Input */}
+                                    {showNewRoomInput ? (
+                                        <div className="flex items-center gap-1 bg-white border-2 border-indigo-400 rounded-full pl-3 pr-1 py-0.5 shadow-sm">
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                placeholder="e.g. Foyer, Pyjama Lounge..."
+                                                className="text-xs font-bold text-slate-800 outline-none bg-transparent w-40"
+                                                value={newCustomRoomInput}
+                                                onChange={e => setNewCustomRoomInput(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleAddCustomRoom();
+                                                    } else if (e.key === 'Escape') {
+                                                        setShowNewRoomInput(false);
+                                                        setNewCustomRoomInput('');
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddCustomRoom()}
+                                                className="px-2.5 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase hover:bg-indigo-700"
+                                            >
+                                                Add
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowNewRoomInput(false);
+                                                    setNewCustomRoomInput('');
+                                                }}
+                                                className="p-1 text-slate-400 hover:text-slate-600"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    ) : (
                                         <button
-                                            key={cat}
                                             type="button"
-                                            onClick={() => setSelectedCategory(cat)}
-                                            className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
-                                                selectedCategory === cat
-                                                    ? 'bg-primary-600 text-white shadow-sm shadow-primary-900/10'
-                                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                                            }`}
+                                            onClick={() => setShowNewRoomInput(true)}
+                                            className="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap bg-indigo-600/10 text-indigo-700 border border-dashed border-indigo-300 hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
                                         >
-                                            {cat}
+                                            <Plus size={12} /> Custom Room Label
                                         </button>
-                                    ))}
+                                    )}
                                 </div>
 
+                                {!orderedCategories.includes(selectedCategory) && (
+                                    <div className="flex items-center justify-between bg-indigo-50/80 border border-indigo-100 rounded-xl px-3.5 py-2 text-xs text-indigo-900">
+                                        <span className="font-semibold">
+                                            ✨ Adding items directly to custom room: <strong className="font-black">{selectedCategory}</strong> (use search box above to filter catalog, or add a Custom Product)
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCustomProductForm(prev => ({ ...prev, room: selectedCategory }));
+                                                setShowCustomProductModal(true);
+                                            }}
+                                            className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 shrink-0 ml-2"
+                                        >
+                                            + Custom Item in {selectedCategory}
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
-                                                                {INVENTORY_ITEMS.filter(item => item.category === selectedCategory && (searchQuery.length < 2 || item.name.toLowerCase().includes(searchQuery.toLowerCase()))).map(item => (
+                                    {INVENTORY_ITEMS.filter(item => {
+                                        const matchesSearch = searchQuery.length < 2 || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+                                        if (!orderedCategories.includes(selectedCategory)) {
+                                            return matchesSearch;
+                                        }
+                                        return item.category === selectedCategory && matchesSearch;
+                                    }).map(item => (
                                         <button
                                             key={item.id}
                                             type="button"
-                                            onClick={() => handleAddItem(item)}
+                                            onClick={() => {
+                                                if (!orderedCategories.includes(selectedCategory)) {
+                                                    handleAddItem(item, null, selectedCategory);
+                                                } else {
+                                                    handleAddItem(item);
+                                                }
+                                            }}
                                             className="flex items-center justify-between p-2.5 bg-white border border-slate-100 hover:border-primary-500 rounded-xl text-left transition-all hover:shadow-sm"
                                         >
                                             <div className="flex items-center gap-2 overflow-hidden">
@@ -1753,28 +2131,124 @@ export default function QuoteDetailPage() {
                                                 grouped[roomCategory].push({ itemId: itemIdKey, id: parsed.itemId, variation: parsed.variation, room: roomCategory, item, qty })
                                             })
 
-                                            if (Object.keys(grouped).length === 0) {
+                                            const groupedCustomByRoom = {}
+                                            activeCustomProductsList.forEach(prod => {
+                                                if (prod.room && prod.room !== 'Custom Products & Manual Items') {
+                                                    if (!groupedCustomByRoom[prod.room]) groupedCustomByRoom[prod.room] = []
+                                                    groupedCustomByRoom[prod.room].push(prod)
+                                                }
+                                            })
+
+                                            const activeRoomKeys = []
+                                            allRoomCategories.forEach(cat => {
+                                                if ((grouped[cat] && grouped[cat].length > 0) || (groupedCustomByRoom[cat] && groupedCustomByRoom[cat].length > 0) || (isEditing && (editForm.custom_rooms || []).includes(cat))) {
+                                                    if (!activeRoomKeys.includes(cat)) activeRoomKeys.push(cat)
+                                                }
+                                            })
+                                            Object.keys(grouped).forEach(cat => {
+                                                if (!activeRoomKeys.includes(cat)) activeRoomKeys.push(cat)
+                                            })
+                                            Object.keys(groupedCustomByRoom).forEach(cat => {
+                                                if (!activeRoomKeys.includes(cat)) activeRoomKeys.push(cat)
+                                            })
+
+                                            if (activeRoomKeys.length === 0 && activeCustomProductsList.length === 0) {
                                                 return <tr><td colSpan="5" className="text-center py-8 text-slate-400 font-medium">No inventory items in this quote.</td></tr>
                                             }
 
-                                            return Object.entries(grouped).map(([category, itemsList]) => {
-                                                const totalQtyInRoom = itemsList.reduce((acc, i) => acc + i.qty, 0)
-                                                const totalVolInRoom = itemsList.reduce((acc, i) => acc + (i.item?.volume || 0) * i.qty, 0)
+                                            return activeRoomKeys.map((category) => {
+                                                const itemsList = grouped[category] || []
+                                                const customProdsInRoom = groupedCustomByRoom[category] || []
+                                                const stdQty = itemsList.reduce((acc, i) => acc + i.qty, 0)
+                                                const stdVol = itemsList.reduce((acc, i) => acc + (i.item?.volume || 0) * i.qty, 0)
+                                                const custQty = customProdsInRoom.reduce((acc, p) => acc + Math.max(1, parseInt(p.quantity || p.qty) || 1), 0)
+                                                const custVol = customProdsInRoom.reduce((acc, p) => acc + (parseFloat(p.cubes || p.cuft || 0) * Math.max(1, parseInt(p.quantity || p.qty) || 1)), 0)
+                                                const totalQtyInRoom = stdQty + custQty
+                                                const totalVolInRoom = stdVol + custVol
 
                                                 return (
                                                     <React.Fragment key={`room-cat-${category}`}>
                                                         <tr className="bg-slate-100/90 border-y border-slate-200">
                                                             <td colSpan="5" className="px-6 py-2.5">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-                                                                        🏠 {category}
-                                                                    </span>
+                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {isEditing && editingRoomName?.oldName === category ? (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span>🏠</span>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    autoFocus
+                                                                                    className="text-xs font-black text-slate-900 bg-white border border-indigo-400 rounded-lg px-2.5 py-1 outline-none"
+                                                                                    value={editingRoomName?.newName || ''}
+                                                                                    onChange={e => setEditingRoomName(prev => ({ ...(prev || {}), newName: e.target.value }))}
+                                                                                    onKeyDown={e => {
+                                                                                        if (e.key === 'Enter') {
+                                                                                            e.preventDefault();
+                                                                                            handleRenameRoom(category, editingRoomName?.newName);
+                                                                                        } else if (e.key === 'Escape') {
+                                                                                            setEditingRoomName({ oldName: null, newName: '' });
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleRenameRoom(category, editingRoomName?.newName)}
+                                                                                    className="px-2 py-1 bg-indigo-600 text-white rounded text-[10px] font-bold hover:bg-indigo-700"
+                                                                                >
+                                                                                    Save Name
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setEditingRoomName({ oldName: null, newName: '' })}
+                                                                                    className="px-2 py-1 bg-slate-200 text-slate-600 rounded text-[10px] font-bold hover:bg-slate-300"
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <>
+                                                                                <span className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                                                                                    🏠 {category}
+                                                                                </span>
+                                                                                {isEditing && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setEditingRoomName({ oldName: category, newName: category })}
+                                                                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-white/80 hover:bg-white border border-slate-200 px-2 py-0.5 rounded-md transition-colors"
+                                                                                        title="Rename this room section"
+                                                                                    >
+                                                                                        ✏️ Rename Room
+                                                                                    </button>
+                                                                                )}
+                                                                                {isEditing && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setCustomProductForm(prev => ({ ...prev, room: category }));
+                                                                                            setShowCustomProductModal(true);
+                                                                                        }}
+                                                                                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md transition-colors"
+                                                                                        title={`Add custom item directly to ${category}`}
+                                                                                    >
+                                                                                        + Add Custom Item
+                                                                                    </button>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </div>
                                                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                                                         {totalQtyInRoom} item{totalQtyInRoom === 1 ? '' : 's'} · {totalVolInRoom.toFixed(2)} ft³
                                                                     </span>
                                                                 </div>
                                                             </td>
                                                         </tr>
+                                                        {itemsList.length === 0 && customProdsInRoom.length === 0 && isEditing && (
+                                                            <tr>
+                                                                <td colSpan="5" className="px-6 py-3 text-xs text-slate-400 italic">
+                                                                    Empty custom room section — select &ldquo;{category}&rdquo; above to add catalog items, or click &ldquo;+ Add Custom Item&rdquo;.
+                                                                </td>
+                                                            </tr>
+                                                        )}
                                                         {itemsList.map(({ itemId, item, qty, variation }) => {
                                                             const wrapInfo = editForm.special_wrapping?.[itemId] || {}
                                                             return (
@@ -1912,6 +2386,149 @@ export default function QuoteDetailPage() {
                                                                 </tr>
                                                             )
                                                         })}
+
+                                                        {/* Room-Assigned Custom Products */}
+                                                        {customProdsInRoom.map(prod => {
+                                                            const prodQty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
+                                                            const prodVol = parseFloat(prod.cubes || prod.cuft || 0);
+                                                            const totalProdVol = prodVol * prodQty;
+                                                            const wrapEnabled = Boolean(prod.wrap);
+                                                            const sleeveQty = parseInt(prod.sleeves || 0);
+                                                            const wrapCost = wrapEnabled ? (totalProdVol * 5.90) : 0;
+                                                            const sleeveCost = sleeveQty * 55;
+
+                                                            return (
+                                                                <tr key={prod.id} className="hover:bg-indigo-50/30 bg-indigo-50/10">
+                                                                    <td className="px-6 py-4 flex items-center gap-3">
+                                                                        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
+                                                                            📦
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <p className="font-bold text-slate-900">{prod.name}</p>
+                                                                                <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase tracking-wider">Custom</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">
+                                                                                    {category} · Vol: {prodVol.toFixed(2)} ft³ {prodQty > 1 ? `ea (Total: ${totalProdVol.toFixed(2)} ft³)` : '(cuft)'}
+                                                                                </p>
+                                                                                {isEditing && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setRoomModalItem({ customProduct: prod, item: { name: prod.name }, targetRoom: category, isMovingCustom: true })}
+                                                                                        className="text-[10px] text-primary-600 hover:text-primary-800 font-bold hover:underline"
+                                                                                    >
+                                                                                        Move Room
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+
+                                                                    {/* WRAPPING COLUMN */}
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {sleeveQty > 0 ? (
+                                                                            <span className="text-slate-400 text-xs">—</span>
+                                                                        ) : isEditing ? (
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={wrapEnabled}
+                                                                                        onChange={(e) => handleToggleCustomProductWrap(prod.id, e.target.checked)}
+                                                                                        className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
+                                                                                    />
+                                                                                    Add Wrapping
+                                                                                </label>
+                                                                                {wrapEnabled && (
+                                                                                    <span className="text-[10px] text-emerald-600 font-bold">
+                                                                                        {totalProdVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : (
+                                                                            wrapEnabled ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                                                                    Wrapped (+R {wrapCost.toFixed(2)})
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-slate-400 text-xs">—</span>
+                                                                            )
+                                                                        )}
+                                                                    </td>
+
+                                                                    {/* PLASTIC SLEEVES COLUMN */}
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {isEditing ? (
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty - 1)}
+                                                                                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
+                                                                                    >
+                                                                                        −
+                                                                                    </button>
+                                                                                    <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty + 1)}
+                                                                                        className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
+                                                                                    >
+                                                                                        +
+                                                                                    </button>
+                                                                                </div>
+                                                                                {sleeveQty > 0 && (
+                                                                                    <span className="text-[10px] text-amber-600 font-bold">
+                                                                                        {sleeveQty} × R55 = R {sleeveCost.toFixed(2)}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : (
+                                                                            sleeveQty > 0 ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                                                    {sleeveQty} sleeves (+R {sleeveCost.toFixed(2)})
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-slate-400 text-xs">—</span>
+                                                                            )
+                                                                        )}
+                                                                    </td>
+
+                                                                    {/* QUANTITY COLUMN */}
+                                                                    <td className="px-6 py-4 text-center font-bold text-slate-900">
+                                                                        {isEditing ? (
+                                                                            <div className="flex items-center justify-center gap-1">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleUpdateCustomProductQty(prod.id, prodQty - 1)}
+                                                                                    className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
+                                                                                >
+                                                                                    −
+                                                                                </button>
+                                                                                <span className="w-8 text-center font-bold text-sm">{prodQty}</span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleUpdateCustomProductQty(prod.id, prodQty + 1)}
+                                                                                    className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
+                                                                                >
+                                                                                    +
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span>{prodQty}</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        {isEditing && (
+                                                                            <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                     </React.Fragment>
                                                 )
                                             })
@@ -1919,150 +2536,166 @@ export default function QuoteDetailPage() {
                                             return <tr><td colSpan="5" className="text-red-500 font-bold p-4">Error rendering inventory: {err.message}</td></tr>
                                         }
                                     })()}
-                                    {/* Custom Products & Manual Items Section */}
-                                    {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).length > 0 && (
-                                        <React.Fragment key="custom-products-section">
-                                            <tr className="bg-indigo-100/90 border-y border-indigo-200">
-                                                <td colSpan="5" className="px-6 py-2.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="font-black text-indigo-900 text-xs uppercase tracking-wider flex items-center gap-2">
-                                                            📦 Custom Products & Manual Items
-                                                        </span>
-                                                        <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">
-                                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).length} item(s) · {customProductsVolume.toFixed(2)} ft³ (Cubes)
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {((isEditing ? editForm.custom_products : (quote?.custom_products || quote?.items_json?.custom_products)) || []).map(prod => {
-                                                 const prodQty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
-                                                 const prodVol = parseFloat(prod.cubes || prod.cuft || 0);
-                                                 const totalProdVol = prodVol * prodQty;
-                                                 const wrapEnabled = Boolean(prod.wrap);
-                                                 const sleeveQty = parseInt(prod.sleeves || 0);
-                                                 const wrapCost = wrapEnabled ? (totalProdVol * 5.90) : 0;
-                                                 const sleeveCost = sleeveQty * 55;
+                                    {/* Unassigned Custom Products & Manual Items Section */}
+                                    {(() => {
+                                        const unassignedCustomProducts = activeCustomProductsList.filter(p => !p.room || p.room === 'Custom Products & Manual Items');
+                                        const unassignedCustomVol = unassignedCustomProducts.reduce((sum, p) => sum + ((parseFloat(p.cubes || p.cuft) || 0) * Math.max(1, parseInt(p.quantity || p.qty) || 1)), 0);
+                                        if (unassignedCustomProducts.length === 0) return null;
+                                        return (
+                                            <React.Fragment key="custom-products-section">
+                                                <tr className="bg-indigo-100/90 border-y border-indigo-200">
+                                                    <td colSpan="5" className="px-6 py-2.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-black text-indigo-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                                                                📦 Custom Products & Manual Items
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">
+                                                                {unassignedCustomProducts.length} item(s) · {unassignedCustomVol.toFixed(2)} ft³ (Cubes)
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {unassignedCustomProducts.map(prod => {
+                                                     const prodQty = Math.max(1, parseInt(prod.quantity || prod.qty) || 1);
+                                                     const prodVol = parseFloat(prod.cubes || prod.cuft || 0);
+                                                     const totalProdVol = prodVol * prodQty;
+                                                     const wrapEnabled = Boolean(prod.wrap);
+                                                     const sleeveQty = parseInt(prod.sleeves || 0);
+                                                     const wrapCost = wrapEnabled ? (totalProdVol * 5.90) : 0;
+                                                     const sleeveCost = sleeveQty * 55;
 
-                                                 return (
-                                                     <tr key={prod.id} className="hover:bg-indigo-50/40">
-                                                         <td className="px-6 py-4 flex items-center gap-3">
-                                                             <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
-                                                                 📦
-                                                             </div>
-                                                             <div>
-                                                                 <p className="font-bold text-slate-900">{prod.name}</p>
-                                                                 <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">
-                                                                     Custom Product · Vol: {prodVol.toFixed(2)} ft³ {prodQty > 1 ? `ea (Total: ${totalProdVol.toFixed(2)} ft³)` : '(cuft)'}
-                                                                 </p>
-                                                             </div>
-                                                         </td>
-
-                                                         {/* WRAPPING COLUMN — total vol × R5.90 */}
-                                                         <td className="px-6 py-4 text-center">
-                                                             {sleeveQty > 0 ? (
-                                                                 <span className="text-slate-400 text-xs">—</span>
-                                                             ) : isEditing ? (
-                                                                 <div className="flex flex-col items-center gap-1">
-                                                                     <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
-                                                                         <input
-                                                                             type="checkbox"
-                                                                             checked={wrapEnabled}
-                                                                             onChange={(e) => handleToggleCustomProductWrap(prod.id, e.target.checked)}
-                                                                             className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
-                                                                         />
-                                                                         Add Wrapping
-                                                                     </label>
-                                                                     {wrapEnabled && (
-                                                                         <span className="text-[10px] text-emerald-600 font-bold">
-                                                                             {totalProdVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
-                                                                         </span>
-                                                                     )}
+                                                     return (
+                                                         <tr key={prod.id} className="hover:bg-indigo-50/40">
+                                                             <td className="px-6 py-4 flex items-center gap-3">
+                                                                 <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 flex-shrink-0">
+                                                                     📦
                                                                  </div>
-                                                             ) : (
-                                                                 wrapEnabled ? (
-                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                                                                         Wrapped (+R {wrapCost.toFixed(2)})
-                                                                     </span>
-                                                                 ) : (
-                                                                     <span className="text-slate-400 text-xs">—</span>
-                                                                 )
-                                                             )}
-                                                         </td>
+                                                                 <div>
+                                                                     <p className="font-bold text-slate-900">{prod.name}</p>
+                                                                     <div className="flex items-center gap-2">
+                                                                         <p className="text-[10px] text-slate-500 uppercase tracking-tight font-semibold">
+                                                                             Custom Product · Vol: {prodVol.toFixed(2)} ft³ {prodQty > 1 ? `ea (Total: ${totalProdVol.toFixed(2)} ft³)` : '(cuft)'}
+                                                                         </p>
+                                                                         {isEditing && (
+                                                                             <button
+                                                                                 type="button"
+                                                                                 onClick={() => setRoomModalItem({ customProduct: prod, item: { name: prod.name }, targetRoom: 'Custom Products & Manual Items', isMovingCustom: true })}
+                                                                                 className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                                                                             >
+                                                                                 Assign to Room
+                                                                             </button>
+                                                                         )}
+                                                                     </div>
+                                                                 </div>
+                                                             </td>
 
-                                                         {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
-                                                         <td className="px-6 py-4 text-center">
-                                                             {isEditing ? (
-                                                                 <div className="flex flex-col items-center gap-1">
-                                                                     <div className="flex items-center gap-1">
+                                                             {/* WRAPPING COLUMN — total vol × R5.90 */}
+                                                             <td className="px-6 py-4 text-center">
+                                                                 {sleeveQty > 0 ? (
+                                                                     <span className="text-slate-400 text-xs">—</span>
+                                                                 ) : isEditing ? (
+                                                                     <div className="flex flex-col items-center gap-1">
+                                                                         <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
+                                                                             <input
+                                                                                 type="checkbox"
+                                                                                 checked={wrapEnabled}
+                                                                                 onChange={(e) => handleToggleCustomProductWrap(prod.id, e.target.checked)}
+                                                                                 className="w-3.5 h-3.5 text-primary-600 rounded border-slate-300"
+                                                                             />
+                                                                             Add Wrapping
+                                                                         </label>
+                                                                         {wrapEnabled && (
+                                                                             <span className="text-[10px] text-emerald-600 font-bold">
+                                                                                 {totalProdVol.toFixed(2)} ft³ × R5.90 = R {wrapCost.toFixed(2)}
+                                                                             </span>
+                                                                         )}
+                                                                     </div>
+                                                                 ) : (
+                                                                     wrapEnabled ? (
+                                                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                                                             Wrapped (+R {wrapCost.toFixed(2)})
+                                                                         </span>
+                                                                     ) : (
+                                                                         <span className="text-slate-400 text-xs">—</span>
+                                                                     )
+                                                                 )}
+                                                             </td>
+
+                                                             {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
+                                                             <td className="px-6 py-4 text-center">
+                                                                 {isEditing ? (
+                                                                     <div className="flex flex-col items-center gap-1">
+                                                                         <div className="flex items-center gap-1">
+                                                                             <button
+                                                                                 type="button"
+                                                                                 onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty - 1)}
+                                                                                 className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
+                                                                             >
+                                                                                 −
+                                                                             </button>
+                                                                             <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                             <button
+                                                                                 type="button"
+                                                                                 onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty + 1)}
+                                                                                 className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
+                                                                             >
+                                                                                 +
+                                                                             </button>
+                                                                         </div>
+                                                                         {sleeveQty > 0 && (
+                                                                             <span className="text-[10px] text-amber-600 font-bold">
+                                                                                 {sleeveQty} × R55 = R {sleeveCost.toFixed(2)}
+                                                                             </span>
+                                                                         )}
+                                                                     </div>
+                                                                 ) : (
+                                                                     sleeveQty > 0 ? (
+                                                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                                             {sleeveQty} sleeves (+R {sleeveCost.toFixed(2)})
+                                                                         </span>
+                                                                     ) : (
+                                                                         <span className="text-slate-400 text-xs">—</span>
+                                                                     )
+                                                                 )}
+                                                             </td>
+
+                                                             {/* QUANTITY COLUMN */}
+                                                             <td className="px-6 py-4 text-center font-bold text-slate-900">
+                                                                 {isEditing ? (
+                                                                     <div className="flex items-center justify-center gap-1">
                                                                          <button
                                                                              type="button"
-                                                                             onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty - 1)}
+                                                                             onClick={() => handleUpdateCustomProductQty(prod.id, prodQty - 1)}
                                                                              className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
                                                                          >
                                                                              −
                                                                          </button>
-                                                                         <span className="w-8 text-center font-bold text-sm">{sleeveQty}</span>
+                                                                         <span className="w-8 text-center font-bold text-sm">{prodQty}</span>
                                                                          <button
                                                                              type="button"
-                                                                             onClick={() => handleUpdateCustomProductSleeves(prod.id, sleeveQty + 1)}
+                                                                             onClick={() => handleUpdateCustomProductQty(prod.id, prodQty + 1)}
                                                                              className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
                                                                          >
                                                                              +
                                                                          </button>
                                                                      </div>
-                                                                     {sleeveQty > 0 && (
-                                                                         <span className="text-[10px] text-amber-600 font-bold">
-                                                                             {sleeveQty} × R55 = R {sleeveCost.toFixed(2)}
-                                                                         </span>
-                                                                     )}
-                                                                 </div>
-                                                             ) : (
-                                                                 sleeveQty > 0 ? (
-                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                                                         {sleeveQty} sleeves (+R {sleeveCost.toFixed(2)})
-                                                                     </span>
                                                                  ) : (
-                                                                     <span className="text-slate-400 text-xs">—</span>
-                                                                 )
-                                                             )}
-                                                         </td>
-
-                                                         {/* QUANTITY COLUMN */}
-                                                         <td className="px-6 py-4 text-center font-bold text-slate-900">
-                                                             {isEditing ? (
-                                                                 <div className="flex items-center justify-center gap-1">
-                                                                     <button
-                                                                         type="button"
-                                                                         onClick={() => handleUpdateCustomProductQty(prod.id, prodQty - 1)}
-                                                                         className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm"
-                                                                     >
-                                                                         −
+                                                                     <span>{prodQty}</span>
+                                                                 )}
+                                                             </td>
+                                                             <td className="px-6 py-4 text-right">
+                                                                 {isEditing && (
+                                                                     <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
+                                                                         <Trash2 size={16} />
                                                                      </button>
-                                                                     <span className="w-8 text-center font-bold text-sm">{prodQty}</span>
-                                                                     <button
-                                                                         type="button"
-                                                                         onClick={() => handleUpdateCustomProductQty(prod.id, prodQty + 1)}
-                                                                         className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm"
-                                                                     >
-                                                                         +
-                                                                     </button>
-                                                                 </div>
-                                                             ) : (
-                                                                 <span>{prodQty}</span>
-                                                             )}
-                                                         </td>
-                                                         <td className="px-6 py-4 text-right">
-                                                             {isEditing && (
-                                                                 <button onClick={() => handleRemoveCustomProduct(prod.id)} className="text-red-400 hover:text-red-600 p-1">
-                                                                     <Trash2 size={16} />
-                                                                 </button>
-                                                             )}
-                                                         </td>
-                                                     </tr>
-                                                 );
-                                             })}
-                                        </React.Fragment>
-                                    )}
+                                                                 )}
+                                                             </td>
+                                                         </tr>
+                                                     );
+                                                 })}
+                                            </React.Fragment>
+                                        );
+                                    })()}
                                 </tbody>
                             </table>
                         </div>
@@ -2072,7 +2705,7 @@ export default function QuoteDetailPage() {
 
                     {/* SECTION 2: ADDRESSES & TRIP */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold">2</div>
                                 <h3 className="font-bold text-slate-900 flex items-center gap-2">
@@ -2096,11 +2729,72 @@ export default function QuoteDetailPage() {
                                 </button>
                             )}
                         </div>
+
+                        {/* Branch Origin Details based on Pickup ("From") */}
+                        {(() => {
+                            const activeBranch = getBranchDetails(isEditing ? editForm : quote);
+                            return (
+                                <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-red-600 text-white">
+                                            {activeBranch.code} Branch
+                                        </span>
+                                        <span className="font-bold text-slate-800">{activeBranch.name}</span>
+                                    </div>
+                                    <div className="text-slate-500 text-[11px]">
+                                        <span className="font-medium">{activeBranch.fullAddress}</span>
+                                        <span className="mx-2">·</span>
+                                        <span>Tel: <strong>{activeBranch.telDisplay}</strong></span>
+                                        <span className="mx-2">·</span>
+                                        <span>VAT: {activeBranch.vatRegNo}</span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Pickup Group */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Primary Pickup Address</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Primary Pickup Address</label>
+                                        {isEditing ? (
+                                            <div className="inline-flex rounded-md bg-slate-100 p-0.5 border border-slate-200">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditForm(prev => ({
+                                                        ...prev,
+                                                        access_details: { ...(prev.access_details || {}), origin: { ...(prev.access_details?.origin || {}), type: 'house' } }
+                                                    }))}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${
+                                                        (editForm.access_details?.origin?.type || 'house') !== 'office'
+                                                            ? 'bg-white text-slate-900 shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    🏠 House
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditForm(prev => ({
+                                                        ...prev,
+                                                        is_company_move: true,
+                                                        access_details: { ...(prev.access_details || {}), origin: { ...(prev.access_details?.origin || {}), type: 'office' } }
+                                                    }))}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${
+                                                        (editForm.access_details?.origin?.type || 'house') === 'office'
+                                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    🏢 Office
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                {(quote?.access_details?.origin?.type || 'house').toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
                                     {isEditing ? (
                                         <AddressAutocomplete 
                                             placeholder="Start typing pickup address..."
@@ -2188,28 +2882,105 @@ export default function QuoteDetailPage() {
                                     ))}
                                 </div>
 
-                                <div className="pt-4 border-t border-gray-50 flex items-center gap-2">
-                                    <Calendar size={14} className="text-slate-400" />
-                                    {isEditing ? (
+                                <div className="pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="flex items-start gap-2">
+                                        <Calendar size={15} className="text-slate-400 mt-1 shrink-0" />
                                         <div className="flex-1">
-                                            <label className="text-[9px] uppercase font-bold text-slate-400">Move Date</label>
-                                            <input 
-                                                type="date"
-                                                className="w-full text-sm font-medium border-b border-gray-100 outline-none pb-1"
-                                                value={editForm.move_date || ''}
-                                                onChange={e => setEditForm({...editForm, move_date: e.target.value})}
-                                            />
+                                            <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Move Date</label>
+                                            {isEditing ? (
+                                                <input 
+                                                    type="date"
+                                                    className="w-full text-sm font-bold text-slate-800 border-b border-gray-200 outline-none pb-1 bg-transparent focus:border-indigo-500"
+                                                    value={editForm.move_date || ''}
+                                                    onChange={e => setEditForm({...editForm, move_date: e.target.value})}
+                                                />
+                                            ) : (
+                                                <p className="text-sm font-bold text-slate-800">{editForm.move_date ? new Date(editForm.move_date).toLocaleDateString() : 'Not Set'}</p>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <p className="text-sm font-bold text-slate-800">{new Date(quote?.move_date || Date.now()).toLocaleDateString()}</p>
-                                    )}
+                                    </div>
+
+                                    <div className="flex items-start gap-2">
+                                        <Package size={15} className="text-indigo-500 mt-1 shrink-0" />
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <label className="text-[9px] uppercase font-bold text-indigo-600">Pack / Wrap Date</label>
+                                                {isEditing && editForm.packing_date && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditForm({...editForm, packing_date: ''})}
+                                                        className="text-[9px] text-slate-400 hover:text-red-500 font-bold"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {isEditing ? (
+                                                <input 
+                                                    type="date"
+                                                    title="Schedule packing/wrapping ahead of moving date"
+                                                    className="w-full text-sm font-bold text-indigo-900 border-b border-indigo-200 outline-none pb-1 bg-transparent focus:border-indigo-500"
+                                                    value={editForm.packing_date || ''}
+                                                    onChange={e => setEditForm({...editForm, packing_date: e.target.value})}
+                                                />
+                                            ) : (
+                                                editForm.packing_date ? (
+                                                    <p className="text-sm font-bold text-indigo-900 flex items-center gap-1.5">
+                                                        <span>{new Date(editForm.packing_date).toLocaleDateString()}</span>
+                                                        <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-black uppercase">Pack Ahead</span>
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-slate-400 italic">Same day / Not scheduled</p>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Dropoff Group */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Primary Dropoff Address</label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Primary Dropoff Address</label>
+                                        {isEditing ? (
+                                            <div className="inline-flex rounded-md bg-slate-100 p-0.5 border border-slate-200">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditForm(prev => ({
+                                                        ...prev,
+                                                        access_details: { ...(prev.access_details || {}), destination: { ...(prev.access_details?.destination || {}), type: 'house' } }
+                                                    }))}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${
+                                                        (editForm.access_details?.destination?.type || 'house') !== 'office'
+                                                            ? 'bg-white text-slate-900 shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    🏠 House
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditForm(prev => ({
+                                                        ...prev,
+                                                        is_company_move: true,
+                                                        access_details: { ...(prev.access_details || {}), destination: { ...(prev.access_details?.destination || {}), type: 'office' } }
+                                                    }))}
+                                                    className={`px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all ${
+                                                        (editForm.access_details?.destination?.type || 'house') === 'office'
+                                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    🏢 Office
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                                {(quote?.access_details?.destination?.type || 'house').toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
                                     {isEditing ? (
                                         <AddressAutocomplete 
                                             placeholder="Start typing dropoff address..."
@@ -2362,14 +3133,48 @@ export default function QuoteDetailPage() {
                                     const idx = parseInt(loc.replace('extra_drop_', '')) || 0;
                                     locLabel = `Dropoff #${idx + 2} Access`;
                                 }
+                                const currentPropType = (editForm.access_details?.[loc]?.type || 'house').toLowerCase();
                                 return (
                                 <div key={loc} className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                                        {locLabel}
-                                        <div className={`w-2 h-2 rounded-full ${loc === 'origin' ? 'bg-red-500' : 'bg-slate-900'}`} />
-                                    </h4>
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                            {locLabel}
+                                            <div className={`w-2 h-2 rounded-full ${loc === 'origin' ? 'bg-red-500' : 'bg-slate-900'}`} />
+                                        </h4>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                            currentPropType === 'office'
+                                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                                : 'bg-slate-200/80 text-slate-700'
+                                        }`}>
+                                            {currentPropType === 'office' ? '🏢 OFFICE' : `🏠 ${currentPropType.toUpperCase()}`}
+                                        </span>
+                                    </div>
                                     
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400">Property Type</label>
+                                            <select
+                                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                                value={currentPropType}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    const details = { ...editForm.access_details };
+                                                    details[loc] = { ...(details[loc] || {}), type: val };
+                                                    setEditForm({
+                                                        ...editForm,
+                                                        access_details: details,
+                                                        is_company_move: val === 'office' ? true : editForm.is_company_move
+                                                    });
+                                                }}
+                                                disabled={!isEditing}
+                                            >
+                                                <option value="house">House</option>
+                                                <option value="office">Office</option>
+                                                <option value="apartment">Apartment / Flat</option>
+                                                <option value="townhouse">Townhouse</option>
+                                                <option value="storage">Storage Unit</option>
+                                            </select>
+                                        </div>
                                         <div>
                                             <label className="text-[9px] uppercase font-bold text-slate-400">Floor Level</label>
                                             <select 
@@ -2378,9 +3183,11 @@ export default function QuoteDetailPage() {
                                                 onChange={e => {
                                                     const val = e.target.value;
                                                     const parsedVal = val === 'double_volume' || val === 'multiple_stairs' ? val : parseInt(val) || 0;
-                                                    const details = { ...editForm.access_details }
-                                                    details[loc] = { ...details[loc], floorLevel: parsedVal }
-                                                    setEditForm({...editForm, access_details: details})
+                                                    const details = { ...editForm.access_details };
+                                                    const curLoc = details[loc] || {};
+                                                    const newStairs = (parsedVal !== 0 && !curLoc.elevator && !curLoc.stairs) ? true : (curLoc.stairs || false);
+                                                    details[loc] = { ...curLoc, floorLevel: parsedVal, stairs: newStairs };
+                                                    setEditForm({...editForm, access_details: details});
                                                 }}
                                                 disabled={!isEditing}
                                             >
@@ -2414,36 +3221,100 @@ export default function QuoteDetailPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4 pt-2">
-                                        <label className="flex items-center gap-2 cursor-pointer group">
-                                            <input 
-                                                type="checkbox"
-                                                className="w-4 h-4 text-indigo-600 rounded"
-                                                checked={editForm.access_details?.[loc]?.elevator || false}
-                                                onChange={e => {
-                                                    const details = { ...editForm.access_details }
-                                                    details[loc] = { ...details[loc], elevator: e.target.checked }
-                                                    setEditForm({...editForm, access_details: details})
-                                                }}
-                                                disabled={!isEditing}
-                                            />
-                                            <span className="text-[10px] font-bold uppercase text-slate-600 group-hover:text-slate-900 transition-colors">Lift Available</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer group">
-                                            <input 
-                                                type="checkbox"
-                                                className="w-4 h-4 text-indigo-600 rounded"
-                                                checked={editForm.access_details?.[loc]?.specialConditions?.longCarry || false}
-                                                onChange={e => {
-                                                    const details = { ...editForm.access_details }
-                                                    const currentCond = details[loc].specialConditions || {}
-                                                    details[loc] = { ...details[loc], specialConditions: { ...currentCond, longCarry: e.target.checked } }
-                                                    setEditForm({...editForm, access_details: details})
-                                                }}
-                                                disabled={!isEditing}
-                                            />
-                                            <span className="text-[10px] font-bold uppercase text-slate-600 group-hover:text-slate-900 transition-colors">Long Carry (+20m)</span>
-                                        </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Stairs at Property?</label>
+                                            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    disabled={!isEditing}
+                                                    onClick={() => {
+                                                        const details = { ...editForm.access_details };
+                                                        details[loc] = { ...(details[loc] || {}), stairs: false };
+                                                        setEditForm({ ...editForm, access_details: details });
+                                                    }}
+                                                    className={clsx(
+                                                        "py-1.5 px-2 rounded text-xs font-bold transition-all text-center",
+                                                        !editForm.access_details?.[loc]?.stairs ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900",
+                                                        !isEditing && "opacity-60 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    Stairs: No
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={!isEditing}
+                                                    onClick={() => {
+                                                        const details = { ...editForm.access_details };
+                                                        details[loc] = { ...(details[loc] || {}), stairs: true };
+                                                        setEditForm({ ...editForm, access_details: details });
+                                                    }}
+                                                    className={clsx(
+                                                        "py-1.5 px-2 rounded text-xs font-bold transition-all text-center",
+                                                        editForm.access_details?.[loc]?.stairs ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900",
+                                                        !isEditing && "opacity-60 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    Stairs: Yes
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Elevator / Lift?</label>
+                                            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    disabled={!isEditing}
+                                                    onClick={() => {
+                                                        const details = { ...editForm.access_details };
+                                                        details[loc] = { ...(details[loc] || {}), elevator: false };
+                                                        setEditForm({ ...editForm, access_details: details });
+                                                    }}
+                                                    className={clsx(
+                                                        "py-1.5 px-2 rounded text-xs font-bold transition-all text-center",
+                                                        !editForm.access_details?.[loc]?.elevator ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900",
+                                                        !isEditing && "opacity-60 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    Lift: No
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={!isEditing}
+                                                    onClick={() => {
+                                                        const details = { ...editForm.access_details };
+                                                        details[loc] = { ...(details[loc] || {}), elevator: true };
+                                                        setEditForm({ ...editForm, access_details: details });
+                                                    }}
+                                                    className={clsx(
+                                                        "py-1.5 px-2 rounded text-xs font-bold transition-all text-center",
+                                                        editForm.access_details?.[loc]?.elevator ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900",
+                                                        !isEditing && "opacity-60 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    Lift: Yes
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center pt-4">
+                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                <input 
+                                                    type="checkbox"
+                                                    className="w-4 h-4 text-indigo-600 rounded"
+                                                    checked={editForm.access_details?.[loc]?.specialConditions?.longCarry || false}
+                                                    onChange={e => {
+                                                        const details = { ...editForm.access_details }
+                                                        const currentCond = details[loc]?.specialConditions || {}
+                                                        details[loc] = { ...details[loc], specialConditions: { ...currentCond, longCarry: e.target.checked } }
+                                                        setEditForm({...editForm, access_details: details})
+                                                    }}
+                                                    disabled={!isEditing}
+                                                />
+                                                <span className="text-[10px] font-bold uppercase text-slate-600 group-hover:text-slate-900 transition-colors">Long Carry (+20m)</span>
+                                            </label>
+                                        </div>
                                     </div>
 
                                     {editForm.access_details?.[loc]?.specialConditions?.longCarry && (
@@ -3012,16 +3883,33 @@ export default function QuoteDetailPage() {
                             </div>
                             <div className="overflow-hidden">
                                 <h3 className="text-base font-bold text-slate-900 leading-tight">
-                                    {roomModalItem.isMoving ? 'Move to Which Room?' : 'Add to Which Room?'}
+                                    {(roomModalItem.isMoving || roomModalItem.isMovingCustom) ? 'Move to Which Room?' : 'Add to Which Room?'}
                                 </h3>
-                                <p className="text-xs font-semibold text-red-600 truncate">{roomModalItem.item?.name || 'Item'}</p>
+                                <p className="text-xs font-semibold text-red-600 truncate">{roomModalItem.item?.name || roomModalItem.customProduct?.name || 'Item'}</p>
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500 mb-4">Select the room destination for this item:</p>
+                        <p className="text-xs text-slate-500 mb-3">Select the room destination for this item, or create a new custom room below:</p>
 
-                        <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
-                            {orderedCategories.map(cat => {
+                        <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                            {roomModalItem.isMovingCustom && (
+                                <button
+                                    type="button"
+                                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between transition-all border-2 ${
+                                        (!roomModalItem.targetRoom || roomModalItem.targetRoom === 'Custom Products & Manual Items')
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                            : 'bg-indigo-50/50 border-indigo-100 text-indigo-800 hover:border-indigo-300'
+                                    }`}
+                                    onClick={() => handleChangeCustomProductRoom(roomModalItem.customProduct.id, '')}
+                                >
+                                    <span>📦 Custom Products &amp; Manual Items</span>
+                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-white/20">
+                                        {(!roomModalItem.targetRoom || roomModalItem.targetRoom === 'Custom Products & Manual Items') ? 'Current ✓' : 'Select →'}
+                                    </span>
+                                </button>
+                            )}
+                            {allRoomCategories.map(cat => {
                                 const isCurrent = (roomModalItem.targetRoom || selectedCategory) === cat;
+                                const isCustomCat = !orderedCategories.includes(cat);
                                 return (
                                     <button
                                         key={cat}
@@ -3032,14 +3920,19 @@ export default function QuoteDetailPage() {
                                                 : 'bg-white border-slate-100 text-slate-700 hover:border-red-200 hover:bg-red-50/50'
                                         }`}
                                         onClick={() => {
-                                            if (roomModalItem.isMoving && roomModalItem.currentKey) {
+                                            if (roomModalItem.isMovingCustom && roomModalItem.customProduct) {
+                                                handleChangeCustomProductRoom(roomModalItem.customProduct.id, cat);
+                                            } else if (roomModalItem.isMoving && roomModalItem.currentKey) {
                                                 handleChangeItemRoom(roomModalItem.currentKey, cat);
                                             } else {
                                                 handleAddItem(roomModalItem.item, roomModalItem.variation || null, cat);
                                             }
                                         }}
                                     >
-                                        <span>{cat}</span>
+                                        <span className="flex items-center gap-1.5">
+                                            {isCustomCat && <span>✨</span>}
+                                            {cat}
+                                        </span>
                                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isCurrent ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                             {isCurrent ? 'Selected ✓' : 'Select →'}
                                         </span>
@@ -3048,10 +3941,49 @@ export default function QuoteDetailPage() {
                             })}
                         </div>
 
+                        {/* Quick Create & Assign to New Custom Room */}
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                                Or Create &amp; Assign to New Custom Room
+                            </label>
+                            <div className="flex gap-1.5">
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Foyer, Pyjama Lounge..."
+                                    className="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 font-semibold"
+                                    value={modalNewRoomName}
+                                    onChange={e => setModalNewRoomName(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    disabled={!modalNewRoomName.trim()}
+                                    onClick={() => {
+                                        const createdRoom = handleAddCustomRoom(modalNewRoomName);
+                                        if (createdRoom) {
+                                            setModalNewRoomName('');
+                                            if (roomModalItem.isMovingCustom && roomModalItem.customProduct) {
+                                                handleChangeCustomProductRoom(roomModalItem.customProduct.id, createdRoom);
+                                            } else if (roomModalItem.isMoving && roomModalItem.currentKey) {
+                                                handleChangeItemRoom(roomModalItem.currentKey, createdRoom);
+                                            } else {
+                                                handleAddItem(roomModalItem.item, roomModalItem.variation || null, createdRoom);
+                                            }
+                                        }
+                                    }}
+                                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shrink-0"
+                                >
+                                    Create &amp; Move
+                                </button>
+                            </div>
+                        </div>
+
                         <button
                             type="button"
-                            className="w-full mt-4 text-slate-400 text-xs font-bold outline-none hover:text-slate-600 text-center py-2"
-                            onClick={() => setRoomModalItem(null)}
+                            className="w-full mt-3 text-slate-400 text-xs font-bold outline-none hover:text-slate-600 text-center py-2"
+                            onClick={() => {
+                                setModalNewRoomName('');
+                                setRoomModalItem(null);
+                            }}
                         >
                             Cancel
                         </button>
@@ -3062,7 +3994,7 @@ export default function QuoteDetailPage() {
             {/* Custom Product Modal for Admin */}
             {showCustomProductModal && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-indigo-100 animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-indigo-100 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
@@ -3072,7 +4004,7 @@ export default function QuoteDetailPage() {
                                     <h3 className="text-base font-bold text-slate-900 leading-tight">
                                         Add Custom Product / Volume
                                     </h3>
-                                    <p className="text-xs text-slate-400">Specify item details, volume & protection options</p>
+                                    <p className="text-xs text-slate-400">Assign to a specific room or general custom items</p>
                                 </div>
                             </div>
                             <button onClick={() => setShowCustomProductModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
@@ -3091,11 +4023,42 @@ export default function QuoteDetailPage() {
                                 <input
                                     type="text"
                                     required
-                                    placeholder="e.g. Custom Marble Dining Table Top, Server Rack..."
+                                    placeholder="e.g. Custom 12-Seater Dining Table, Server Rack..."
                                     className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                                     value={customProductForm.name}
                                     onChange={e => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
                                 />
+                            </div>
+
+                            {/* Room / Section Placement Selector */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block mb-1">
+                                    Assign to Room / Section
+                                </label>
+                                <select
+                                    className="w-full text-sm border border-indigo-200 bg-indigo-50/40 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                                    value={customProductForm.room || ''}
+                                    onChange={e => setCustomProductForm(prev => ({ ...prev, room: e.target.value }))}
+                                >
+                                    <option value="">📦 Custom Products &amp; Manual Items (General)</option>
+                                    {allRoomCategories.map(cat => (
+                                        <option key={cat} value={cat}>🏠 {cat}</option>
+                                    ))}
+                                    <option value="__NEW_ROOM__">✨ + Create New Custom Room Heading...</option>
+                                </select>
+
+                                {customProductForm.room === '__NEW_ROOM__' && (
+                                    <div className="mt-2">
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Enter custom room name (e.g. Foyer, Pyjama Lounge, Boardroom)..."
+                                            className="w-full text-xs font-bold border-2 border-indigo-400 rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                            value={customProductForm.customRoomInput || ''}
+                                            onChange={e => setCustomProductForm(prev => ({ ...prev, customRoomInput: e.target.value }))}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">

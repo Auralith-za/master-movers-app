@@ -1,8 +1,9 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PACKAGING_RATES, PRICING_CONSTANTS } from '../features/inventory/data/pricingRates';
-import { getSimpleQuoteNumber } from '../utils/quoteHelpers';
-import { normalizeInventory } from '../utils/inventoryUtils';
+import { PACKAGING_RATES, PRICING_CONSTANTS } from '../features/inventory/data/pricingRates.js';
+import { getSimpleQuoteNumber } from '../utils/quoteHelpers.js';
+import { normalizeInventory } from '../utils/inventoryUtils.js';
+import { getBranchDetails } from '../utils/branchDetails.js';
 
 /**
  * Service to generate professional PDF quotes for MasterMovers
@@ -17,6 +18,7 @@ export const generateProfessionalQuote = (data) => {
             pickupAddress,
             dropoffAddress,
             moveDate,
+            packingDate: rawPackingDate,
             createdAt,
             created_at,
             breakdown = {},
@@ -33,8 +35,11 @@ export const generateProfessionalQuote = (data) => {
 
         const rawInventory = data.inventory || data.items_json?.items || (data.items_json && !data.items_json.items ? data.items_json : {}) || data.items || {};
         const inventory = normalizeInventory(rawInventory);
+        const packingDate = rawPackingDate || data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '';
+        const branch = getBranchDetails(data);
 
-        const doc = new jsPDF({ compress: true });
+        const jsPDFDoc = typeof jsPDF === 'function' ? jsPDF : (jsPDF.jsPDF || jsPDF);
+        const doc = new jsPDFDoc({ compress: true });
         const slate900 = [15, 23, 42]; // Premium Slate
         const slate500 = [100, 116, 139]; // Muted Slate
         const borderCol = [226, 232, 240]; // Light gray border
@@ -47,10 +52,10 @@ export const generateProfessionalQuote = (data) => {
             // Draw divider line under header
             doc.setDrawColor(...borderCol);
             doc.setLineWidth(0.5);
-            doc.line(20, 35, 190, 35);
+            doc.line(20, 42, 190, 42);
 
             // --- Client & Move Info ---
-            let currentY = 48;
+            let currentY = 50;
 
             doc.setTextColor(...slate900);
             doc.setFontSize(10);
@@ -68,9 +73,40 @@ export const generateProfessionalQuote = (data) => {
             doc.setTextColor(51, 65, 85); // Slate 700
 
             // Client Column
-            doc.text(`Name: ${clientName || 'N/A'}`, 20, currentY);
-            doc.text(`Phone: ${clientPhone || 'N/A'}`, 20, currentY + 6);
-            doc.text(`Email: ${clientEmail || 'N/A'}`, 20, currentY + 12);
+            let clientY = currentY;
+            doc.text(`Name: ${clientName || 'N/A'}`, 20, clientY);
+            clientY += 6;
+            doc.text(`Phone: ${clientPhone || 'N/A'}`, 20, clientY);
+            clientY += 6;
+            doc.text(`Email: ${clientEmail || 'N/A'}`, 20, clientY);
+            clientY += 6;
+
+            const compObj = (typeof data.companyDetails === 'object' && data.companyDetails !== null ? data.companyDetails : null) ||
+                data.company_details ||
+                data.items_json?.company_details ||
+                data.quote?.items_json?.company_details ||
+                data.moveDetails ||
+                {};
+            const compName = data.companyName || compObj.companyName || '';
+            const compVat = data.companyVat || compObj.companyVat || '';
+            const compNotes = (typeof data.companyDetails === 'string' ? data.companyDetails : '') || compObj.companyDetails || '';
+
+            if (compName) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Company: ${compName}`, 20, clientY, { maxWidth: 85 });
+                doc.setFont('helvetica', 'normal');
+                const cDim = doc.getTextDimensions(`Company: ${compName}`, { maxWidth: 85 });
+                clientY += Math.max(5.5, (cDim.h || 5) + 1.5);
+            }
+            if (compVat) {
+                doc.text(`VAT / Reg: ${compVat}`, 20, clientY, { maxWidth: 85 });
+                clientY += 5.5;
+            }
+            if (compNotes) {
+                doc.text(`Company Info: ${compNotes}`, 20, clientY, { maxWidth: 85 });
+                const cnDim = doc.getTextDimensions(`Company Info: ${compNotes}`, { maxWidth: 85 });
+                clientY += Math.max(5.5, (cnDim.h || 5) + 1.5);
+            }
 
             const extraColls = data.extraCollections || data.moveDetails?.extraCollections || data.items_json?.extraCollections || data.quote?.items_json?.extraCollections || [];
             const extraDrops = data.extraDrops || data.moveDetails?.extraDrops || data.items_json?.extraDrops || data.quote?.items_json?.extraDrops || [];
@@ -112,11 +148,25 @@ export const generateProfessionalQuote = (data) => {
                 displayVolume += customVolSum;
             }
 
-            // Move Column
-            doc.text(`Date: ${moveDate || 'N/A'}`, 110, currentY);
-            let moveY = currentY + 6;
+            const accDetails = data.accessDetails || data.moveDetails?.accessDetails || data.quote?.access_details || {};
+            const originTypeLabel = (accDetails.origin?.type || 'house').toUpperCase();
+            const destTypeLabel = (accDetails.destination?.type || 'house').toUpperCase();
 
-            const fromLines = [`From: ${pickupAddress || 'N/A'}`];
+            // Move Column
+            doc.text(`Move Date: ${moveDate || 'N/A'}`, 110, currentY);
+            let moveY = currentY + 5.5;
+            if (packingDate) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Pack/Wrap Date: ${packingDate}`, 110, moveY);
+                doc.setFont('helvetica', 'normal');
+                moveY += 5.5;
+            }
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Move Type: ${originTypeLabel} TO ${destTypeLabel}`, 110, moveY);
+            doc.setFont('helvetica', 'normal');
+            moveY += 5.5;
+
+            const fromLines = [`From (${originTypeLabel}): ${pickupAddress || 'N/A'}`];
             extraColls.forEach((c, idx) => {
                 if (c.address) fromLines.push(`Coll #${idx + 2}: ${c.address}`);
             });
@@ -125,7 +175,7 @@ export const generateProfessionalQuote = (data) => {
             const fromDim = doc.getTextDimensions(fromText, { maxWidth: 80 });
             moveY += (fromDim.h || 6) + 3;
 
-            const toLines = [`To: ${dropoffAddress || 'N/A'}`];
+            const toLines = [`To (${destTypeLabel}): ${dropoffAddress || 'N/A'}`];
             extraDrops.forEach((d, idx) => {
                 if (d.address) toLines.push(`Drop #${idx + 2}: ${d.address}`);
             });
@@ -139,7 +189,7 @@ export const generateProfessionalQuote = (data) => {
             doc.setFont('helvetica', 'normal');
             moveY += 6;
 
-            currentY = Math.max(currentY + 36, moveY + 2);
+            currentY = Math.max(clientY + 4, moveY + 2);
 
             // --- Site Access & Logistics Section ---
             doc.setTextColor(...slate900);
@@ -154,11 +204,13 @@ export const generateProfessionalQuote = (data) => {
             doc.setTextColor(51, 65, 85);
 
             const getAccessSummaryString = (acc) => {
-                if (!acc) return 'House (Ground Floor)';
+                if (!acc) return 'HOUSE (Ground Floor)';
                 const parts = [];
                 const type = (acc.type || 'house').toUpperCase();
                 parts.push(type);
-                if (acc.floorLevel > 0) parts.push(`Floor ${acc.floorLevel}`);
+                if (acc.floorLevel > 0 || acc.floorLevel === 'double_volume' || acc.floorLevel === 'multiple_stairs') {
+                    parts.push(`Floor: ${acc.floorLevel}`);
+                }
                 parts.push(`Elevator: ${acc.elevator ? 'Yes' : 'No'}`);
                 parts.push(`Stairs: ${acc.stairs ? 'Yes' : 'No'}`);
                 if (acc.longCarryMeters > 0) parts.push(`Long Carry: ${acc.longCarryMeters}m`);
@@ -171,7 +223,6 @@ export const generateProfessionalQuote = (data) => {
                 return parts.join(' • ');
             };
 
-            const accDetails = data.accessDetails || data.moveDetails?.accessDetails || data.quote?.access_details || {};
             const pickupAccessStr = getAccessSummaryString(accDetails.origin);
             const dropoffAccessStr = getAccessSummaryString(accDetails.destination);
 
@@ -282,7 +333,8 @@ export const generateProfessionalQuote = (data) => {
             })
 
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
-                groupedPdfItems['CUSTOM PRODUCTS & MANUAL ITEMS'] = customProductsList.map(p => {
+                const unassignedCustom = [];
+                customProductsList.forEach(p => {
                     const cVol = parseFloat(p.cubes || p.cuft || 0);
                     const qty = Math.max(1, parseInt(p.quantity || p.qty) || 1);
                     const totalVol = cVol * qty;
@@ -293,8 +345,18 @@ export const generateProfessionalQuote = (data) => {
                     } else if (p.sleeves > 0) {
                         protLabel = ` [${p.sleeves} Plastic Sleeve${p.sleeves > 1 ? 's' : ''}]`;
                     }
-                    return [`${p.name}${volLabel}${protLabel}`, qty];
+                    const rowEntry = [`${p.name}${volLabel}${protLabel}`, qty];
+                    if (p.room && p.room !== 'Custom Products & Manual Items') {
+                        const roomUpper = p.room.trim().toUpperCase();
+                        if (!groupedPdfItems[roomUpper]) groupedPdfItems[roomUpper] = [];
+                        groupedPdfItems[roomUpper].push(rowEntry);
+                    } else {
+                        unassignedCustom.push(rowEntry);
+                    }
                 });
+                if (unassignedCustom.length > 0) {
+                    groupedPdfItems['CUSTOM PRODUCTS & MANUAL ITEMS'] = unassignedCustom;
+                }
             }
 
             const tableRows = []
@@ -424,8 +486,7 @@ export const generateProfessionalQuote = (data) => {
                     costs.push(['Documentation Fee', `R ${Number(docFee).toFixed(2)}`]);
                 }
 
-                const storageFeeCalc = Number(bd.storageCost || data.storage_cost || data.storageCost || 0) ||
-                                       ((data.dropoffAddress?.toLowerCase().includes('storage') || data.storage_destination || bd.storageDestination) ? Math.max(PRICING_CONSTANTS.minStorageFee || 450, Math.round(displayVolume * 1.50 * 100)/100) : 0);
+                const storageFeeCalc = Number(bd.storageCost || data.storage_cost || data.storageCost || 0);
                 if (storageFeeCalc > 0) {
                     costs.push([`Master Movers Storage (Monthly Fee)`, `R ${Number(storageFeeCalc).toFixed(2)}`]);
                 }
@@ -545,7 +606,7 @@ export const generateProfessionalQuote = (data) => {
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(148, 163, 184); // Slate 400
                 doc.text('MasterMovers NextGen - Professional Moving & Logistics Solutions', 105, 283, { align: 'center' });
-                doc.text(`MasterMovers.co.za | +27 11 493 7569 | sales1@mastermoversjhb.co.za  ·  Page ${i} of ${totalPages}`, 105, 287, { align: 'center' });
+                doc.text(`MasterMovers.co.za | ${branch.telDisplay} | ${branch.email}  ·  Page ${i} of ${totalPages}`, 105, 287, { align: 'center' });
             }
 
             if (shouldSave) {
@@ -568,46 +629,53 @@ export const generateProfessionalQuote = (data) => {
             formattedCreatedDate = new Date().toISOString().split('T')[0];
         }
 
-        img.onload = () => {
-            // Draw Logo on top left in original aspect ratio
-            const ratio = img.width / img.height || 1;
-            const targetHeight = 12;
-            const targetWidth = targetHeight * ratio;
-            doc.addImage(img, 'PNG', 20, 12, targetWidth, targetHeight, undefined, 'FAST');
+        const drawHeader = (hasLogo, logoWidth = 0, logoHeight = 0) => {
+            if (hasLogo && logoWidth > 0) {
+                doc.addImage(img, 'PNG', 20, 10, logoWidth, logoHeight, undefined, 'FAST');
+            } else {
+                doc.setTextColor(227, 24, 55); // Crimson fallback
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.text('MASTER MOVERS', 20, 16);
+            }
 
-            // Draw header text on top right
+            // Left header meta
             doc.setTextColor(...slate900);
-            doc.setFontSize(14);
+            doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
-            doc.text('OFFICIAL QUOTE', 190, 16, { align: 'right' });
+            doc.text('OFFICIAL QUOTE', 20, 24);
             
-            doc.setFontSize(8.5);
+            doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...slate500);
-            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 22, { align: 'right' });
-            doc.text(`Date Created: ${formattedCreatedDate}`, 190, 27, { align: 'right' });
+            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 20, 28.5);
+            doc.text(`Date Created: ${formattedCreatedDate}`, 20, 32.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...slate900);
+            doc.text(`Branch: ${branch.name}`, 20, 36.5);
+
+            // Right header: Branch address block matching official branch screenshot
+            doc.setTextColor(...slate900);
+            doc.setFontSize(7.8);
+            doc.setFont('helvetica', 'normal');
+            let bY = 10;
+            branch.pdfAddressLines.forEach(line => {
+                doc.text(line, 125, bY);
+                bY += 4.5;
+            });
 
             renderPdfContent();
         };
 
+        img.onload = () => {
+            const ratio = img.width / img.height || 1;
+            const targetHeight = 11;
+            const targetWidth = targetHeight * ratio;
+            drawHeader(true, targetWidth, targetHeight);
+        };
+
         img.onerror = () => {
-            // Fallback text if logo fails to load
-            doc.setTextColor(227, 24, 55); // Crimson fallback
-            doc.setFontSize(18);
-            doc.setFont('helvetica', 'bold');
-            doc.text('MASTER MOVERS', 20, 20);
-
-            doc.setTextColor(...slate900);
-            doc.setFontSize(14);
-            doc.text('OFFICIAL QUOTE', 190, 16, { align: 'right' });
-            
-            doc.setFontSize(8.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...slate500);
-            doc.text(`Ref: ${getSimpleQuoteNumber(quoteId)}`, 190, 22, { align: 'right' });
-            doc.text(`Date Created: ${formattedCreatedDate}`, 190, 27, { align: 'right' });
-
-            renderPdfContent();
+            drawHeader(false);
         };
     });
 };

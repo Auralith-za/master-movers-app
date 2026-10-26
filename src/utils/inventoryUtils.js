@@ -47,11 +47,16 @@ export function normalizeInventory(itemsInput) {
         'rejection_reason', 'reject_reason',
         'referral_source', 'referralSource',
         'special_wrapping', 'total_volume', 'breakdown',
-        'items'
+        'items', 'custom_products', 'custom_rooms', 'customRooms',
+        'company_details', 'companyDetails', 'companyName', 'company_name',
+        'companyVat', 'company_vat', 'isCompanyMove', 'is_company_move',
+        'packaging_details', 'include_box_volume', 'disable_shuttle', 'shuttle_override',
+        'pickupLatLng', 'dropoffLatLng', 'pickupAddressComponents', 'dropoffAddressComponents'
     ]);
 
     for (const [key, val] of Object.entries(raw)) {
         if (metadataKeys.has(key)) continue;
+        if (typeof val === 'boolean' || typeof val === 'object') continue;
         const qty = Number(val);
         if (!isNaN(qty) && qty > 0) {
             cleanInventory[key] = qty;

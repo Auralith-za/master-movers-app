@@ -36,7 +36,12 @@ export const useMoveStore = create(
                 linenBoxes: 0,
                 insuranceEnabled: false,
                 paymentMethod: 'eft', // Default to EFT
-                tripBreakdown: null
+                tripBreakdown: null,
+                isCompanyMove: false,
+                companyName: '',
+                companyVat: '',
+                companyDetails: '',
+                customRooms: []
             },
             lastSavedQuote: null,
             setMoveDetails: (details) =>
@@ -182,8 +187,11 @@ export const useMoveStore = create(
                     .forEach(k => sessionStorage.removeItem(k))
                 sessionStorage.removeItem('abandoned_lead_sent')
                 set({ 
-                    moveDetails: { packagingOption: 'none', insuranceEnabled: false, referralSource: '' }, 
-                    accessDetails: {}, 
+                    moveDetails: { packagingOption: 'none', insuranceEnabled: false, referralSource: '', isCompanyMove: false, companyName: '', companyVat: '', companyDetails: '', customRooms: [] }, 
+                    accessDetails: {
+                        origin: { type: 'house', floorLevel: 0, elevator: false, stairs: false, shuttle: false, longCarry: false, longCarryDistance: 0, distanceFromDoor: '<10m', notes: '', specialConditions: {} },
+                        destination: { type: 'house', floorLevel: 0, elevator: false, stairs: false, shuttle: false, longCarry: false, longCarryDistance: 0, distanceFromDoor: '<10m', notes: '', specialConditions: {} }
+                    }, 
                     inventory: {}, 
                     manualServiceCharges: {},
                     undoHistory: [],
@@ -276,6 +284,13 @@ export const useMoveStore = create(
 
                 const rejectionReason = dbOverrides.rejection_reason || dbOverrides.reject_reason || overrides.rejection_reason || overrides.reject_reason || state.moveDetails?.rejectionReason || null
                 const referralSource = dbOverrides.referral_source || overrides.referral_source || overrides.referralSource || state.moveDetails?.referralSource || ''
+                const companyDetailsObj = overrides.company_details || dbOverrides.company_details || {
+                    isCompanyMove: Boolean(state.moveDetails?.isCompanyMove || state.moveDetails?.companyName || state.accessDetails?.origin?.type === 'office' || state.accessDetails?.destination?.type === 'office'),
+                    companyName: (state.moveDetails?.companyName || '').trim(),
+                    companyVat: (state.moveDetails?.companyVat || '').trim(),
+                    companyDetails: (state.moveDetails?.companyDetails || '').trim()
+                }
+                const customRoomsList = overrides.custom_rooms || dbOverrides.custom_rooms || state.moveDetails?.customRooms || state.moveDetails?.custom_rooms || []
 
                 const activeInventory = overrides.inventory || dbOverrides.inventory || overrides.items_json || dbOverrides.items_json || state.inventory || {}
                 const quotePayload = {
@@ -300,6 +315,8 @@ export const useMoveStore = create(
                             breakdown: totals.breakdown || null,
                             rejection_reason: rejectionReason,
                             referral_source: referralSource,
+                            company_details: companyDetailsObj,
+                            custom_rooms: customRoomsList,
                             custom_products: state.moveDetails?.customProducts || state.moveDetails?.custom_products || [],
                             ...activeInventory
                         },

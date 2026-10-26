@@ -234,7 +234,36 @@ export const isOutlyingOrOuterRegional = (addressStr, components = null, latLng 
             }
             return /,\s*george\b/i.test(str) || /\bgeorge,\s*(western cape|wc|garden route|65\d\d)\b/i.test(str) || /\bgeorge\s+65\d\d\b/i.test(str);
         }
-        return str.includes(term);
+
+        // If the term is followed by a street suffix (e.g. Tulbagh Street, Ceres Rd, Worcester Ave), it's a street name, not the town!
+        const streetSuffixRegex = new RegExp(`\\b${term}\\s+(st|street|rd|road|ave|avenue|dr|drive|cres|crescent|way|lane|blvd|boulevard|close|cl|ct|court|terrace|place|pl)\\b`, 'i');
+        if (streetSuffixRegex.test(str)) {
+            return false;
+        }
+
+        // Check word boundary so substrings don't accidentally match
+        const termWordRegex = new RegExp(`\\b${term}\\b`, 'i');
+        if (!termWordRegex.test(str)) {
+            return false;
+        }
+
+        // If the address explicitly mentions a core metro (e.g. Cape Town, Durban, Johannesburg, Pretoria, Sandton),
+        // and the term appears before a core suburb or metro name, it is a street name within that metro!
+        const hasCoreMetroInAddr = 
+            str.includes('cape town') || str.includes('capetown') || str.includes('city of cape town') ||
+            str.includes('durban') || str.includes('ethekwini') ||
+            str.includes('johannesburg') || str.includes('joburg') || str.includes('pretoria') || str.includes('tshwane') || str.includes('sandton');
+
+        if (hasCoreMetroInAddr) {
+            // If the term appears at the start of the address (typical for street name, e.g. "Tulbagh, Stellenryk...")
+            // or is followed by a comma, it is a street mention in a core metro!
+            const streetPositionRegex = new RegExp(`^(\\d+\\s+)?${term}\\b`, 'i');
+            if (streetPositionRegex.test(str) || new RegExp(`\\b${term}\\s*,`, 'i').test(str)) {
+                return false;
+            }
+        }
+
+        return true;
     };
 
     const isGardenRouteTown = GARDEN_ROUTE_TOWNS.some(t => matchesTerm(t, lowerAddr));
@@ -247,6 +276,19 @@ export const isOutlyingOrOuterRegional = (addressStr, components = null, latLng 
 
             // Garden Route postal codes (6500 to 6600) are handled by National Linehaul
             if (isGardenRouteTown && code >= 6500 && code <= 6600) {
+                return false;
+            }
+
+            // CORE METRO POSTAL CODES CAN NEVER BE OUTLYING OR OUTER REGIONAL:
+            // Cape Town: 7100-7151 (Helderberg), 7400-7690 (CPT metro/Winelands, e.g. 7550 Stellenryk/Durbanville), 8000-8099 (CBD)
+            // Durban: 3600-3660, 4000-4099 (Berea/central), 4125-4130, 4300-4320, 4390-4450 (Ballito)
+            // Gauteng: 1400-1750, 2000-2199, 0001-0199 (Pretoria)
+            const isCoreMetroCode = 
+                ((code >= 7100 && code <= 7151) || (code >= 7400 && code <= 7690) || (code >= 8000 && code <= 8099)) ||
+                ((code >= 3600 && code <= 3660) || (code >= 4000 && code <= 4099) || (code >= 4125 && code <= 4130) || (code >= 4300 && code <= 4320) || (code >= 4390 && code <= 4450)) ||
+                ((code >= 1400 && code <= 1750) || (code >= 2000 && code <= 2199) || (code >= 1 && code <= 199));
+
+            if (isCoreMetroCode) {
                 return false;
             }
 
@@ -534,7 +576,8 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('franschhoek') || name.includes('gordon\'s bay') || name.includes('gordons bay') ||
             name.includes('fish hoek') || name.includes('simon\'s town') || name.includes('simonstown') ||
             name.includes('muizenberg') || name.includes('melkbosstrand') || name.includes('kuils river') ||
-            name.includes('kuilsriver') || name.includes('kraaifontein') || name.includes('pinelands');
+            name.includes('kuilsriver') || name.includes('kraaifontein') || name.includes('pinelands') ||
+            name.includes('stellenryk') || name.includes('kenridge');
 
         // Core Durban / KZN Markers
         const hasDbnMarker = 
@@ -549,7 +592,7 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('salt rock') || name.includes('hillcrest') ||
             name.includes('westville') || name.includes('kwamashu') || name.includes('umdloti') ||
             name.includes('mount edgecombe') || name.includes('la lucia') ||
-            name.includes('queensburgh') || name.includes('berea') || name.includes('glenwood') ||
+            name.includes('queensburgh') || name.includes('berea') || name.includes('windermere') || name.includes('glenwood') ||
             name.includes('chatsworth') || name.includes('phoenix') || name.includes('gillitts') ||
             name.includes('assagay') || name.includes('bothas hill') || name.includes('cowies hill') ||
             name.includes('warner beach') || name.includes('winklespruit');

@@ -174,7 +174,6 @@ export default function Step2Access() {
         const label = customLabel || (locationType === 'origin' ? 'Pickup Location' : 'Dropoff Location')
         const colorClass = locationType === 'origin' || locationType.startsWith('extra_coll') ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-slate-900'
 
-        const showFloorFields = data.type === 'flat' || data.type === 'office'
         const isHouse = data.type === 'house'
         const isTownhouse = data.type === 'townhouse'
 
@@ -215,70 +214,110 @@ export default function Step2Access() {
 
                 {/* Vertical & Parking Access */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {showFloorFields && (
-                        <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100">
-                            <Label className="text-xs font-bold flex items-center gap-2">
-                                Vertical Access <Tooltip text="Floor level and lift access info." />
-                            </Label>
-                            <div className="flex items-center gap-4">
-                                <div className="flex-1">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Floor</p>
-                                    <select
-                                        value={data.floorLevel}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            handleUpdate(locationType, 'floorLevel', val === 'double_volume' || val === 'multiple_stairs' ? val : parseInt(val) || 0);
-                                        }}
-                                        className="w-full p-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium outline-none"
-                                    >
-                                        <option value={0}>Ground Floor</option>
-                                        <option value={1}>1st Floor</option>
-                                        <option value={2}>2nd Floor</option>
-                                        <option value={3}>3rd Floor</option>
-                                        <option value={4}>4th Floor</option>
-                                        <option value={5}>5th Floor and above</option>
-                                        <option value="double_volume">Double Volume</option>
-                                        <option value="multiple_stairs">Multiple Flights of Stairs</option>
-                                    </select>
+                    <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100">
+                        <Label className="text-xs font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                                Vertical Access <Tooltip text="Floor level, stairs, and elevator access info." />
+                            </span>
+                        </Label>
+                        <div className="space-y-3">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Floor Level</p>
+                                <select
+                                    value={data.floorLevel}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const parsedVal = val === 'double_volume' || val === 'multiple_stairs' ? val : parseInt(val) || 0;
+                                        handleUpdate(locationType, 'floorLevel', parsedVal);
+                                        if (parsedVal !== 0 && !data.elevator && !data.stairs) {
+                                            handleUpdate(locationType, 'stairs', true);
+                                        }
+                                    }}
+                                    className="w-full p-2 bg-slate-50 border border-gray-200 rounded-lg text-sm font-medium outline-none"
+                                >
+                                    <option value={0}>Ground Floor</option>
+                                    <option value={1}>1st Floor</option>
+                                    <option value={2}>2nd Floor</option>
+                                    <option value={3}>3rd Floor</option>
+                                    <option value={4}>4th Floor</option>
+                                    <option value={5}>5th Floor and above</option>
+                                    <option value="double_volume">Double Volume</option>
+                                    <option value="multiple_stairs">Multiple Flights of Stairs</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1.5">Stairs at Property?</p>
+                                    <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdate(locationType, 'stairs', false)}
+                                            className={clsx(
+                                                "py-1.5 px-2 rounded-md text-xs font-bold transition-all text-center",
+                                                !data.stairs ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            No
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdate(locationType, 'stairs', true)}
+                                            className={clsx(
+                                                "py-1.5 px-2 rounded-md text-xs font-bold transition-all text-center",
+                                                data.stairs ? "bg-red-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            Yes
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-2 pt-4">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={data.elevator}
-                                            onChange={(e) => handleUpdate(locationType, 'elevator', e.target.checked)}
-                                            className="w-4 h-4 text-red-600 rounded border-gray-300"
-                                        />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Elevator</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={data.stairs}
-                                            onChange={(e) => handleUpdate(locationType, 'stairs', e.target.checked)}
-                                            className="w-4 h-4 text-red-600 rounded border-gray-300"
-                                        />
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">Stairs</span>
-                                    </label>
+
+                                <div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1.5">Elevator / Lift?</p>
+                                    <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdate(locationType, 'elevator', false)}
+                                            className={clsx(
+                                                "py-1.5 px-2 rounded-md text-xs font-bold transition-all text-center",
+                                                !data.elevator ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            No
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUpdate(locationType, 'elevator', true)}
+                                            className={clsx(
+                                                "py-1.5 px-2 rounded-md text-xs font-bold transition-all text-center",
+                                                data.elevator ? "bg-red-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            Yes
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    )}
+                    </div>
 
-                    <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100 h-full">
-                        <Label className="text-xs font-bold flex items-center gap-2">
-                            Vehicle Access <Tooltip text="Select the most accurate parking situation at this address." />
-                        </Label>
-                        <select
-                            value={data.parkingType}
-                            onChange={(e) => handleUpdate(locationType, 'parkingType', e.target.value)}
-                            className="w-full p-2.5 bg-slate-50 border border-gray-100 rounded-lg text-sm font-medium outline-none"
-                        >
-                            {PARKING_OPTIONS.map(o => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
-                         <p className="text-[9px] text-slate-400 font-medium">Shuttle / Panhandle required? Select above.</p>
+                    <div className="space-y-3 p-4 bg-white rounded-xl border border-gray-100 h-full flex flex-col justify-between">
+                        <div>
+                            <Label className="text-xs font-bold flex items-center gap-2 mb-2">
+                                Vehicle Access <Tooltip text="Select the most accurate parking situation at this address." />
+                            </Label>
+                            <select
+                                value={data.parkingType}
+                                onChange={(e) => handleUpdate(locationType, 'parkingType', e.target.value)}
+                                className="w-full p-2.5 bg-slate-50 border border-gray-100 rounded-lg text-sm font-medium outline-none"
+                            >
+                                {PARKING_OPTIONS.map(o => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </select>
+                            <p className="text-[9px] text-slate-400 font-medium mt-2">Shuttle / Panhandle required? Select above.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -321,22 +360,7 @@ export default function Step2Access() {
                                 onChange={() => handleSpecialCondition(locationType, 'weightRestriction')}
                             />
                         )}
-                        {isTownhouse && (
-                            <>
-                                <ConditionCheckbox
-                                    label="Elevator"
-                                    tooltip="Goods lift or passenger lift available."
-                                    checked={data.elevator}
-                                    onChange={() => handleUpdate(locationType, 'elevator', !data.elevator)}
-                                />
-                                <ConditionCheckbox
-                                    label="Stairs"
-                                    tooltip="Multiple flights of stairs required for entry."
-                                    checked={data.stairs}
-                                    onChange={() => handleUpdate(locationType, 'stairs', !data.stairs)}
-                                />
-                            </>
-                        )}
+
                         <ConditionCheckbox
                             label="Security Gate"
                             tooltip="Complex requires formal security clearance or gate booking."

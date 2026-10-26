@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck, Package } from 'lucide-react'
+import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck, Package, CheckCircle, XCircle, Clock, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
@@ -122,6 +122,8 @@ export default function QuotesPage() {
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: quote.items_json?.breakdown || null,
                 accessDetails: quote.access_details || {},
+                companyDetails: quote.items_json?.company_details || null,
+                customProducts: quote.custom_products || quote.items_json?.custom_products || [],
                 extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
                 extraDrops: quote.items_json?.extraDrops || quote.extra_drops || []
             });
@@ -138,16 +140,22 @@ export default function QuotesPage() {
     }
 
     const handleSendToPayLink = async (quote) => {
-        if (!quote.client_email) {
-            alert('Client email is missing — cannot send payment link.')
-            return
-        }
-
+        const clientEmail = quote.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email
         const SITE_URL = 'https://mastermovers.co.za'
         const paymentLink = `${SITE_URL}/quote-review?id=${quote.id}`
 
+        if (!clientEmail) {
+            try {
+                await navigator.clipboard.writeText(paymentLink)
+                alert(`No client email on file, but the Payment & Terms link has been copied to your clipboard!\n\nLink:\n${paymentLink}`)
+            } catch {
+                alert(`No client email on file. Payment & Terms link:\n\n${paymentLink}`)
+            }
+            return
+        }
+
         const confirmed = confirm(
-            `Send payment link to ${quote.client_email}?\n\nLink: ${paymentLink}\n\nThe customer will be able to view their full quote summary and pay via PayFast or Payflex.`
+            `Send payment & terms link to ${clientEmail}?\n\nLink: ${paymentLink}\n\nThe customer will be able to review their terms, sign electronically, and pay via PayFast or Payflex.`
         )
         if (!confirmed) return
 
@@ -155,12 +163,12 @@ export default function QuotesPage() {
             // Send via Resend email
             const result = await emailService.sendEmail({
                 type: 'payment_link',
-                to: quote.client_email,
+                to: clientEmail,
                 quoteData: quote,
                 paymentLink
             })
 
-            // Also update status to pending_payment if still 'lead'
+            // Also update status to pending_payment if still 'lead' or 'new'
             if (quote.status === 'lead' || quote.status === 'new') {
                 await supabase
                     .from('quotes')
@@ -169,7 +177,7 @@ export default function QuotesPage() {
                 fetchQuotes()
             }
 
-            alert(`✅ Payment link sent to ${quote.client_email}!`)
+            alert(`✅ Payment link sent to ${clientEmail}!`)
         } catch (error) {
             console.error('Send to pay error:', error)
             // Fallback: just copy link to clipboard
@@ -272,11 +280,21 @@ export default function QuotesPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{quote.client_name}</div>
+                                        {quote.items_json?.company_details?.companyName && (
+                                            <div className="text-[11px] font-bold text-indigo-700 mt-0.5">
+                                                🏢 {quote.items_json.company_details.companyName}
+                                            </div>
+                                        )}
                                         <div className="text-xs text-slate-500">{quote.client_phone}</div>
                                     </td>
                                     <td className="px-6 py-4 text-sm">
                                         <div className="text-slate-900">{quote.pickup_address?.split(',')[0]}</div>
                                         <div className="text-slate-400 text-xs">to {quote.dropoff_address?.split(',')[0]}</div>
+                                        {(quote.access_details?.origin?.type === 'office' || quote.access_details?.destination?.type === 'office') && (
+                                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase tracking-wider">
+                                                {(quote.access_details?.origin?.type || 'house').toUpperCase()} → {(quote.access_details?.destination?.type || 'house').toUpperCase()}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-sm">
                                         {(() => {
@@ -313,6 +331,11 @@ export default function QuotesPage() {
                                                 📅 Move: {quote.move_date}
                                             </div>
                                         )}
+                                        {(quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate) && (
+                                            <div className="text-[11px] font-bold text-indigo-600 mt-0.5">
+                                                📦 Pack: {quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
                                         {(() => {
@@ -347,27 +370,49 @@ export default function QuotesPage() {
                                         </td>
                                     )}
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ring-1 ring-inset ${getStatusColor(quote.status)}`}>
-                                            {quote.status.toUpperCase()}
-                                        </span>
+                                        <div className="flex flex-col gap-1.5 items-start">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${getStatusColor(quote.status)}`}>
+                                                {quote.status.toUpperCase()}
+                                            </span>
+                                            {quote.terms_accepted ? (
+                                                <span 
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                                                    title={`Signed by ${quote.signature_json?.name || quote.client_name || 'Client'} on ${quote.signature_json?.date ? new Date(quote.signature_json.date).toLocaleString() : ''}`}
+                                                >
+                                                    <CheckCircle size={10} className="text-emerald-600" />
+                                                    Signed: {quote.signature_json?.name || 'Yes'}
+                                                </span>
+                                            ) : (quote.status === 'rejected' || quote.rejection_reason || quote.items_json?.rejection_reason) ? (
+                                                <span 
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" 
+                                                    title={`Declined: ${quote.rejection_reason || quote.items_json?.rejection_reason || 'No reason specified'}`}
+                                                >
+                                                    <XCircle size={10} className="text-red-500" />
+                                                    Declined
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200">
+                                                    <Clock size={10} className="text-slate-400" />
+                                                    Terms Pending
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {/* Send to Pay — only for pending/lead quotes */}
-                                            {(quote.status === 'pending_payment' || quote.status === 'lead' || quote.status === 'new') && (
-                                                <button
-                                                    onClick={() => handleSendToPayLink(quote)}
-                                                    className="p-1.5 text-emerald-700 bg-emerald-50 rounded hover:bg-emerald-100 flex items-center gap-1"
-                                                    title="Send Payment Link to Client"
-                                                >
-                                                    <CreditCard size={16} />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleAutomatedEmail(quote)}
-                                                className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100"
-                                                title="Send Proposal Email"
-                                            >
+                                             {/* Send Payment Link — Enabled for ALL quotes */}
+                                             <button
+                                                 onClick={() => handleSendToPayLink(quote)}
+                                                 className="p-1.5 text-emerald-700 bg-emerald-50 rounded hover:bg-emerald-100 flex items-center gap-1 cursor-pointer"
+                                                 title="Send Payment & Terms Link to Client"
+                                             >
+                                                 <CreditCard size={16} />
+                                             </button>
+                                             <button
+                                                 onClick={() => handleAutomatedEmail(quote)}
+                                                 className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100"
+                                                 title="Send Proposal Email"
+                                             >
                                                 <Mail size={16} />
                                             </button>
                                             <a

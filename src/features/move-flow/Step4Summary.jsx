@@ -16,6 +16,7 @@ import { LeadCaptureModal } from './Step1Details'
 import { supabase } from '../../lib/supabaseClient'
 import { formatClientName, cleanClientName, getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import { hasCompletedEmailAndPhone } from '../../lib/utils'
+import { getBranchDetails } from '../../utils/branchDetails'
 
 const SERVICE_KEYS = [
     { key: 'crateConstruction', label: 'Crate Construction' },
@@ -87,6 +88,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [showLeadModal, setShowLeadModal] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
+    const branch = useMemo(() => getBranchDetails(moveDetails), [moveDetails?.pickupAddress, moveDetails?.pickupCityCode])
     const [appSettings, setAppSettings] = useState(null)
     const [isLoadingSettings, setIsLoadingSettings] = useState(true)
 
@@ -189,6 +191,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         extraCollections: moveDetails.extraCollections || [],
                         extraDrops: moveDetails.extraDrops || [],
                         accessDetails: accessDetails,
+                        moveDetails: moveDetails,
                         total: discountedTotal || total,
                         vat: vat,
                         subTotal: subTotal,
@@ -310,6 +313,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         extraCollections: moveDetails.extraCollections || [],
                         extraDrops: moveDetails.extraDrops || [],
                         accessDetails: accessDetails,
+                        moveDetails: moveDetails,
                         total: discountedTotal || total,
                         vat: vat,
                         subTotal: subTotal,
@@ -386,6 +390,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         extraCollections: moveDetails.extraCollections || [],
                         extraDrops: moveDetails.extraDrops || [],
                         accessDetails: accessDetails,
+                        moveDetails: moveDetails,
                         total: discountedTotal || total,
                         vat: vat,
                         subTotal: subTotal,
@@ -449,6 +454,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     total: discountedTotal || total,
                     breakdown: breakdown,
                     accessDetails: accessDetails,
+                    moveDetails: moveDetails,
                     notes: moveDetails.generalNotes || ''
                 })
             }
@@ -506,6 +512,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                             total: discountedTotal || total,
                             breakdown: breakdown,
                             accessDetails: accessDetails,
+                            moveDetails: moveDetails,
                             notes: moveDetails.generalNotes || ''
                         }).catch(err => console.error('Callback email error:', err))
                     }
@@ -553,6 +560,7 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     total: discountedTotal || total,
                     breakdown: breakdown,
                     accessDetails: accessDetails,
+                    moveDetails: moveDetails,
                     notes: moveDetails.generalNotes || ''
                 }).catch(err => console.error('Callback email error:', err))
             }
@@ -595,6 +603,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                     moveDate: moveDetails.moveDate,
                     pickupAddress: moveDetails.pickupAddress,
                     dropoffAddress: moveDetails.dropoffAddress,
+                    accessDetails: accessDetails,
+                    moveDetails: moveDetails,
                     total: discountedTotal || total,
                     vat: vat,
                     subTotal: subTotal,
@@ -818,10 +828,16 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-2xl font-bold">Estimated Quote</h2>
-                                <p className="text-slate-400 text-sm mt-1">Based on provided inventory & distance.</p>
-                                <div className="mt-4 flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg w-fit">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Volume:</span>
-                                    <span className="text-xs font-black text-white">{totalVolume?.toFixed(2)} ft³</span>
+                                <p className="text-slate-400 text-sm mt-1">Based on provided inventory & move details.</p>
+                                <div className="mt-4 flex flex-wrap items-center gap-2">
+                                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg w-fit">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Volume:</span>
+                                        <span className="text-xs font-black text-white">{totalVolume?.toFixed(2)} ft³</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg w-fit">
+                                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Branch:</span>
+                                        <span className="text-xs font-black text-white">{branch.name}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="text-right">
@@ -1283,11 +1299,22 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                 {/* Summary Details */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                             <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                                 <MapPin size={18} className="text-red-600" /> Move Route
                             </h3>
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                {((accessDetails?.origin?.type || 'house').replace('_', ' ')).toUpperCase()} → {(moveDetails.storageDestination ? 'STORAGE' : (accessDetails?.destination?.type || 'house').replace('_', ' ')).toUpperCase()}
+                            </span>
                         </div>
+                        {(moveDetails.companyName || moveDetails.companyVat || moveDetails.companyDetails) && (
+                            <div className="mb-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-red-600">🏢 Company / Corporate Move Details</div>
+                                {moveDetails.companyName && <p className="font-bold text-slate-900">{moveDetails.companyName}</p>}
+                                {moveDetails.companyVat && <p className="text-slate-600 font-medium">VAT / Reg: {moveDetails.companyVat}</p>}
+                                {moveDetails.companyDetails && <p className="text-slate-600 font-medium">{moveDetails.companyDetails}</p>}
+                            </div>
+                        )}
                         <div className="space-y-4 pl-4 border-l-2 border-slate-200 relative">
                             {/* Primary Pickup */}
                             <div className="relative">
@@ -1302,8 +1329,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         const a = accessDetails.origin || {}
                                         const parts = [(a.type || 'House').toUpperCase()]
                                         if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
-                                        if (a.elevator) parts.push('Elevator: Yes')
-                                        if (a.stairs) parts.push('Stairs: Yes')
+                                        parts.push(`Elevator: ${a.elevator ? 'Yes' : 'No'}`)
+                                        parts.push(`Stairs: ${a.stairs ? 'Yes' : 'No'}`)
                                         const dist = a.longCarryMeters || a.longCarryDistance || 0
                                         if (dist > 0) parts.push(`Long Carry: ${dist}m`)
                                         else if (a.specialConditions?.longCarry) parts.push('Long Carry')
@@ -1328,8 +1355,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                             const a = accessDetails[`extra_coll_${idx}`] || {}
                                             const parts = [(a.type || 'House').toUpperCase()]
                                             if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
-                                            if (a.elevator) parts.push('Elevator: Yes')
-                                            if (a.stairs) parts.push('Stairs: Yes')
+                                            parts.push(`Elevator: ${a.elevator ? 'Yes' : 'No'}`)
+                                            parts.push(`Stairs: ${a.stairs ? 'Yes' : 'No'}`)
                                             const dist = a.longCarryMeters || a.longCarryDistance || 0
                                             if (dist > 0) parts.push(`Long Carry: ${dist}m`)
                                             else if (a.specialConditions?.longCarry) parts.push('Long Carry')
@@ -1356,8 +1383,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                         const a = accessDetails.destination || {}
                                         const parts = [(a.type || 'House').toUpperCase()]
                                         if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
-                                        if (a.elevator) parts.push('Elevator: Yes')
-                                        if (a.stairs) parts.push('Stairs: Yes')
+                                        parts.push(`Elevator: ${a.elevator ? 'Yes' : 'No'}`)
+                                        parts.push(`Stairs: ${a.stairs ? 'Yes' : 'No'}`)
                                         const dist = a.longCarryMeters || a.longCarryDistance || 0
                                         if (dist > 0) parts.push(`Long Carry: ${dist}m`)
                                         else if (a.specialConditions?.longCarry) parts.push('Long Carry')
@@ -1382,8 +1409,8 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                             const a = accessDetails[`extra_drop_${idx}`] || {}
                                             const parts = [(a.type || 'House').toUpperCase()]
                                             if (a.floorLevel > 0) parts.push(`Floor ${a.floorLevel}`)
-                                            if (a.elevator) parts.push('Elevator: Yes')
-                                            if (a.stairs) parts.push('Stairs: Yes')
+                                            parts.push(`Elevator: ${a.elevator ? 'Yes' : 'No'}`)
+                                            parts.push(`Stairs: ${a.stairs ? 'Yes' : 'No'}`)
                                             const dist = a.longCarryMeters || a.longCarryDistance || 0
                                             if (dist > 0) parts.push(`Long Carry: ${dist}m`)
                                             else if (a.specialConditions?.longCarry) parts.push('Long Carry')
@@ -1497,12 +1524,19 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
 
                     {/* Support Contact */}
                     <div className="pt-6 border-t border-slate-100 mt-6 text-center">
+                        <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-left max-w-lg mx-auto text-xs text-slate-600">
+                            <p className="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-1">Issuing Branch: {branch.name}</p>
+                            <p className="leading-snug">{branch.fullAddress}</p>
+                            <p className="text-[10px] text-slate-500 mt-1.5 font-medium">
+                                Tel: {branch.telDisplay} {branch.fax ? `· Fax: ${branch.faxDisplay}` : ''} · Co Reg: {branch.coRegNo} · VAT: {branch.vatRegNo}
+                            </p>
+                        </div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">Need immediate help with your quote?</p>
                         <p className="text-sm font-black text-slate-900 group">
-                            Call us at any time: <a href="tel:+27114937569" className="text-red-600 hover:underline">+27 11 493 7569</a>
+                            Call us at any time: <a href={`tel:${branch.telLink}`} className="text-red-600 hover:underline">{branch.telDisplay}</a>
                         </p>
                         <p className="text-sm font-black text-slate-900 group mt-2">
-                            <a href="mailto:sales1@mastermoversjhb.co.za" className="text-sm font-medium hover:text-red-600 underline underline-offset-4">sales1@mastermoversjhb.co.za</a>
+                            <a href={`mailto:${branch.email}`} className="text-sm font-medium hover:text-red-600 underline underline-offset-4">{branch.email}</a>
                         </p>
                     </div>
 

@@ -91,11 +91,33 @@ export default function LeadsPage() {
                             <div className="flex justify-between items-start mb-3">
                                 <div>
                                     <h3 className="font-bold text-slate-900">{lead.client_name || 'Unknown Client'}</h3>
+                                    {lead.items_json?.company_details?.companyName && (
+                                        <p className="text-[11px] font-bold text-indigo-700 mt-0.5">
+                                            🏢 {lead.items_json.company_details.companyName}
+                                            {lead.items_json.company_details.companyVat ? ` (VAT: ${lead.items_json.company_details.companyVat})` : ''}
+                                        </p>
+                                    )}
                                     <p className="text-xs text-slate-400">{new Date(lead.created_at).toLocaleString()}</p>
                                 </div>
-                                <span className="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded font-medium">
-                                    New Lead
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded font-medium">
+                                        New Lead
+                                    </span>
+                                    {(() => {
+                                        const cDet = lead.items_json?.company_details || {};
+                                        const aDet = lead.items_json?.access_details || {};
+                                        const oType = (aDet?.origin?.type || (cDet.pickupIsOffice ? 'Office' : 'House')).toUpperCase();
+                                        const dType = (aDet?.destination?.type || (cDet.dropoffIsOffice ? 'Office' : 'House')).toUpperCase();
+                                        if (oType === 'OFFICE' || dType === 'OFFICE' || cDet.isCompanyMove) {
+                                            return (
+                                                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                                    {oType} → {dType}
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
                             </div>
 
                             <div className="space-y-2 mb-5">
