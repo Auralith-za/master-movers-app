@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
+import { calculateQuote } from '../features/inventory/store/moveStore';
 import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
@@ -90,6 +91,64 @@ export default function QuoteReviewPage() {
                 .single();
 
             if (error) throw error;
+
+            // Reconcile pricing with calculateQuote to protect against stale draft pricing or accidental mid-month discount on month-end moves
+            if (data && !data.is_manual_price) {
+                try {
+                    const inventory = data.items_json?.items || data.items_json || data.inventory || {};
+                    const customProductsList = data.custom_products || data.items_json?.custom_products || [];
+                    const sendMeBoxes = data.items_json?.packaging_details?.send_me_boxes || data.send_me_boxes;
+                    const boxesAndPacking = data.items_json?.packaging_details?.boxes_and_packing || data.boxes_and_packing;
+                    const moveDetails = {
+                        pickupAddress: data.pickup_address,
+                        dropoffAddress: data.dropoff_address,
+                        distanceKm: Number(data.distance_km || 0),
+                        totalBillableDistance: Number(data.distance_km || 0),
+                        tripBreakdown: data.trip_breakdown || data.items_json?.trip_breakdown,
+                        moveDate: data.move_date,
+                        packagingOption: data.packaging_option,
+                        st7Boxes: data.st7_boxes,
+                        linenBoxes: data.linen_boxes,
+                        sendMeBoxes,
+                        boxesAndPacking,
+                        insuranceEnabled: data.insurance_enabled,
+                        isSharedLoad: data.is_shared_load,
+                        paymentMethod: data.payment_method || 'eft',
+                        customProducts: customProductsList,
+                        includeBoxVolume: data.items_json?.include_box_volume,
+                        disableShuttle: Boolean(data.items_json?.disable_shuttle),
+                        shuttleOverride: data.items_json?.shuttle_override
+                    };
+                    const calc = calculateQuote(
+                        inventory,
+                        moveDetails,
+                        data.access_details || {},
+                        INVENTORY_ITEMS,
+                        data.items_json?.manual_service_charges || {},
+                        0,
+                        data.items_json?.special_wrapping || {},
+                        true
+                    );
+                    if (calc && !calc.error && calc.total > 0) {
+                        const dbTotal = Number(data.total_price || 0);
+                        const calcTotal = Number(calc.total);
+                        if (Math.abs(dbTotal - calcTotal) > 1.0) {
+                            console.warn(`[QuoteReview] Reconciling stale quote total: DB had R${dbTotal.toFixed(2)}, recalculated is R${calcTotal.toFixed(2)}`);
+                            data.total_price = calcTotal;
+                            data.total_volume = Number(calc.totalVolume || data.total_volume || 0);
+                            supabase.from('quotes').update({
+                                total_price: calcTotal,
+                                total_volume: data.total_volume
+                            }).eq('id', data.id).then(({ error: syncErr }) => {
+                                if (syncErr) console.error('[QuoteReview] Error syncing price to DB:', syncErr);
+                            });
+                        }
+                    }
+                } catch (calcErr) {
+                    console.error('[QuoteReview] Error reconciling quote price:', calcErr);
+                }
+            }
+
             setQuote(data);
             if (data.terms_accepted) {
                 setAccepted(true);
@@ -649,6 +708,19 @@ export default function QuoteReviewPage() {
                                 <p className="text-amber-800 text-sm font-medium mb-4 leading-relaxed">
                                     {appSettings.maintenance_message || 'We are currently updating our pricing engine. Please contact the Master Movers team to complete your quote.'}
                                 </p>
+                            </div>
+                        ) : quote?.status === 'booked_paid' ? (
+                            <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-8 text-center space-y-3">
+                                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                                    <CheckCircle size={30} />
+                                </div>
+                                <h3 className="font-black text-slate-900 uppercase tracking-tight">Payment Completed</h3>
+                                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                    Thank you! Your payment has been received and your moving booking is confirmed.
+                                </p>
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-black text-emerald-700">
+                                    ✓ Booking Confirmed &amp; Paid
+                                </div>
                             </div>
                         ) : (
                         <div className={clsx(

@@ -99,7 +99,7 @@ export default function QuoteDetailPage() {
                 pickup_address: '',
                 dropoff_address: '',
                 distance_km: 0,
-                move_date: new Date().toISOString().split('T')[0],
+                move_date: '',
                 packing_date: '',
                 status: 'lead',
                 items_json: {},
@@ -857,7 +857,8 @@ export default function QuoteDetailPage() {
         ? Number(recalculatedData.totalVolume)
         : Number(quote?.total_volume || 0);
 
-    const handleSave = async () => {
+    const handleSave = async (options = false) => {
+        const silent = options === true;
         try {
             const basePrice = recalculatedData?.total || editForm.total_price || 0
             const finalPrice = basePrice + priceOffset
@@ -1019,7 +1020,7 @@ export default function QuoteDetailPage() {
                 await logActivity('edit', `Quote adjusted manually in backend. New Total: R ${finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
                 setEditingRoomName({ oldName: null, newName: '' })
                 setIsEditing(false)
-                alert('Quote updated successfully!')
+                if (!silent) alert('Quote updated successfully!')
             }
         } catch (error) {
             console.error('Error saving quote:', error)
@@ -1045,7 +1046,23 @@ export default function QuoteDetailPage() {
         }
     }
 
+    const ensureSyncedWithDb = async () => {
+        if (!quote || id === 'new') return
+        const basePrice = recalculatedData?.total || editForm.total_price || 0
+        const finalPriceToSave = (isEditing || !quote?.total_price || !quote?.is_manual_price)
+            ? (basePrice + priceOffset)
+            : (Number(quote?.total_price) || 0)
+        if (finalPriceToSave > 0 && (Math.abs(finalPriceToSave - (quote.total_price || 0)) > 0.01 || isEditing)) {
+            try {
+                await handleSave(true)
+            } catch (saveErr) {
+                console.warn('Auto-save prior to action failed:', saveErr)
+            }
+        }
+    }
+
     const handleSendEmailUpdate = async () => {
+        await ensureSyncedWithDb()
         // Use saved email OR fall back to the edit form value (unsaved new quote)
         let emailTo = quote.client_email || editForm.client_email
 
@@ -1101,6 +1118,7 @@ export default function QuoteDetailPage() {
     }
 
     const handleResendQuote = async () => {
+        await ensureSyncedWithDb()
         let emailTo = quote.client_email || editForm.client_email
 
         if (!emailTo) {
@@ -1154,7 +1172,8 @@ export default function QuoteDetailPage() {
         }
     }
 
-    const copyPaymentLink = () => {
+    const copyPaymentLink = async () => {
+        await ensureSyncedWithDb()
         const link = `https://mastermovers.co.za/quote-review?id=${id}`
         navigator.clipboard.writeText(link)
         alert('Payment & Terms link copied to clipboard!')
@@ -1162,6 +1181,7 @@ export default function QuoteDetailPage() {
 
     const handleSendPaymentLink = async () => {
         if (!quote) return
+        await ensureSyncedWithDb()
         let clientEmail = quote.client_email || editForm.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email
         const SITE_URL = 'https://mastermovers.co.za'
         const paymentLink = `${SITE_URL}/quote-review?id=${quote.id}`
@@ -1233,6 +1253,7 @@ export default function QuoteDetailPage() {
     }, [searchQuery])
 
     const downloadInventoryPDF = async () => {
+        await ensureSyncedWithDb()
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
             const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
