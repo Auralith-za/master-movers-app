@@ -1091,10 +1091,17 @@ export default function QuoteDetailPage() {
                 pickupAddress: quote.pickup_address || editForm.pickup_address,
                 dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
                 moveDate: quote.move_date || editForm.move_date,
+                packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
                 inventory: inventoryForPdf,
                 total: finalPrice,
                 vat: finalVat,
                 subTotal: finalSubTotal,
+                discount: recalculatedData?.discount || quote.items_json?.breakdown?.discount || 0,
+                packagingOption: isEditing ? (editForm.packaging_option || 'none') : (quote.packaging_option || 'none'),
+                packagingDetails: recalculatedData?.breakdown?.packagingDetails || (isEditing ? { sendMeBoxes: editForm.send_me_boxes, boxesAndPacking: editForm.boxes_and_packing } : quote.items_json?.packaging_details),
+                st7Boxes: isEditing ? editForm.st7_boxes : (quote.st7_boxes || 0),
+                linenBoxes: isEditing ? editForm.linen_boxes : (quote.linen_boxes || 0),
+                includeBoxVolume: isEditing ? editForm.include_box_volume : quote?.items_json?.include_box_volume,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
                 extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
@@ -1145,11 +1152,17 @@ export default function QuoteDetailPage() {
                 pickupAddress: quote.pickup_address,
                 dropoffAddress: quote.dropoff_address,
                 moveDate: quote.move_date,
-                packingDate: quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || '',
+                packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
                 inventory: inventoryForPdf,
                 total: finalPrice,
                 vat: finalVat,
                 subTotal: finalSubTotal,
+                discount: recalculatedData?.discount || quote.items_json?.breakdown?.discount || 0,
+                packagingOption: isEditing ? (editForm.packaging_option || 'none') : (quote.packaging_option || 'none'),
+                packagingDetails: recalculatedData?.breakdown?.packagingDetails || (isEditing ? { sendMeBoxes: editForm.send_me_boxes, boxesAndPacking: editForm.boxes_and_packing } : quote.items_json?.packaging_details),
+                st7Boxes: isEditing ? editForm.st7_boxes : (quote.st7_boxes || 0),
+                linenBoxes: isEditing ? editForm.linen_boxes : (quote.linen_boxes || 0),
+                includeBoxVolume: isEditing ? editForm.include_box_volume : quote?.items_json?.include_box_volume,
                 inventoryItems: INVENTORY_ITEMS,
                 breakdown: recalculatedData?.breakdown || quote.items_json?.breakdown || null,
                 extraCollections: isEditing ? (editForm.extraCollections || editForm.extra_collections || []) : (quote.items_json?.extraCollections || quote.extra_collections || []),
@@ -1318,6 +1331,9 @@ export default function QuoteDetailPage() {
             if (p.room && p.room.trim()) set.add(p.room.trim())
         })
         activeCustomProductsList.forEach(p => {
+            const isManualAdjustment = String(p.id || '').startsWith('manual_adjustment_') ||
+                (parseFloat(p.cubes || p.cuft || 0) === 0 && Number(p.price || 0) !== 0 && !p.wrap && !p.sleeves);
+            if (isManualAdjustment) return;
             if (p.room && p.room.trim() && p.room !== 'Custom Products & Manual Items') set.add(p.room.trim())
         })
         return Array.from(set)
@@ -2154,6 +2170,9 @@ export default function QuoteDetailPage() {
 
                                             const groupedCustomByRoom = {}
                                             activeCustomProductsList.forEach(prod => {
+                                                const isManualAdjustment = String(prod.id || '').startsWith('manual_adjustment_') ||
+                                                    (parseFloat(prod.cubes || prod.cuft || 0) === 0 && Number(prod.price || 0) !== 0 && !prod.wrap && !prod.sleeves);
+                                                if (isManualAdjustment) return;
                                                 if (prod.room && prod.room !== 'Custom Products & Manual Items') {
                                                     if (!groupedCustomByRoom[prod.room]) groupedCustomByRoom[prod.room] = []
                                                     groupedCustomByRoom[prod.room].push(prod)
@@ -2559,7 +2578,12 @@ export default function QuoteDetailPage() {
                                     })()}
                                     {/* Unassigned Custom Products & Manual Items Section */}
                                     {(() => {
-                                        const unassignedCustomProducts = activeCustomProductsList.filter(p => !p.room || p.room === 'Custom Products & Manual Items');
+                                        const unassignedCustomProducts = activeCustomProductsList.filter(p => {
+                                            const isManualAdjustment = String(p.id || '').startsWith('manual_adjustment_') ||
+                                                (parseFloat(p.cubes || p.cuft || 0) === 0 && Number(p.price || 0) !== 0 && !p.wrap && !p.sleeves);
+                                            if (isManualAdjustment) return false;
+                                            return !p.room || p.room === 'Custom Products & Manual Items';
+                                        });
                                         const unassignedCustomVol = unassignedCustomProducts.reduce((sum, p) => sum + ((parseFloat(p.cubes || p.cuft) || 0) * Math.max(1, parseInt(p.quantity || p.qty) || 1)), 0);
                                         if (unassignedCustomProducts.length === 0) return null;
                                         return (

@@ -8,7 +8,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, packingDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume, packagingOption = 'none', packagingDetails = null, st7Boxes = 0, linenBoxes = 0, includeBoxVolume = undefined, discount = 0 }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -24,6 +24,8 @@ export const emailService = {
                 companyDetails: moveDetails.companyDetails || ''
             } : {});
 
+            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || moveDetails?.totalVolume || moveDetails?.totalVolumeCuFt || 0
+
             // 1. Generate the PDF instance silently (shouldSave = false)
             const doc = await generateProfessionalQuote({
                 quoteId,
@@ -33,12 +35,20 @@ export const emailService = {
                 pickupAddress,
                 dropoffAddress,
                 moveDate,
+                packingDate: packingDate || moveDetails?.packingDate || moveDetails?.packing_date || '',
                 createdAt: createdAt || created_at,
                 inventory,
                 breakdown,
                 total,
                 vat,
                 subTotal,
+                discount: discount || breakdown?.discount || 0,
+                totalVolume: computedVol,
+                packagingOption: packagingOption || moveDetails?.packagingOption || 'none',
+                packagingDetails: packagingDetails || breakdown?.packagingDetails || moveDetails?.packagingDetails || null,
+                st7Boxes: st7Boxes || moveDetails?.st7Boxes || 0,
+                linenBoxes: linenBoxes || moveDetails?.linenBoxes || 0,
+                includeBoxVolume: includeBoxVolume !== undefined ? includeBoxVolume : moveDetails?.includeBoxVolume,
                 inventoryItems,
                 accessDetails,
                 moveDetails,
@@ -54,8 +64,6 @@ export const emailService = {
             // 2. Convert PDF to raw base64 string (no data URI prefix)
             const pdfBase64 = doc.output('base64')
             const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
-
-            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || moveDetails?.totalVolume || moveDetails?.totalVolumeCuFt || 0
 
             // 3. Construct quote payload for the email template
             const quoteData = {
@@ -162,6 +170,8 @@ export const emailService = {
                 companyDetails: moveDetails.companyDetails || ''
             } : {});
 
+            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || 0
+
             const doc = await generateProfessionalQuote({
                 quoteId,
                 clientName,
@@ -170,11 +180,13 @@ export const emailService = {
                 pickupAddress,
                 dropoffAddress,
                 moveDate,
+                packingDate: moveDetails?.packingDate || moveDetails?.packing_date || '',
                 inventory,
                 breakdown,
                 total,
                 vat,
                 subTotal,
+                totalVolume: computedVol,
                 inventoryItems,
                 extraCollections,
                 extraDrops,
@@ -188,8 +200,6 @@ export const emailService = {
 
             const pdfBase64 = doc.output('base64')
             const pdfFilename = `MasterMovers_Quote_${quoteId || 'New'}.pdf`
-
-            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || 0
 
             const quoteData = {
                 id: quoteId,
@@ -245,6 +255,8 @@ export const emailService = {
                 companyDetails: moveDetails.companyDetails || ''
             } : {});
 
+            const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || 0
+
             const doc = await generateProfessionalQuote({
                 quoteId,
                 clientName,
@@ -253,11 +265,13 @@ export const emailService = {
                 pickupAddress,
                 dropoffAddress,
                 moveDate,
+                packingDate: moveDetails?.packingDate || moveDetails?.packing_date || '',
                 inventory,
                 breakdown,
                 total,
                 vat,
                 subTotal,
+                totalVolume: computedVol,
                 inventoryItems,
                 extraCollections,
                 extraDrops,

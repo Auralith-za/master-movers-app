@@ -32,24 +32,80 @@ function hasCompletedEmailAndPhone(email?: string, phone?: string): boolean {
     return isEmailValid(email) && isPhoneValid(phone)
 }
 
+// Helper to extract company details and property route type (e.g. OFFICE -> HOUSE)
+function extractCompanyAndRouteMeta(quoteData?: any, inventoryData?: any) {
+    const itemsObj = (inventoryData && typeof inventoryData === 'object' && !Array.isArray(inventoryData))
+        ? inventoryData
+        : (quoteData?.items_json && typeof quoteData.items_json === 'object' ? quoteData.items_json : {})
+
+    const companyDetails = quoteData?.company_details || itemsObj?.company_details || {}
+    const accessDetails = quoteData?.access_details || itemsObj?.access_details || {}
+
+    const originPropType = String(
+        accessDetails?.origin?.type ||
+        (companyDetails?.pickupIsOffice ? 'Office' : 'House')
+    ).trim()
+    const destPropType = String(
+        accessDetails?.destination?.type ||
+        (companyDetails?.dropoffIsOffice ? 'Office' : 'House')
+    ).trim()
+
+    const originUpper = originPropType.toUpperCase()
+    const destUpper = destPropType.toUpperCase()
+    const propertyRouteLabel = `${originUpper} → ${destUpper}`
+    const hasOffice = originUpper === 'OFFICE' || destUpper === 'OFFICE'
+    const hasCompany = Boolean(
+        companyDetails?.isCompanyMove ||
+        companyDetails?.companyName ||
+        companyDetails?.companyVat ||
+        companyDetails?.companyDetails ||
+        hasOffice
+    )
+
+    return {
+        companyDetails,
+        accessDetails,
+        originPropType,
+        destPropType,
+        originUpper,
+        destUpper,
+        propertyRouteLabel,
+        hasOffice,
+        hasCompany
+    }
+}
+
 // Helper to format inventory list as clean HTML table for email templates
-function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | string): string {
-    if (!rawItemsInput) return ''
+function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | string, customProductsInput?: any[]): string {
+    if (!rawItemsInput && (!customProductsInput || customProductsInput.length === 0)) return ''
 
     let rawItems: any = rawItemsInput
     if (typeof rawItems === 'string') {
         try {
             rawItems = JSON.parse(rawItems)
         } catch (_) {
-            return ''
+            rawItems = {}
         }
     }
+
+    const customProducts: any[] = Array.isArray(customProductsInput)
+        ? customProductsInput
+        : (Array.isArray(rawItems?.custom_products) ? rawItems.custom_products : [])
 
     if (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)) {
         if (rawItems.items) {
             rawItems = rawItems.items
         }
     }
+
+    const metadataKeys = new Set([
+        'include_box_volume', 'disable_shuttle', 'shuttle_override', 'total_volume',
+        'payment_method', 'referral_source', 'referralSource', 'company_details',
+        'custom_rooms', 'custom_products', 'access_details', 'move_details',
+        'breakdown', 'manual_discount', 'discount', 'packing_materials',
+        'packingMaterials', 'wrapping', 'full_packing', 'storage_selected',
+        'storage_duration', 'custom_surcharge', 'custom_surcharge_description'
+    ])
 
     const itemRows: Array<{ name: string; qty: number; room?: string }> = []
 
@@ -64,6 +120,8 @@ function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | str
         }
     } else if (rawItems && typeof rawItems === 'object') {
         for (const [key, val] of Object.entries(rawItems)) {
+            if (metadataKeys.has(key)) continue
+            if (typeof val === 'boolean' || typeof val === 'object') continue
             const qty = Number(val)
             if (isNaN(qty) || qty <= 0) continue
 
@@ -113,6 +171,29 @@ function renderInventoryTableHtml(rawItemsInput: any, totalVolume?: number | str
                 .trim()
 
             itemRows.push({ name: cleanName, qty, room })
+        }
+    }
+
+    // Add custom products under their assigned room (or 'Custom Products & Manual Items' if unassigned)
+    if (Array.isArray(customProducts) && customProducts.length > 0) {
+        for (const prod of customProducts) {
+            if (!prod) continue
+            // Skip manual financial adjustments / surcharges / coupons with 0 volume
+            const isManualAdjustment = String(prod.id || '').startsWith('manual_adjustment_') ||
+                (parseFloat(prod.cubes || prod.cuft || 0) === 0 && Number(prod.price || 0) !== 0 && !prod.wrap && !prod.sleeves)
+            if (isManualAdjustment) continue
+
+            const qty = Number(prod.quantity || prod.qty || 1)
+            if (qty <= 0) continue
+            const assignedRoom = prod.room && String(prod.room).trim()
+                ? String(prod.room).trim()
+                : 'Custom Products & Manual Items'
+            const customLabel = `${prod.name || 'Custom Item'} (Custom)`
+            itemRows.push({
+                name: customLabel,
+                qty,
+                room: assignedRoom
+            })
         }
     }
 
@@ -368,7 +449,9 @@ function buildStandardDetailsTable({
     vat,
     total,
     step,
-    notes
+    notes,
+    quoteData,
+    inventoryData
 }: {
     ref?: string,
     name?: string,
@@ -386,7 +469,9 @@ function buildStandardDetailsTable({
     vat?: string | number,
     total?: string | number,
     step?: string,
-    notes?: string
+    notes?: string,
+    quoteData?: any,
+    inventoryData?: any
 }) {
     const cleanRef = ref ? (ref.startsWith('MM-') ? ref : `MM-${ref}`) : '—'
     const phoneDisplay = phone ? `<a href="tel:${phone}" style="color:#e31837;font-weight:700;">${phone}</a>` : '—'
@@ -402,6 +487,33 @@ function buildStandardDetailsTable({
         : (numTotal > 0 ? `R ${(numTotal - numTotal / 1.15).toFixed(2)}` : '—')
 
     const totalDisplay = numTotal > 0 ? `R ${numTotal.toFixed(2)} (Incl. VAT)` : '—'
+
+    const meta = extractCompanyAndRouteMeta(quoteData, inventoryData)
+    const { companyDetails, originUpper, destUpper, propertyRouteLabel, hasOffice, hasCompany } = meta
+
+    const originBadge = (pickup && quoteData)
+        ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;background:${originUpper === 'OFFICE' ? '#eff6ff' : '#f1f5f9'};color:${originUpper === 'OFFICE' ? '#1d4ed8' : '#475569'};border:1px solid ${originUpper === 'OFFICE' ? '#bfdbfe' : '#cbd5e1'};">${originUpper}</span>`
+        : ''
+    const destBadge = (dropoff && quoteData)
+        ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;background:${destUpper === 'OFFICE' ? '#eff6ff' : '#f1f5f9'};color:${destUpper === 'OFFICE' ? '#1d4ed8' : '#475569'};border:1px solid ${destUpper === 'OFFICE' ? '#bfdbfe' : '#cbd5e1'};">${destUpper}</span>`
+        : ''
+
+    let companyRows = ''
+    if (hasCompany) {
+        if (companyDetails?.companyName) {
+            companyRows += `<tr><td class="label">🏢 Company Name:</td><td class="value"><strong style="color:#1e40af;">${companyDetails.companyName}</strong></td></tr>`
+        }
+        if (companyDetails?.companyVat) {
+            companyRows += `<tr><td class="label">Company VAT / Reg:</td><td class="value">${companyDetails.companyVat}</td></tr>`
+        }
+        if (companyDetails?.companyDetails) {
+            companyRows += `<tr><td class="label">Company / Billing Info:</td><td class="value">${companyDetails.companyDetails}</td></tr>`
+        }
+    }
+
+    const propertyRouteRow = quoteData
+        ? `<tr><td class="label">Property Route Type:</td><td class="value"><span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;background:${hasOffice ? '#eff6ff' : '#f8fafc'};color:${hasOffice ? '#1d4ed8' : '#334155'};border:1px solid ${hasOffice ? '#bfdbfe' : '#e2e8f0'};">${propertyRouteLabel}</span></td></tr>`
+        : ''
 
     let extraCollsRows = ''
     if (Array.isArray(extraCollections)) {
@@ -425,11 +537,13 @@ function buildStandardDetailsTable({
     <table class="details-table">
         <tr><td class="label">Quote / Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">${cleanRef}</td></tr>
         <tr><td class="label">Customer Name:</td><td class="value"><strong>${name || '—'}</strong></td></tr>
+        ${companyRows}
         <tr><td class="label">Phone Number:</td><td class="value">${phoneDisplay}</td></tr>
         <tr><td class="label">Email Address:</td><td class="value">${emailDisplay}</td></tr>
-        <tr><td class="label">Collection From:</td><td class="value">${pickup || '—'}</td></tr>
+        ${propertyRouteRow}
+        <tr><td class="label">Collection From:</td><td class="value">${pickup || '—'}${originBadge}</td></tr>
         ${extraCollsRows}
-        <tr><td class="label">Delivery To:</td><td class="value">${dropoff || '—'}</td></tr>
+        <tr><td class="label">Delivery To:</td><td class="value">${dropoff || '—'}${destBadge}</td></tr>
         ${extraDropsRows}
         <tr><td class="label">Preferred Move Date:</td><td class="value"><strong>${moveDate || '—'}</strong></td></tr>
         <tr><td class="label">Move Type / Route:</td><td class="value">${moveType || '—'}</td></tr>
@@ -450,7 +564,7 @@ serve(async (req) => {
     }
 
     try {
-        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, paymentLink } = await req.json()
+        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, pngBase64, pngFilename, signatureName, signatureDate, paymentLink } = await req.json()
 
         // Lead Validation: For abandoned leads, require at least email or phone. For callback/contact requests, require both.
         if (type === 'abandoned_lead_alert') {
@@ -534,7 +648,7 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
 
             innerHtml = `
                 <h1 style="color:#0f172a;">🔔 New Pending Quote</h1>
@@ -553,7 +667,9 @@ serve(async (req) => {
                     paymentMethod: quoteData?.payment_method || 'Awaiting Selection',
                     total: quoteData?.total_price,
                     step: 'Step 4 — Quote Summary (Awaiting Payment)',
-                    notes: quoteData?.customer_comments
+                    notes: quoteData?.customer_comments,
+                    quoteData,
+                    inventoryData
                 })}
 
                 ${inventoryHtml}
@@ -602,7 +718,8 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
+            const meta = extractCompanyAndRouteMeta(quoteData, inventoryData)
 
             innerHtml = `
                 <h1>Move Quote Proposal</h1>
@@ -623,17 +740,39 @@ serve(async (req) => {
                         <td class="label">Client Name:</td>
                         <td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td>
                     </tr>
+                    ${meta.companyDetails?.companyName ? `
+                    <tr>
+                        <td class="label">🏢 Company Name:</td>
+                        <td class="value"><strong style="color:#1e40af;">${meta.companyDetails.companyName}</strong></td>
+                    </tr>
+                    ` : ''}
+                    ${meta.companyDetails?.companyVat ? `
+                    <tr>
+                        <td class="label">Company VAT / Reg:</td>
+                        <td class="value">${meta.companyDetails.companyVat}</td>
+                    </tr>
+                    ` : ''}
+                    ${meta.companyDetails?.companyDetails ? `
+                    <tr>
+                        <td class="label">Company / Billing Info:</td>
+                        <td class="value">${meta.companyDetails.companyDetails}</td>
+                    </tr>
+                    ` : ''}
                     <tr>
                         <td class="label">Proposed Date:</td>
                         <td class="value">${quoteData?.move_date || 'TBD'}</td>
                     </tr>
                     <tr>
+                        <td class="label">Property Route Type:</td>
+                        <td class="value"><span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;background:${meta.hasOffice ? '#eff6ff' : '#f8fafc'};color:${meta.hasOffice ? '#1d4ed8' : '#334155'};border:1px solid ${meta.hasOffice ? '#bfdbfe' : '#e2e8f0'};">${meta.propertyRouteLabel}</span></td>
+                    </tr>
+                    <tr>
                         <td class="label">Collection From:</td>
-                        <td class="value">${quoteData?.pickup_address || 'N/A'}</td>
+                        <td class="value">${quoteData?.pickup_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.originUpper}</span></td>
                     </tr>
                     <tr>
                         <td class="label">Delivery To:</td>
-                        <td class="value">${quoteData?.dropoff_address || 'N/A'}</td>
+                        <td class="value">${quoteData?.dropoff_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.destUpper}</span></td>
                     </tr>
                 </table>
 
@@ -676,7 +815,7 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
 
             innerHtml = `
                 <h1 style="color:#059669;">✅ Booking Confirmed — Payment Received</h1>
@@ -695,7 +834,9 @@ serve(async (req) => {
                     paymentMethod: (quoteData?.payment_method || 'Card / EFT').toUpperCase(),
                     total: quoteData?.total_price,
                     step: 'Booking Confirmed / Payment Received',
-                    notes: quoteData?.customer_comments
+                    notes: quoteData?.customer_comments,
+                    quoteData,
+                    inventoryData
                 })}
 
                 ${inventoryHtml}
@@ -743,7 +884,8 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
+            const meta = extractCompanyAndRouteMeta(quoteData, inventoryData)
 
             innerHtml = `
                 <h1>Booking Confirmation</h1>
@@ -759,9 +901,13 @@ serve(async (req) => {
                 <table class="details-table">
                     <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-size:16px;font-weight:900;">MM-${ref}</td></tr>
                     <tr><td class="label">Client Name:</td><td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td></tr>
+                    ${meta.companyDetails?.companyName ? `<tr><td class="label">🏢 Company Name:</td><td class="value"><strong style="color:#1e40af;">${meta.companyDetails.companyName}</strong></td></tr>` : ''}
+                    ${meta.companyDetails?.companyVat ? `<tr><td class="label">Company VAT / Reg:</td><td class="value">${meta.companyDetails.companyVat}</td></tr>` : ''}
+                    ${meta.companyDetails?.companyDetails ? `<tr><td class="label">Company / Billing Info:</td><td class="value">${meta.companyDetails.companyDetails}</td></tr>` : ''}
                     <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
-                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
-                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
+                    <tr><td class="label">Property Route Type:</td><td class="value"><span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;background:${meta.hasOffice ? '#eff6ff' : '#f8fafc'};color:${meta.hasOffice ? '#1d4ed8' : '#334155'};border:1px solid ${meta.hasOffice ? '#bfdbfe' : '#e2e8f0'};">${meta.propertyRouteLabel}</span></td></tr>
+                    <tr><td class="label">Collection From:</td><td class="value">${quoteData?.pickup_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.originUpper}</span></td></tr>
+                    <tr><td class="label">Delivery To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.destUpper}</span></td></tr>
                     <tr><td class="label">Payment Method:</td><td class="value" style="text-transform: uppercase;">${quoteData?.payment_method || 'Card/EFT'}</td></tr>
                 </table>
 
@@ -846,7 +992,7 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
 
             innerHtml = `
                 <h1 style="color:#e31837;">📞 Callback Request</h1>
@@ -867,7 +1013,9 @@ serve(async (req) => {
                     moveDate: contactData?.moveDate,
                     referralSource: contactData?.referral_source || contactData?.referralSource,
                     step: contactData?.step || 'Quote Flow Callback Request',
-                    notes: contactData?.notes || contactData?.comments
+                    notes: contactData?.notes || contactData?.comments,
+                    quoteData,
+                    inventoryData
                 })}
 
                 ${inventoryHtml}
@@ -911,7 +1059,7 @@ serve(async (req) => {
                 }
             }
 
-            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume)
+            const inventoryHtml = renderInventoryTableHtml(inventoryData, totalVolume, quoteData?.custom_products || inventoryData?.custom_products)
 
             innerHtml = `
                 <h1 style="color:#e31837;">🚛 Outline Area Custom Quote Request</h1>
@@ -925,7 +1073,9 @@ serve(async (req) => {
                     pickup: contactData?.pickup,
                     dropoff: contactData?.dropoff,
                     step: 'Outlaying Area Custom Quote Request',
-                    notes: contactData?.notes || contactData?.comments
+                    notes: contactData?.notes || contactData?.comments,
+                    quoteData,
+                    inventoryData
                 })}
 
                 ${inventoryHtml}
@@ -1003,11 +1153,12 @@ serve(async (req) => {
             // Build inventory HTML from items_json
             // items_json can be { items: {...} } or a flat { itemId: qty } object
             const rawItems = quoteData?.items_json?.items || quoteData?.items_json || {}
-            const itemEntries = Object.entries(rawItems).filter(([, qty]) => Number(qty) > 0)
+            const customProds = quoteData?.custom_products || quoteData?.items_json?.custom_products || []
+            const itemEntries = Object.entries(rawItems).filter(([k, qty]) => typeof qty === 'number' && Number(qty) > 0 && k !== 'total_volume')
 
             let inventoryHtml = ''
-            if (itemEntries.length > 0) {
-                inventoryHtml = renderInventoryTableHtml(rawItems, quoteData?.total_volume)
+            if (itemEntries.length > 0 || customProds.length > 0) {
+                inventoryHtml = renderInventoryTableHtml(quoteData?.items_json || rawItems, quoteData?.total_volume, customProds)
             } else {
                 inventoryHtml = `
                 <div style="margin-top:20px;padding:12px 16px;background:#fefce8;border-left:3px solid #eab308;border-radius:6px;">
@@ -1017,7 +1168,7 @@ serve(async (req) => {
 
             // Work out which step the customer dropped off at
             const hasAddresses = !!(quoteData?.pickup_address && quoteData?.dropoff_address)
-            const hasInventory = itemEntries.length > 0
+            const hasInventory = itemEntries.length > 0 || customProds.length > 0
             const hasPrice = Number(quoteData?.total_price || 0) > 0
             let stepDropped = ''
             let stepColor = '#64748b'
@@ -1063,7 +1214,9 @@ serve(async (req) => {
                     paymentMethod: quoteData?.payment_method,
                     total: quoteData?.total_price,
                     step: stepDropped,
-                    notes: hasInventory ? `${itemEntries.reduce((s, [, q]) => s + Number(q), 0)} items added in inventory` : 'No inventory added yet'
+                    notes: hasInventory ? `${itemEntries.reduce((s, [, q]) => s + Number(q), 0)} items added in inventory` : 'No inventory added yet',
+                    quoteData,
+                    inventoryData: quoteData?.items_json
                 })}
 
                 ${inventoryHtml}
@@ -1081,6 +1234,8 @@ serve(async (req) => {
             subject = `Complete Your Master Movers Booking [Ref: MM-${ref}]`
             recipients = typeof to === 'string' ? [to] : (to || [quoteData?.client_email])
 
+            const meta = extractCompanyAndRouteMeta(quoteData, quoteData?.items_json)
+
             innerHtml = `
                 <h1>Your Move is Ready to Book!</h1>
                 <p>Dear ${quoteData?.client_name || 'Valued Customer'},</p>
@@ -1094,9 +1249,12 @@ serve(async (req) => {
                 <table class="details-table">
                     <tr><td class="label">Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">MM-${ref}</td></tr>
                     <tr><td class="label">Client Name:</td><td class="value"><strong>${quoteData?.client_name || 'Valued Customer'}</strong></td></tr>
+                    ${meta.companyDetails?.companyName ? `<tr><td class="label">🏢 Company Name:</td><td class="value"><strong style="color:#1e40af;">${meta.companyDetails.companyName}</strong></td></tr>` : ''}
+                    ${meta.companyDetails?.companyVat ? `<tr><td class="label">Company VAT / Reg:</td><td class="value">${meta.companyDetails.companyVat}</td></tr>` : ''}
                     <tr><td class="label">Move Date:</td><td class="value">${quoteData?.move_date || 'TBD'}</td></tr>
-                    <tr><td class="label">From:</td><td class="value">${quoteData?.pickup_address || 'N/A'}</td></tr>
-                    <tr><td class="label">To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'}</td></tr>
+                    <tr><td class="label">Property Route Type:</td><td class="value"><span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;background:${meta.hasOffice ? '#eff6ff' : '#f8fafc'};color:${meta.hasOffice ? '#1d4ed8' : '#334155'};border:1px solid ${meta.hasOffice ? '#bfdbfe' : '#e2e8f0'};">${meta.propertyRouteLabel}</span></td></tr>
+                    <tr><td class="label">From:</td><td class="value">${quoteData?.pickup_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.originUpper}</span></td></tr>
+                    <tr><td class="label">To:</td><td class="value">${quoteData?.dropoff_address || 'N/A'} <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:800;background:#f1f5f9;color:#475569;">${meta.destUpper}</span></td></tr>
                 </table>
 
                 <p>We accept <strong>credit/debit card</strong> and <strong>Payflex interest-free instalments</strong> (4 payments over 6 weeks).</p>
@@ -1138,7 +1296,9 @@ serve(async (req) => {
                     paymentMethod: quoteData?.payment_method,
                     total: quoteData?.total_price,
                     step: 'Quote Declined / Rejected by Client',
-                    notes: reasonText
+                    notes: reasonText,
+                    quoteData,
+                    inventoryData: quoteData?.items_json
                 })}
 
                 <div style="text-align:center;margin:30px 0;">
@@ -1148,6 +1308,75 @@ serve(async (req) => {
                 </div>
 
                 <p style="font-size:13px;color:#64748b;">Contact the customer on <strong>${quoteData?.client_phone || '—'}</strong> to discuss alternative pricing or options.</p>
+            `
+        } else if (type === 'terms_accepted_alert') {
+            const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
+            const clientName = cleanClientName(quoteData?.client_name || 'Customer')
+            const sigName = signatureName || quoteData?.client_name || 'Client'
+            const sigDate = signatureDate ? new Date(signatureDate).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('en-ZA')
+
+            subject = `✅ TERMS ACCEPTED & SIGNED — ${clientName} [MM-${ref}]`
+            recipients = adminEmails
+
+            innerHtml = `
+                <div style="text-align:center;margin-bottom:20px;">
+                    <span style="display:inline-block;padding:6px 16px;background:#dcfce7;color:#15803d;border-radius:20px;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">
+                        Official Agreement Signed
+                    </span>
+                    <h1 style="color:#0f172a;margin:12px 0 6px 0;font-size:24px;">Terms &amp; Conditions Accepted</h1>
+                    <p style="color:#64748b;font-size:14px;margin:0;">The client has accepted and electronically signed their moving agreement.</p>
+                </div>
+
+                <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:16px;padding:24px;text-align:center;margin:24px 0;">
+                    <div style="display:inline-block;width:48px;height:48px;line-height:48px;border-radius:50%;background:#22c55e;color:#ffffff;font-size:24px;font-weight:bold;margin-bottom:12px;text-align:center;">✓</div>
+                    <div style="font-size:15px;font-weight:900;color:#15803d;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">TERMS ACCEPTED</div>
+                    <div style="font-size:10px;font-weight:800;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">ELECTRONICALLY SIGNED BY</div>
+                    <div style="font-family:Georgia, serif;font-size:26px;font-weight:bold;font-style:italic;color:#0f172a;margin-bottom:6px;">${sigName}</div>
+                    <div style="font-size:12px;color:#64748b;font-weight:600;">${sigDate}</div>
+                    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #bbf7d0;font-size:12px;color:#166534;font-style:italic;">
+                        &ldquo;I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above.&rdquo;
+                    </div>
+                </div>
+
+                ${buildStandardDetailsTable({
+                    ref: ref,
+                    name: clientName,
+                    phone: quoteData?.client_phone,
+                    email: quoteData?.client_email,
+                    pickup: quoteData?.pickup_address,
+                    dropoff: quoteData?.dropoff_address,
+                    moveDate: quoteData?.move_date,
+                    moveType: quoteData?.move_type,
+                    total: quoteData?.total_price,
+                    step: 'Terms & Conditions Accepted & Signed',
+                    notes: `Electronically signed by ${sigName} on ${sigDate}`,
+                    quoteData,
+                    inventoryData: quoteData?.items_json
+                })}
+
+                <div style="margin:24px 0;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;">
+                    <h3 style="margin:0 0 10px 0;font-size:13px;font-weight:900;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Summary of Contract Clauses Agreed:</h3>
+                    <ul style="margin:0;padding-left:18px;color:#475569;font-size:12px;line-height:1.6;">
+                        <li><strong>1. Booking &amp; Payment:</strong> Full payment (or agreed deposit) required at least 48 hours prior to move.</li>
+                        <li><strong>2. Inventory Accuracy:</strong> Quote based on inventory provided; price adjustments apply if actual volume exceeds quoted volume.</li>
+                        <li><strong>3. Protection Cover:</strong> Standard Goods in Transit (GIT) covers fire, collision, hijacking. Platinum cover required for breakage.</li>
+                        <li><strong>4. Access &amp; Surcharges:</strong> Standard access assumed; surcharges apply for long carries (&gt;30m), stairs, or shuttle vehicles.</li>
+                    </ul>
+                </div>
+
+                ${pngBase64 ? `
+                <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin:20px 0;text-align:center;">
+                    <p style="margin:0;font-size:13px;color:#334155;font-weight:700;">
+                        📎 Official signed certificate image attached: <strong>MasterMovers_Signed_Terms_${ref}.png</strong>
+                    </p>
+                </div>
+                ` : ''}
+
+                <div style="text-align:center;margin:30px 0;">
+                    <a href="https://mastermovers.co.za/admin/quotes/${quoteData?.id || ''}" class="btn" style="background:#0f172a;">
+                        View Quote in Admin →
+                    </a>
+                </div>
             `
         } else {
             throw new Error(`Unsupported email type: ${type}`)
@@ -1161,6 +1390,12 @@ serve(async (req) => {
             attachments.push({
                 content: pdfBase64,
                 filename: pdfFilename,
+            })
+        }
+        if (pngBase64 && pngFilename) {
+            attachments.push({
+                content: pngBase64,
+                filename: pngFilename,
             })
         }
 

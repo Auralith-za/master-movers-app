@@ -335,6 +335,11 @@ export const generateProfessionalQuote = (data) => {
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
                 const unassignedCustom = [];
                 customProductsList.forEach(p => {
+                    // Exclude pure financial adjustments / coupons / fee surcharges (e.g. Piano Crate R1800 with 0 cubes)
+                    const isManualAdjustment = String(p.id || '').startsWith('manual_adjustment_') ||
+                        (parseFloat(p.cubes || p.cuft || 0) === 0 && Number(p.price || 0) !== 0 && !p.wrap && !p.sleeves);
+                    if (isManualAdjustment) return;
+
                     const cVol = parseFloat(p.cubes || p.cuft || 0);
                     const qty = Math.max(1, parseInt(p.quantity || p.qty) || 1);
                     const totalVol = cVol * qty;
@@ -376,6 +381,7 @@ export const generateProfessionalQuote = (data) => {
                 head: [['Item Description', 'Quantity']],
                 body: tableRows,
                 theme: 'striped',
+                showHead: 'everyPage',
                 headStyles: { 
                     fillColor: slate900, 
                     textColor: [255, 255, 255],
@@ -383,13 +389,15 @@ export const generateProfessionalQuote = (data) => {
                     fontSize: 9
                 },
                 styles: { fontSize: 8.5, cellPadding: 3 },
-                margin: { left: 20, right: 20 }
+                margin: { left: 20, right: 20, top: 20, bottom: 22 }
             });
 
             currentY = doc.lastAutoTable.finalY + 12;
 
             // --- Costs Section & Terms Page Control ---
-            if (currentY > 140) {
+            // A4 page height is 297mm; footer is at 283mm.
+            // Cost summary + payment terms take ~95mm. Only force new page if remaining height cannot fit both.
+            if (currentY > 175) {
                 doc.addPage();
                 currentY = 20;
             }
