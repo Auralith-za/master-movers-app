@@ -2370,12 +2370,12 @@ export default function QuoteDetailPage() {
                                                                         })()}
                                                                     </td>
 
-                                                                    {/* PLASTIC SLEEVES COLUMN — qty × R55 */}
+                                                                    {/* PLASTIC SLEEVES COLUMN — R55 each */}
                                                                     <td className="px-6 py-4 text-center">
                                                                         {(() => {
-                                                                            const defaultSleeves = getPlasticSleevesCount(item, itemId)
+                                                                            const defaultSleeves = (getPlasticSleevesCount(item, itemId) || 0) * qty
                                                                             const sleeveQty = wrapInfo.sleeves !== undefined ? wrapInfo.sleeves : defaultSleeves
-                                                                            const sleeveCost = sleeveQty * qty * 55
+                                                                            const sleeveCost = sleeveQty * 55
 
                                                                             return isEditing ? (
                                                                                 <div className="flex flex-col items-center gap-1">
@@ -2392,7 +2392,7 @@ export default function QuoteDetailPage() {
                                                                                             setEditForm({ ...editForm, special_wrapping: updatedWrap })
                                                                                         }} className="w-6 h-6 rounded bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">+</button>
                                                                                     </div>
-                                                                                    {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × {qty} × R55 = R {sleeveCost.toFixed(2)}</span>}
+                                                                                    {sleeveQty > 0 && <span className="text-[10px] text-amber-600 font-bold">{sleeveQty} × R55 = R {sleeveCost.toFixed(2)}</span>}
                                                                                 </div>
                                                                             ) : (
                                                                                 sleeveQty > 0

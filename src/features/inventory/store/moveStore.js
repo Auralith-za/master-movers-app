@@ -653,23 +653,27 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
             
             let appliesWrapping = getWrappingFlag(item, variation)
-            let sleeves = getPlasticSleevesCount(item, idKey)
+            let totalSleeves = 0
 
             // Apply overrides if any
-            if (specialWrappingOverrides && specialWrappingOverrides[idKey]) {
-                const override = specialWrappingOverrides[idKey]
-                if (override.wrap !== undefined) appliesWrapping = override.wrap
-                if (override.sleeves !== undefined) sleeves = override.sleeves
+            if (specialWrappingOverrides && specialWrappingOverrides[idKey] && specialWrappingOverrides[idKey].sleeves !== undefined) {
+                totalSleeves = Math.max(0, parseInt(specialWrappingOverrides[idKey].sleeves) || 0)
+            } else {
+                totalSleeves = (getPlasticSleevesCount(item, idKey) || 0) * qty
             }
 
-            // Enforce mutual exclusivity: auto-sleeved items (sleeves > 0) use plastic sleeves ONLY and cannot be wrapped
-            if (sleeves > 0) {
+            if (specialWrappingOverrides && specialWrappingOverrides[idKey] && specialWrappingOverrides[idKey].wrap !== undefined) {
+                appliesWrapping = specialWrappingOverrides[idKey].wrap
+            }
+
+            // Enforce mutual exclusivity: auto-sleeved items (totalSleeves > 0) use plastic sleeves ONLY and cannot be wrapped
+            if (totalSleeves > 0) {
                 appliesWrapping = false
             }
 
-            if (sleeves > 0) {
-                plasticSleeveCount += (qty * sleeves)
-                plasticSleeveCost += (qty * sleeves * 55)
+            if (totalSleeves > 0) {
+                plasticSleeveCount += totalSleeves
+                plasticSleeveCost += (totalSleeves * 55)
             }
             
             if (appliesWrapping) {
@@ -820,11 +824,36 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
     const inferCityFromAddress = (addr) => {
         if (!addr) return null;
         const a = addr.toLowerCase();
+
+        // 1. Postal Code Geographic Check
+        const postalMatches = a.match(/\b(\d{4})\b/g);
+        if (postalMatches && postalMatches.length > 0) {
+            for (let i = postalMatches.length - 1; i >= 0; i--) {
+                const code = parseInt(postalMatches[i], 10);
+                // Western Cape postal codes (6700 to 8099, including 7300 Malmesbury)
+                if (code >= 6700 && code <= 8099) {
+                    return CITY_CODES.CPT;
+                }
+                // KwaZulu-Natal postal codes (2900 to 4799)
+                if (code >= 2900 && code <= 4799) {
+                    return CITY_CODES.DBN;
+                }
+                // Gauteng & Pretoria postal codes (0001 to 2899)
+                if (code >= 1 && code <= 2899) {
+                    return CITY_CODES.JHB;
+                }
+            }
+        }
+
+        // 2. Keyword check
         if (
             a.includes('cape town') || a.includes('capetown') || a.includes('cpt') || a.includes('western cape') ||
+            a.includes('malmesbury') || a.includes('swartland') || a.includes('hermanus') || a.includes('worcester') ||
+            a.includes('langebaan') || a.includes('saldanha') || a.includes('vredenburg') || a.includes('caledon') ||
+            a.includes('ceres') || a.includes('robertson') || a.includes('moorreesburg') || a.includes('piketberg') ||
             a.includes('stellenryk') || a.includes('durbanville') || a.includes('bellville') || a.includes('stellenbosch') ||
             a.includes('paarl') || a.includes('somerset west') || a.includes('blouberg') || a.includes('milnerton') ||
-            a.includes('sea point') || a.includes('camps bay') || a.includes('table view')
+            a.includes('sea point') || a.includes('camps bay') || a.includes('table view') || a.includes('overberg')
         ) {
             return CITY_CODES.CPT;
         }
@@ -846,9 +875,23 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         return null;
     };
 
-    // Fallback: check address string before defaulting to JHB
-    if (!pickupCityCode) pickupCityCode = inferCityFromAddress(pickupAddress) || CITY_CODES.JHB;
-    if (!dropoffCityCode) dropoffCityCode = inferCityFromAddress(dropoffAddress) || CITY_CODES.JHB;
+    // Fallback: check address string before defaulting
+    if (!pickupCityCode) pickupCityCode = inferCityFromAddress(pickupAddress);
+    if (!dropoffCityCode) dropoffCityCode = inferCityFromAddress(dropoffAddress);
+
+    // If still unresolved, default intelligently based on distance
+    const estDistance = parseFloat(moveDetails.totalBillableDistance) || parseFloat(moveDetails.distanceKm) || 0;
+    if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
+    if (!dropoffCityCode) {
+        if (pickupCityCode === CITY_CODES.DBN) {
+            // From DBN, >1100km one-way / >2200km circuit is Western Cape (CPT), ~500-700km is Gauteng (JHB)
+            dropoffCityCode = (estDistance > 1100) ? CITY_CODES.CPT : CITY_CODES.JHB;
+        } else if (pickupCityCode === CITY_CODES.CPT) {
+            dropoffCityCode = (estDistance > 1500) ? CITY_CODES.DBN : CITY_CODES.JHB;
+        } else {
+            dropoffCityCode = CITY_CODES.JHB;
+        }
+    }
 
     // ─── STEP 4: Province text cross-check (fail-safe) ───────────────────────────
     const provinces = ['gauteng', 'western cape', 'kwazulu-natal', 'kzn', 'eastern cape', 'free state', 'limpopo', 'mpumalanga', 'mpumulanga', 'mphumulanga', 'north west', 'northern cape'];
@@ -919,31 +962,48 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             nationalDestinationCityCode = firstDiff;
         }
 
-        // Explicit destination sanity check: Ensure dropoff address text takes precedence over any generic fallback
+        // Explicit destination sanity check: Ensure dropoff address text & postal code take precedence
+        const dropoffLower = (dropoffAddress || '').toLowerCase();
+        const dropoffPostalMatch = dropoffLower.match(/\b(\d{4})\b/g);
+        let hasCptPostal = false;
+        if (dropoffPostalMatch) {
+            for (const p of dropoffPostalMatch) {
+                const code = parseInt(p, 10);
+                if (code >= 6700 && code <= 8099) {
+                    hasCptPostal = true;
+                    break;
+                }
+            }
+        }
+
         if (
-            dropoffAddress.includes('cape town') || dropoffAddress.includes('capetown') || dropoffAddress.includes('cpt') ||
-            dropoffAddress.includes('western cape') || dropoffAddress.includes('stellenryk') || dropoffAddress.includes('durbanville')
+            hasCptPostal ||
+            dropoffLower.includes('cape town') || dropoffLower.includes('capetown') || dropoffLower.includes('cpt') ||
+            dropoffLower.includes('western cape') || dropoffLower.includes('stellenryk') || dropoffLower.includes('durbanville') ||
+            dropoffLower.includes('malmesbury') || dropoffLower.includes('swartland') || dropoffLower.includes('hermanus') ||
+            dropoffLower.includes('worcester') || dropoffLower.includes('langebaan') || dropoffLower.includes('saldanha') ||
+            dropoffLower.includes('vredenburg')
         ) {
             if (pickupCityCode !== CITY_CODES.CPT) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
             }
         } else if (
-            dropoffAddress.includes('durban') || dropoffAddress.includes('dbn') || dropoffAddress.includes('kzn') || dropoffAddress.includes('kwazulu') ||
-            dropoffAddress.includes('ethekwini') || dropoffAddress.includes('berea') || dropoffAddress.includes('umhlanga') || dropoffAddress.includes('ballito')
+            dropoffLower.includes('durban') || dropoffLower.includes('dbn') || dropoffLower.includes('kzn') || dropoffLower.includes('kwazulu') ||
+            dropoffLower.includes('ethekwini') || dropoffLower.includes('berea') || dropoffLower.includes('umhlanga') || dropoffLower.includes('ballito')
         ) {
             if (pickupCityCode !== CITY_CODES.DBN) {
                 nationalDestinationCityCode = CITY_CODES.DBN;
             }
-        } else if (pickupCityCode === nationalDestinationCityCode) {
-            // Fallback for long-distance routes where destination city wasn't explicitly parsed
-            if (pickupCityCode === CITY_CODES.JHB) {
-                const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || (totalDistance / 2);
-                nationalDestinationCityCode = (oneWayDist > 950 || totalDistance > 1800) ? CITY_CODES.CPT : CITY_CODES.DBN;
-            } else if (pickupCityCode === CITY_CODES.DBN) {
-                const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || (totalDistance / 2);
-                nationalDestinationCityCode = (oneWayDist > 1100 || totalDistance > 2200) ? CITY_CODES.CPT : CITY_CODES.JHB;
+        } else if (pickupCityCode === nationalDestinationCityCode || (pickupCityCode === CITY_CODES.DBN && nationalDestinationCityCode === CITY_CODES.JHB)) {
+            // Fallback for long-distance routes: Durban to Cape Town is ~1,650km one way (circuit > 2,200km or one-way > 1,100km).
+            // A move from DBN with >1100km CANNOT be JHB (which is ~570km)!
+            const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || (totalDistance / 2);
+            if (pickupCityCode === CITY_CODES.DBN && (oneWayDist > 1100 || totalDistance > 2200)) {
+                nationalDestinationCityCode = CITY_CODES.CPT;
+            } else if (pickupCityCode === CITY_CODES.JHB && (oneWayDist > 950 || totalDistance > 1800)) {
+                nationalDestinationCityCode = CITY_CODES.CPT;
             } else if (pickupCityCode === CITY_CODES.CPT) {
-                nationalDestinationCityCode = CITY_CODES.JHB;
+                nationalDestinationCityCode = (oneWayDist > 1400 || totalDistance > 2800) ? CITY_CODES.DBN : CITY_CODES.JHB;
             }
         }
     }

@@ -566,6 +566,12 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         const hasCptMarker = 
             name.includes('cape town') || name.includes('capetown') || name.includes('cpt') ||
             name.includes('city of cape town') || name.includes('western cape') ||
+            name.includes('malmesbury') || name.includes('swartland') || name.includes('hermanus') ||
+            name.includes('worcester') || name.includes('langebaan') || name.includes('saldanha') ||
+            name.includes('vredenburg') || name.includes('caledon') || name.includes('ceres') ||
+            name.includes('robertson') || name.includes('moorreesburg') || name.includes('piketberg') ||
+            name.includes('porterville') || name.includes('tulbagh') || name.includes('montagu') ||
+            name.includes('swellendam') || name.includes('overberg') || name.includes('west coast') ||
             name.includes('bellville') || name.includes('stellenbosch') || name.includes('somerset west') ||
             name.includes('milnerton') || name.includes('tableview') || name.includes('table view') ||
             name.includes('bloubergstrand') || name.includes('blouberg sands') || name.includes('blouberg rise') ||
