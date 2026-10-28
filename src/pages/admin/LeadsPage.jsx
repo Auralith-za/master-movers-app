@@ -12,16 +12,37 @@ export default function LeadsPage() {
 
     const fetchLeads = async () => {
         try {
-            // Fetch all quotes to be safe against missing columns in the DB
-            const { data, error } = await supabase
-                .from('quotes')
-                .select('*')
-                .order('created_at', { ascending: false })
+            let allQuotes = []
+            let page = 0
+            const pageSize = 1000
 
-            if (error) throw error
+            while (true) {
+                const { data, error } = await supabase
+                    .from('quotes')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1)
 
-            // Only show genuine leads: status=lead OR has a callback request
-            const processedLeads = (data || []).filter(quote =>
+                if (error) throw error
+                if (!data || data.length === 0) break
+
+                allQuotes.push(...data)
+                if (page === 0) {
+                    const firstLeads = allQuotes.filter(quote =>
+                        quote.status === 'lead' || Boolean(quote.request_call_back) === true
+                    ).sort((a, b) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    )
+                    setLeads(firstLeads)
+                    setLoading(false)
+                }
+
+                if (data.length < pageSize) break
+                page++
+            }
+
+            // Only show genuine leads across all quotes: status=lead OR has a callback request
+            const processedLeads = allQuotes.filter(quote =>
                 quote.status === 'lead' ||
                 Boolean(quote.request_call_back) === true
             ).sort((a, b) =>

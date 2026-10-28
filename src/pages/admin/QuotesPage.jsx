@@ -21,14 +21,33 @@ export default function QuotesPage() {
 
     const fetchQuotes = async () => {
         try {
-            const { data, error } = await supabase
-                .from('quotes')
-                .select('*')
-                .order('created_at', { ascending: false })
+            let allQuotes = []
+            let page = 0
+            const pageSize = 1000
 
-            if (error) throw error
-            // Sort by created_at descending — newest quote at the top
-            const sorted = [...(data || [])].sort((a, b) => {
+            while (true) {
+                const { data, error } = await supabase
+                    .from('quotes')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1)
+
+                if (error) throw error
+                if (!data || data.length === 0) break
+
+                allQuotes.push(...data)
+                // Show the latest batch immediately so the UI is fast and responsive
+                if (page === 0) {
+                    setQuotes([...allQuotes])
+                    setLoading(false)
+                }
+
+                if (data.length < pageSize) break
+                page++
+            }
+
+            // Sort all quotes across all pages by created_at descending
+            const sorted = allQuotes.sort((a, b) => {
                 return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             })
             setQuotes(sorted)
@@ -38,6 +57,33 @@ export default function QuotesPage() {
             setLoading(false)
         }
     }
+
+    // Active server-side search fallback to find any historical quotes instantly
+    useEffect(() => {
+        if (!searchTerm || searchTerm.trim().length < 2) return
+        const rawQ = searchTerm.trim()
+        const q = rawQ.replace(/^MM-/i, '')
+        const timer = setTimeout(async () => {
+            try {
+                const { data } = await supabase
+                    .from('quotes')
+                    .select('*')
+                    .or(`client_name.ilike.%${q}%,client_phone.ilike.%${q}%,client_email.ilike.%${q}%,pickup_address.ilike.%${q}%,dropoff_address.ilike.%${q}%`)
+                    .limit(50)
+                if (data && data.length > 0) {
+                    setQuotes(prev => {
+                        const existingIds = new Set(prev.map(item => item.id))
+                        const newItems = data.filter(item => !existingIds.has(item.id))
+                        if (newItems.length === 0) return prev
+                        return [...prev, ...newItems].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    })
+                }
+            } catch (err) {
+                console.warn('Server search error:', err)
+            }
+        }, 400)
+        return () => clearTimeout(timer)
+    }, [searchTerm])
 
     const getStatusColor = (status) => {
         switch (status) {

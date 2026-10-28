@@ -31,13 +31,36 @@ export default function DashboardPage() {
     const fetchData = async () => {
         setIsLoading(true)
         try {
-            const { data, error } = await supabase
-                .from('quotes')
-                .select('*')
-                .order('created_at', { ascending: false })
+            let allQuotes = []
+            let page = 0
+            const pageSize = 1000
 
-            if (data) {
-                const sorted = [...data].sort((a, b) =>
+            while (true) {
+                const { data, error } = await supabase
+                    .from('quotes')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(page * pageSize, (page + 1) * pageSize - 1)
+
+                if (error) throw error
+                if (!data || data.length === 0) break
+
+                allQuotes.push(...data)
+                if (page === 0) {
+                    const sortedInitial = [...allQuotes].sort((a, b) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    )
+                    setQuotes(sortedInitial)
+                    calculateStats(sortedInitial)
+                    setIsLoading(false)
+                }
+
+                if (data.length < pageSize) break
+                page++
+            }
+
+            if (allQuotes.length > 0) {
+                const sorted = [...allQuotes].sort((a, b) =>
                     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                 )
                 setQuotes(sorted)
