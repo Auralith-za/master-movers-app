@@ -901,7 +901,6 @@ export default function QuoteDetailPage() {
                 distance_km: Number(editForm.distance_km || 0),
                 trip_breakdown: editForm.trip_breakdown || null,
                 move_date: editForm.move_date,
-                packing_date: editForm.packing_date || null,
                 status: editForm.status,
                 rejection_reason: editForm.rejection_reason,
                 team_notes: editForm.team_notes,
@@ -979,8 +978,25 @@ export default function QuoteDetailPage() {
             if (error) throw error
 
             if (id === 'new') {
-                alert('Quote created successfully!')
+                setQuote({
+                    ...editForm,
+                    id: newId,
+                    created_at: new Date().toISOString(),
+                    packaging_option: resolvedPackagingOption,
+                    st7_boxes: totalSt7,
+                    linen_boxes: totalLinen,
+                    send_me_boxes: sendMeBoxes,
+                    boxes_and_packing: boxesAndPacking,
+                    extra_collections: editForm.extraCollections || editForm.extra_collections || [],
+                    extra_drops: editForm.extraDrops || editForm.extra_drops || [],
+                    items_json: payload.items_json,
+                    total_price: finalPrice,
+                    total_volume: finalVolume
+                })
+                setIsEditing(false)
+                if (!silent) alert('Quote created successfully!')
                 navigate(`/admin/quotes/${newId}`)
+                return newId
             } else {
                 setQuote({ 
                     ...editForm, 
@@ -1023,10 +1039,12 @@ export default function QuoteDetailPage() {
                 setEditingRoomName({ oldName: null, newName: '' })
                 setIsEditing(false)
                 if (!silent) alert('Quote updated successfully!')
+                return id
             }
         } catch (error) {
             console.error('Error saving quote:', error)
-            alert('Failed to save quote: ' + error.message)
+            if (!silent) alert('Failed to save quote: ' + error.message)
+            return null
         }
     }
 
@@ -1049,31 +1067,41 @@ export default function QuoteDetailPage() {
     }
 
     const ensureSyncedWithDb = async () => {
-        if (!quote || id === 'new') return
+        if (!quote) return null
+        if (id === 'new') {
+            const savedId = await handleSave(true)
+            return savedId
+        }
         const basePrice = recalculatedData?.total || editForm.total_price || 0
         const finalPriceToSave = (isEditing || !quote?.total_price || !quote?.is_manual_price)
             ? (basePrice + priceOffset)
             : (Number(quote?.total_price) || 0)
         if (finalPriceToSave > 0 && (Math.abs(finalPriceToSave - (quote.total_price || 0)) > 0.01 || isEditing)) {
             try {
-                await handleSave(true)
+                const savedId = await handleSave(true)
+                return savedId || quote.id
             } catch (saveErr) {
                 console.warn('Auto-save prior to action failed:', saveErr)
             }
         }
+        return quote?.id
     }
 
     const handleSendEmailUpdate = async () => {
-        await ensureSyncedWithDb()
+        const activeId = (await ensureSyncedWithDb()) || (id !== 'new' ? quote?.id : null)
+        if (!activeId) {
+            alert('Please ensure quote details are entered and saved before sending.')
+            return
+        }
         // Use saved email OR fall back to the edit form value (unsaved new quote)
-        let emailTo = quote.client_email || editForm.client_email
+        let emailTo = quote?.client_email || editForm.client_email
 
         if (!emailTo) {
             emailTo = prompt('No email address on this quote. Enter the client email to send to:')
             if (!emailTo) return
             // Save it to the quote immediately
             setEditForm(prev => ({ ...prev, client_email: emailTo }))
-            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', quote.id)
+            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', activeId)
         }
 
         const confirmSend = confirm(`Send automated proposal email with PDF to ${emailTo}?`)
@@ -1085,7 +1113,7 @@ export default function QuoteDetailPage() {
             
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
-                quoteId: quote.id,
+                quoteId: activeId,
                 totalVolume: computedVolume || quote.total_volume,
                 clientName: quote.client_name || editForm.client_name,
                 clientEmail: emailTo,
@@ -1127,33 +1155,37 @@ export default function QuoteDetailPage() {
     }
 
     const handleResendQuote = async () => {
-        await ensureSyncedWithDb()
-        let emailTo = quote.client_email || editForm.client_email
+        const activeId = (await ensureSyncedWithDb()) || (id !== 'new' ? quote?.id : null)
+        if (!activeId) {
+            alert('Please ensure quote details are entered and saved before sending.')
+            return
+        }
+        let emailTo = quote?.client_email || editForm.client_email
 
         if (!emailTo) {
             emailTo = prompt('No email address on this quote. Enter the client email to send to:')
             if (!emailTo) return
             setEditForm(prev => ({ ...prev, client_email: emailTo }))
-            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', quote.id)
+            await supabase.from('quotes').update({ client_email: emailTo }).eq('id', activeId)
         }
 
         if (!confirm(`Regenerate and email quote PDF to ${emailTo}?`)) return
         
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json?.items || quote.items_json || {}))
-            const reviewLink = `https://mastermovers.co.za/quote-review?id=${id}`
+            const reviewLink = `https://mastermovers.co.za/quote-review?id=${activeId}`
             const companyInfo = getActiveCompanyDetails()
             
             const result = await emailService.sendQuoteEmail({
                 type: 'quote_proposal',
-                quoteId: quote.id,
+                quoteId: activeId,
                 totalVolume: computedVolume || quote.total_volume,
-                clientName: quote.client_name,
-                clientEmail: quote.client_email,
-                clientPhone: quote.client_phone,
-                pickupAddress: quote.pickup_address,
-                dropoffAddress: quote.dropoff_address,
-                moveDate: quote.move_date,
+                clientName: quote.client_name || editForm.client_name,
+                clientEmail: quote.client_email || emailTo,
+                clientPhone: quote.client_phone || editForm.client_phone,
+                pickupAddress: quote.pickup_address || editForm.pickup_address,
+                dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
+                moveDate: quote.move_date || editForm.move_date,
                 packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
                 inventory: inventoryForPdf,
                 total: finalPrice,
@@ -1176,7 +1208,7 @@ export default function QuoteDetailPage() {
             });
 
             if (result.success) {
-                await logActivity('email', `Quote PDF resent to client at ${quote.client_email}. Payment Link: ${reviewLink}`);
+                await logActivity('email', `Quote PDF resent to client at ${emailTo}. Payment Link: ${reviewLink}`);
                 alert('Quote resent successfully!');
             } else {
                 alert('Failed to send email: ' + result.error);
@@ -1188,18 +1220,25 @@ export default function QuoteDetailPage() {
     }
 
     const copyPaymentLink = async () => {
-        await ensureSyncedWithDb()
-        const link = `https://mastermovers.co.za/quote-review?id=${id}`
+        const activeId = (await ensureSyncedWithDb()) || (id !== 'new' ? quote?.id : null)
+        if (!activeId) {
+            alert('Please ensure quote details are entered and saved before copying payment link.')
+            return
+        }
+        const link = `https://mastermovers.co.za/quote-review?id=${activeId}`
         navigator.clipboard.writeText(link)
         alert('Payment & Terms link copied to clipboard!')
     }
 
     const handleSendPaymentLink = async () => {
-        if (!quote) return
-        await ensureSyncedWithDb()
-        let clientEmail = quote.client_email || editForm.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email
+        const activeId = (await ensureSyncedWithDb()) || (id !== 'new' ? quote?.id : null)
+        if (!activeId) {
+            alert('Please ensure quote details are entered and saved before sending payment link.')
+            return
+        }
+        let clientEmail = quote?.client_email || editForm.client_email || quote?.items_json?.contactEmail || quote?.items_json?.client_email
         const SITE_URL = 'https://mastermovers.co.za'
-        const paymentLink = `${SITE_URL}/quote-review?id=${quote.id}`
+        const paymentLink = `${SITE_URL}/quote-review?id=${activeId}`
 
         if (!clientEmail) {
             try {
@@ -1268,21 +1307,25 @@ export default function QuoteDetailPage() {
     }, [searchQuery])
 
     const downloadInventoryPDF = async () => {
-        await ensureSyncedWithDb()
+        const activeId = (await ensureSyncedWithDb()) || (id !== 'new' ? quote?.id : null)
+        if (!activeId) {
+            alert('Please ensure quote details are entered and saved before downloading.')
+            return
+        }
         try {
             const inventoryForPdf = normalizeInventory(isEditing ? editForm.items_json : (quote.items_json || quote.inventory))
             const activeCustomProds = editForm.custom_products || quote.custom_products || quote.items_json?.custom_products || []
             const companyInfo = getActiveCompanyDetails()
             await generateProfessionalQuote({
-                quoteId: quote.id,
-                clientName: isEditing ? editForm.client_name : quote.client_name,
-                clientEmail: isEditing ? editForm.client_email : quote.client_email,
-                clientPhone: isEditing ? editForm.client_phone : quote.client_phone,
-                pickupAddress: isEditing ? editForm.pickup_address : quote.pickup_address,
-                dropoffAddress: isEditing ? editForm.dropoff_address : quote.dropoff_address,
-                moveDate: isEditing ? editForm.move_date : quote.move_date,
+                quoteId: activeId,
+                clientName: isEditing ? editForm.client_name : (quote.client_name || editForm.client_name),
+                clientEmail: isEditing ? editForm.client_email : (quote.client_email || editForm.client_email),
+                clientPhone: isEditing ? editForm.client_phone : (quote.client_phone || editForm.client_phone),
+                pickupAddress: isEditing ? editForm.pickup_address : (quote.pickup_address || editForm.pickup_address),
+                dropoffAddress: isEditing ? editForm.dropoff_address : (quote.dropoff_address || editForm.dropoff_address),
+                moveDate: isEditing ? editForm.move_date : (quote.move_date || editForm.move_date),
                 packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
-                createdAt: quote.created_at,
+                createdAt: quote.created_at || new Date().toISOString(),
                 inventory: inventoryForPdf,
                 // Always prefer live recalculated values so PDF matches sidebar
                 total: finalPrice,
