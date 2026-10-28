@@ -662,12 +662,11 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
                 totalSleeves = (getPlasticSleevesCount(item, idKey) || 0) * qty
             }
 
-            if (specialWrappingOverrides && specialWrappingOverrides[idKey] && specialWrappingOverrides[idKey].wrap !== undefined) {
-                appliesWrapping = specialWrappingOverrides[idKey].wrap
-            }
-
-            // Enforce mutual exclusivity: auto-sleeved items (totalSleeves > 0) use plastic sleeves ONLY and cannot be wrapped
-            if (totalSleeves > 0) {
+            const hasWrapOverride = specialWrappingOverrides && specialWrappingOverrides[idKey] && specialWrappingOverrides[idKey].wrap !== undefined
+            if (hasWrapOverride) {
+                appliesWrapping = Boolean(specialWrappingOverrides[idKey].wrap)
+            } else if (totalSleeves > 0) {
+                // By default without admin override, auto-sleeved items use plastic sleeves ONLY and cannot be wrapped
                 appliesWrapping = false
             }
 
@@ -701,14 +700,21 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             let appliesWrap = Boolean(prod.wrap);
             let sleeveQty = parseInt(prod.sleeves) || 0;
 
+            let hasCustomWrapOverride = false;
             if (specialWrappingOverrides && specialWrappingOverrides[prod.id]) {
                 const override = specialWrappingOverrides[prod.id];
-                if (override.wrap !== undefined) appliesWrap = override.wrap;
+                if (override.wrap !== undefined) {
+                    appliesWrap = Boolean(override.wrap);
+                    hasCustomWrapOverride = true;
+                }
                 if (override.sleeves !== undefined) sleeveQty = override.sleeves;
             }
 
-            if (sleeveQty > 0) {
+            if (sleeveQty > 0 && !hasCustomWrapOverride && prod.wrap === undefined) {
                 appliesWrap = false;
+            }
+
+            if (sleeveQty > 0) {
                 plasticSleeveCount += sleeveQty;
                 plasticSleeveCost += sleeveQty * 55;
             }

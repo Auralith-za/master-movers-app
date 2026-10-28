@@ -474,12 +474,14 @@ export default function QuoteDetailPage() {
 
     const handleUpdateQuantity = (itemId, newQty) => {
         const updatedItems = { ...editForm.items_json }
+        const updatedWrapping = { ...(editForm.special_wrapping || {}) }
         if (newQty <= 0) {
             delete updatedItems[itemId]
+            delete updatedWrapping[itemId]
         } else {
             updatedItems[itemId] = newQty
         }
-        setEditForm({ ...editForm, items_json: updatedItems })
+        setEditForm({ ...editForm, items_json: updatedItems, special_wrapping: updatedWrapping })
     }
 
     const handleAddItem = (item, variation = null, targetRoom = null) => {
@@ -765,7 +767,7 @@ export default function QuoteDetailPage() {
             ...prev,
             custom_products: (prev.custom_products || []).map(p => {
                 if (p.id === productId) {
-                    return { ...p, sleeves, wrap: sleeves > 0 ? false : p.wrap }
+                    return { ...p, sleeves }
                 }
                 return p
             })
@@ -2330,11 +2332,6 @@ export default function QuoteDetailPage() {
                                                                     {/* WRAPPING COLUMN — vol × R5.90 */}
                                                                     <td className="px-6 py-4 text-center">
                                                                         {(() => {
-                                                                            const isAutoSleeved = getPlasticSleevesCount(item, itemId) > 0
-                                                                            if (isAutoSleeved) {
-                                                                                return <span className="text-slate-400 text-xs">—</span>
-                                                                            }
-
                                                                             const defaultWrapped = getWrappingFlag(item, variation)
                                                                             const wrappingEnabled = wrapInfo.wrap !== undefined ? wrapInfo.wrap : defaultWrapped
                                                                             const wrappingCostCalc = wrappingEnabled ? ((item?.volume || 0) * qty * 5.90) : 0
@@ -2346,9 +2343,18 @@ export default function QuoteDetailPage() {
                                                                                             type="checkbox"
                                                                                             checked={wrappingEnabled}
                                                                                             onChange={(e) => {
+                                                                                                const isChecked = e.target.checked
+                                                                                                const defaultSleeves = (getPlasticSleevesCount(item, itemId) || 0) * qty
+                                                                                                const currentSleeves = wrapInfo.sleeves !== undefined ? wrapInfo.sleeves : defaultSleeves
+                                                                                                // When ticking wrap on an auto-sleeved item, if sleeves haven't been modified yet, set sleeves to 0 (cardboard wrapping requested instead of plastic)
+                                                                                                const updatedSleeves = (isChecked && wrapInfo.sleeves === undefined && currentSleeves > 0) ? 0 : wrapInfo.sleeves
                                                                                                 const updatedWrap = {
                                                                                                     ...(editForm.special_wrapping || {}),
-                                                                                                    [itemId]: { ...wrapInfo, wrap: e.target.checked }
+                                                                                                    [itemId]: {
+                                                                                                        ...wrapInfo,
+                                                                                                        wrap: isChecked,
+                                                                                                        ...(updatedSleeves !== undefined ? { sleeves: updatedSleeves } : {})
+                                                                                                    }
                                                                                                 }
                                                                                                 setEditForm({ ...editForm, special_wrapping: updatedWrap })
                                                                                             }}
@@ -2467,9 +2473,7 @@ export default function QuoteDetailPage() {
 
                                                                     {/* WRAPPING COLUMN */}
                                                                     <td className="px-6 py-4 text-center">
-                                                                        {sleeveQty > 0 ? (
-                                                                            <span className="text-slate-400 text-xs">—</span>
-                                                                        ) : isEditing ? (
+                                                                        {isEditing ? (
                                                                             <div className="flex flex-col items-center gap-1">
                                                                                 <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
                                                                                     <input
@@ -2636,9 +2640,7 @@ export default function QuoteDetailPage() {
 
                                                              {/* WRAPPING COLUMN — total vol × R5.90 */}
                                                              <td className="px-6 py-4 text-center">
-                                                                 {sleeveQty > 0 ? (
-                                                                     <span className="text-slate-400 text-xs">—</span>
-                                                                 ) : isEditing ? (
+                                                                 {isEditing ? (
                                                                      <div className="flex flex-col items-center gap-1">
                                                                          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600">
                                                                              <input
