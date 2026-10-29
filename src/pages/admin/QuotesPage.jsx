@@ -423,7 +423,7 @@ export default function QuotesPage() {
                                             {quote.terms_accepted ? (
                                                 <span 
                                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                                                    title={`Signed by ${quote.signature_json?.name || quote.client_name || 'Client'} on ${quote.signature_json?.date ? new Date(quote.signature_json.date).toLocaleString() : ''}`}
+                                                    title={`Signed by ${quote.signature_json?.name || quote.client_name || 'Client'}${(quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number) ? ` (ID: ${quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number})` : ''} on ${quote.signature_json?.date ? new Date(quote.signature_json.date).toLocaleString() : ''}`}
                                                 >
                                                     <CheckCircle size={10} className="text-emerald-600" />
                                                     Signed: {quote.signature_json?.name || 'Yes'}

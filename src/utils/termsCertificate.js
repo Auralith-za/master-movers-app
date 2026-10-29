@@ -46,7 +46,7 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
  * Generates an official, high-resolution PNG Certificate of the Signed Terms & Conditions.
  * Returns { dataUrl, base64 }
  */
-export async function generateSignedTermsCertificatePng({ quote, signatureName, signatureDate }) {
+export async function generateSignedTermsCertificatePng({ quote, signatureName, signatureIdNumber, signatureDate }) {
     const width = 800
     const height = 1120
 
@@ -256,8 +256,16 @@ export async function generateSignedTermsCertificatePng({ quote, signatureName, 
 
     // Electronic Signature Name (Serif, italic, large)
     ctx.fillStyle = '#0f172a'
-    ctx.font = 'bold italic 28px Georgia, "Times New Roman", serif'
-    ctx.fillText(signatureName || clientNameStr, circleCenterX, sigCardY + 166)
+    ctx.font = 'bold italic 26px Georgia, "Times New Roman", serif'
+    ctx.fillText(signatureName || clientNameStr, circleCenterX, sigCardY + 160)
+
+    // ID Number if provided
+    const effectiveIdNumber = signatureIdNumber || quote?.signature_json?.idNumber || quote?.signature_json?.id_number || quote?.id_number || ''
+    if (effectiveIdNumber) {
+        ctx.fillStyle = '#334155'
+        ctx.font = '700 11px system-ui, -apple-system, sans-serif'
+        ctx.fillText(`ID / Passport: ${effectiveIdNumber}`, circleCenterX, sigCardY + 180)
+    }
 
     // Date & Timestamp
     const formattedDate = signatureDate 
@@ -265,12 +273,12 @@ export async function generateSignedTermsCertificatePng({ quote, signatureName, 
         : new Date().toLocaleString('en-ZA')
     ctx.fillStyle = '#64748b'
     ctx.font = '600 11px system-ui, -apple-system, sans-serif'
-    ctx.fillText(formattedDate, circleCenterX, sigCardY + 192)
+    ctx.fillText(formattedDate, circleCenterX, sigCardY + (effectiveIdNumber ? 199 : 192))
 
     // Bottom confirmation quote
     ctx.fillStyle = '#166534'
     ctx.font = 'italic 10px system-ui, -apple-system, sans-serif'
-    ctx.fillText('"I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above."', circleCenterX, sigCardY + 220)
+    ctx.fillText('"I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above."', circleCenterX, sigCardY + (effectiveIdNumber ? 222 : 220))
     ctx.restore()
 
     // 7. Official Legal Footer

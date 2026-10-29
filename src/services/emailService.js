@@ -676,6 +676,7 @@ export const emailService = {
         moveDate,
         total,
         signatureName,
+        signatureIdNumber,
         signatureDate,
         signedPngBase64
     }) => {
@@ -704,6 +705,8 @@ export const emailService = {
                     type: 'terms_accepted_alert',
                     quoteData,
                     signatureName,
+                    signatureIdNumber: signatureIdNumber || null,
+                    idNumber: signatureIdNumber || null,
                     signatureDate,
                     pngBase64: signedPngBase64 || null,
                     pngFilename: `MasterMovers_Signed_Terms_${quoteId || 'Agreement'}.png`

@@ -12,7 +12,8 @@ serve(async (req) => {
     }
 
     try {
-        const { quoteId, signatureName } = await req.json()
+        const { quoteId, signatureName, idNumber, signatureIdNumber, signatureDate } = await req.json()
+        const cleanIdNumber = (idNumber || signatureIdNumber || '').trim()
 
         if (!quoteId || !signatureName) {
             return new Response(
@@ -29,7 +30,9 @@ serve(async (req) => {
 
         const signatureJson = {
             name: signatureName,
-            date: new Date().toISOString()
+            idNumber: cleanIdNumber,
+            id_number: cleanIdNumber,
+            date: signatureDate || new Date().toISOString()
         }
 
         const { data, error } = await supabase
@@ -48,7 +51,7 @@ serve(async (req) => {
         await supabase.from('quote_activities').insert([{
             quote_id: quoteId,
             activity_type: 'system',
-            content: `Client accepted and signed terms. Signature: ${signatureName}`
+            content: `Client accepted and signed terms. Signature: ${signatureName}${cleanIdNumber ? ` (ID: ${cleanIdNumber})` : ''}`
         }])
 
         return new Response(

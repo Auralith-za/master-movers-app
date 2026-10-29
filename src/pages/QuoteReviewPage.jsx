@@ -174,6 +174,7 @@ export default function QuoteReviewPage() {
                 const cert = await generateSignedTermsCertificatePng({
                     quote,
                     signatureName: sig.name,
+                    signatureIdNumber: sig.idNumber,
                     signatureDate: sig.date
                 })
                 signedPngBase64 = cert.base64
@@ -181,24 +182,62 @@ export default function QuoteReviewPage() {
                 console.warn('Canvas certificate generation warning:', certErr)
             }
 
-            // 2. Use edge function (service role) to bypass RLS on the public quote page
-            const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-terms`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                },
-                body: JSON.stringify({
-                    quoteId: id,
-                    signatureName: sig.name,
-                    signatureDate: sig.date
+            // 2. Call edge function
+            let edgeSucceeded = false
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-terms`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        quoteId: id,
+                        signatureName: sig.name,
+                        idNumber: sig.idNumber,
+                        signatureIdNumber: sig.idNumber,
+                        signatureDate: sig.date
+                    })
                 })
-            })
+                if (response.ok) edgeSucceeded = true
+            } catch (err) {
+                console.warn('accept-terms edge function call error:', err)
+            }
 
-            const result = await response.json()
-            if (!response.ok) throw new Error(result.error || 'Failed to save acceptance')
+            // 3. Always ensure signature_json with idNumber is directly persisted to Supabase quotes table
+            const signaturePayload = {
+                name: sig.name,
+                idNumber: sig.idNumber,
+                id_number: sig.idNumber,
+                date: sig.date
+            }
 
-            // 3. Send email to admin with attached PNG certificate
+            const { error: dbError } = await supabase
+                .from('quotes')
+                .update({
+                    terms_accepted: true,
+                    signature_json: signaturePayload,
+                    status: 'pending_payment'
+                })
+                .eq('id', id)
+
+            if (dbError && !edgeSucceeded) {
+                console.error('Database update error:', dbError)
+                throw new Error(dbError.message || 'Failed to save acceptance')
+            }
+
+            // 4. Log activity
+            try {
+                await supabase.from('quote_activities').insert([{
+                    quote_id: id,
+                    activity_type: 'system',
+                    content: `Client accepted and signed terms. Signature: ${sig.name} (ID: ${sig.idNumber})`
+                }])
+            } catch (actErr) {
+                console.warn('Could not record activity:', actErr)
+            }
+
+            // 5. Send email to admin with attached PNG certificate
             try {
                 await emailService.sendTermsAcceptedAlert({
                     quoteId: quote.id,
@@ -210,6 +249,7 @@ export default function QuoteReviewPage() {
                     moveDate: quote.move_date,
                     total: quote.total_price || 0,
                     signatureName: sig.name,
+                    signatureIdNumber: sig.idNumber,
                     signatureDate: sig.date,
                     signedPngBase64: signedPngBase64
                 })
@@ -218,7 +258,7 @@ export default function QuoteReviewPage() {
             }
 
             setAccepted(true);
-            setSignatureData(sig);
+            setSignatureData(signaturePayload);
             setIsTermsOpen(false);
 
         } catch (error) {
@@ -697,7 +737,13 @@ export default function QuoteReviewPage() {
                                     <h3 className="font-black text-slate-900 uppercase tracking-tight">Terms Accepted</h3>
                                     <p className="text-[10px] text-slate-400 font-black uppercase mt-2">Electronically Signed By</p>
                                     <p className="font-serif text-lg text-slate-800 italic mt-1 font-bold">{signatureData?.name}</p>
-                                    <p className="text-[10px] text-slate-400 mt-1">{new Date(signatureData?.date).toLocaleString()}</p>
+                                    {(signatureData?.idNumber || signatureData?.id_number) && (
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100/60 border border-emerald-200 rounded-full text-xs font-mono font-bold text-slate-700 mt-1.5 shadow-xs">
+                                            <span className="text-[10px] uppercase font-bold text-slate-500">ID / Passport:</span>
+                                            <span>{signatureData.idNumber || signatureData.id_number}</span>
+                                        </div>
+                                    )}
+                                    <p className="text-[10px] text-slate-400 mt-1">{signatureData?.date ? new Date(signatureData.date).toLocaleString() : ''}</p>
                                 </div>
                             )}
                         </div>

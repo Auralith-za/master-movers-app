@@ -564,7 +564,7 @@ serve(async (req) => {
     }
 
     try {
-        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, pngBase64, pngFilename, signatureName, signatureDate, paymentLink } = await req.json()
+        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, pngBase64, pngFilename, signatureName, signatureIdNumber, idNumber, signatureDate, paymentLink } = await req.json()
 
         // Lead Validation: For abandoned leads, require at least email or phone. For callback/contact requests, require both.
         if (type === 'abandoned_lead_alert') {
@@ -1313,6 +1313,7 @@ serve(async (req) => {
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
             const clientName = cleanClientName(quoteData?.client_name || 'Customer')
             const sigName = signatureName || quoteData?.client_name || 'Client'
+            const sigId = (signatureIdNumber || idNumber || quoteData?.signature_json?.idNumber || quoteData?.signature_json?.id_number || quoteData?.id_number || '').toString().trim()
             const sigDate = signatureDate ? new Date(signatureDate).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('en-ZA')
 
             subject = `✅ TERMS ACCEPTED & SIGNED — ${clientName} [MM-${ref}]`
@@ -1332,6 +1333,7 @@ serve(async (req) => {
                     <div style="font-size:15px;font-weight:900;color:#15803d;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">TERMS ACCEPTED</div>
                     <div style="font-size:10px;font-weight:800;color:#64748b;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">ELECTRONICALLY SIGNED BY</div>
                     <div style="font-family:Georgia, serif;font-size:26px;font-weight:bold;font-style:italic;color:#0f172a;margin-bottom:6px;">${sigName}</div>
+                    ${sigId ? `<div style="display:inline-block;padding:4px 12px;background:#ffffff;border:1px solid #bbf7d0;border-radius:20px;font-size:12px;font-weight:bold;color:#166534;margin-bottom:8px;font-family:monospace;">ID / Passport: ${sigId}</div><br/>` : ''}
                     <div style="font-size:12px;color:#64748b;font-weight:600;">${sigDate}</div>
                     <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #bbf7d0;font-size:12px;color:#166534;font-style:italic;">
                         &ldquo;I hereby confirm that the inventory list is correct and I accept the terms and conditions outlined above.&rdquo;
@@ -1349,7 +1351,7 @@ serve(async (req) => {
                     moveType: quoteData?.move_type,
                     total: quoteData?.total_price,
                     step: 'Terms & Conditions Accepted & Signed',
-                    notes: `Electronically signed by ${sigName} on ${sigDate}`,
+                    notes: `Electronically signed by ${sigName}${sigId ? ` (ID: ${sigId})` : ''} on ${sigDate}`,
                     quoteData,
                     inventoryData: quoteData?.items_json
                 })}

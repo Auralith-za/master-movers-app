@@ -1288,6 +1288,7 @@ export default function QuoteDetailPage() {
             const cert = await generateSignedTermsCertificatePng({
                 quote,
                 signatureName: quote.signature_json?.name || quote.client_name,
+                signatureIdNumber: quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number,
                 signatureDate: quote.signature_json?.date || quote.created_at
             })
             downloadCertificatePng(cert.dataUrl, `MasterMovers_Signed_Terms_${quote.id.toString().slice(0, 8)}.png`)
@@ -1428,7 +1429,7 @@ export default function QuoteDetailPage() {
                         </span>
                         {quote.terms_accepted ? (
                             <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
-                                <ShieldCheck size={12} /> Terms Signed: {quote.signature_json?.name || quote.client_name || 'Yes'}
+                                <ShieldCheck size={12} /> Terms Signed: {quote.signature_json?.name || quote.client_name || 'Yes'}{(quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number) ? ` (ID: ${quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number})` : ''}
                             </span>
                         ) : (quote.status === 'rejected' || quote.rejection_reason || quote.items_json?.rejection_reason) ? (
                             <span className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
@@ -3847,7 +3848,13 @@ export default function QuoteDetailPage() {
                                     <p className="font-serif text-xl text-slate-900 italic font-bold mt-0.5">
                                         {quote.signature_json?.name || quote.client_name}
                                     </p>
-                                    <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                                    {(quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number) && (
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/90 border border-emerald-300 rounded-full text-xs font-mono font-bold text-slate-700 mt-2 shadow-xs">
+                                            <span className="text-[10px] uppercase font-bold text-slate-400">ID / Passport:</span>
+                                            <span>{quote.signature_json?.idNumber || quote.signature_json?.id_number || quote.id_number}</span>
+                                        </div>
+                                    )}
+                                    <p className="text-[11px] text-slate-500 font-semibold mt-1.5">
                                         {quote.signature_json?.date ? new Date(quote.signature_json.date).toLocaleString('en-ZA') : 'Signed Digitally'}
                                     </p>
                                     <div className="mt-3 pt-2.5 border-t border-emerald-200/60 text-[10px] text-emerald-800 italic leading-snug">
