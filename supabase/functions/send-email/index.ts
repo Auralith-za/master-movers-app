@@ -601,7 +601,6 @@ serve(async (req) => {
         // Designated admin recipients for all internal notifications (new leads, callbacks, outline areas, quotes, bookings, etc.)
         const adminEmails = [
             'curtleroux7785@gmail.com',
-            'ray@nova-gg.com',
             'sales1@mastermoversjhb.co.za',
             'melonie@nova-gg.com',
             'accounts@mastermoversjhb.co.za'
