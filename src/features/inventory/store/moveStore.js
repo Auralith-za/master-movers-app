@@ -866,8 +866,13 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         if (
             a.includes('durban') || a.includes('dbn') || a.includes('ethekwini') || a.includes('kwazulu') || a.includes('kzn') ||
             a.includes('berea') || a.includes('windermere') || a.includes('umhlanga') || a.includes('ballito') ||
-            a.includes('pinetown') || a.includes('hillcrest') || a.includes('westville') || a.includes('kloof')
+            a.includes('pinetown') || a.includes('hillcrest') || a.includes('westville') || a.includes('kloof') ||
+            a.includes('inanda') || a.includes('ntuzuma') || a.includes('umlazi') || a.includes('musgrave') ||
+            a.includes('bluff') || a.includes('isipingo') || a.includes('durban north') || a.includes('yellowwood park')
         ) {
+            if (a.includes('inanda') && (a.includes('sandton') || a.includes('gauteng') || a.includes('joburg') || a.includes('johannesburg'))) {
+                return CITY_CODES.JHB;
+            }
             return CITY_CODES.DBN;
         }
         if (
@@ -894,6 +899,17 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             dropoffCityCode = (estDistance > 1100) ? CITY_CODES.CPT : CITY_CODES.JHB;
         } else if (pickupCityCode === CITY_CODES.CPT) {
             dropoffCityCode = (estDistance > 1500) ? CITY_CODES.DBN : CITY_CODES.JHB;
+        } else if (pickupCityCode === CITY_CODES.JHB) {
+            // From JHB:
+            // Cape Town is ~1,400km one-way (>900km one-way / >1800km round-trip)
+            // Durban is ~570km one-way (~350km - 850km one-way / 700km - 1700km round-trip)
+            if (estDistance > 900) {
+                dropoffCityCode = CITY_CODES.CPT;
+            } else if (estDistance >= 350) {
+                dropoffCityCode = CITY_CODES.DBN;
+            } else {
+                dropoffCityCode = CITY_CODES.JHB;
+            }
         } else {
             dropoffCityCode = CITY_CODES.JHB;
         }
@@ -995,19 +1011,23 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             }
         } else if (
             dropoffLower.includes('durban') || dropoffLower.includes('dbn') || dropoffLower.includes('kzn') || dropoffLower.includes('kwazulu') ||
-            dropoffLower.includes('ethekwini') || dropoffLower.includes('berea') || dropoffLower.includes('umhlanga') || dropoffLower.includes('ballito')
+            dropoffLower.includes('ethekwini') || dropoffLower.includes('berea') || dropoffLower.includes('umhlanga') || dropoffLower.includes('ballito') ||
+            dropoffLower.includes('inanda') || dropoffLower.includes('ntuzuma') || dropoffLower.includes('umlazi') ||
+            dropoffLower.includes('pinetown') || dropoffLower.includes('hillcrest') || dropoffLower.includes('westville') || dropoffLower.includes('amanzimtoti')
         ) {
             if (pickupCityCode !== CITY_CODES.DBN) {
                 nationalDestinationCityCode = CITY_CODES.DBN;
             }
-        } else if (pickupCityCode === nationalDestinationCityCode || (pickupCityCode === CITY_CODES.DBN && nationalDestinationCityCode === CITY_CODES.JHB)) {
+        } else if (pickupCityCode === nationalDestinationCityCode || (pickupCityCode === CITY_CODES.JHB && (!nationalDestinationCityCode || nationalDestinationCityCode === CITY_CODES.JHB)) || (pickupCityCode === CITY_CODES.DBN && nationalDestinationCityCode === CITY_CODES.JHB)) {
             // Fallback for long-distance routes: Durban to Cape Town is ~1,650km one way (circuit > 2,200km or one-way > 1,100km).
-            // A move from DBN with >1100km CANNOT be JHB (which is ~570km)!
+            // JHB to DBN is ~570km one way (~350km - 850km), JHB to CPT is ~1400km (>950km).
             const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || (totalDistance / 2);
             if (pickupCityCode === CITY_CODES.DBN && (oneWayDist > 1100 || totalDistance > 2200)) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
             } else if (pickupCityCode === CITY_CODES.JHB && (oneWayDist > 950 || totalDistance > 1800)) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
+            } else if (pickupCityCode === CITY_CODES.JHB && (oneWayDist >= 350 || totalDistance >= 700)) {
+                nationalDestinationCityCode = CITY_CODES.DBN;
             } else if (pickupCityCode === CITY_CODES.CPT) {
                 nationalDestinationCityCode = (oneWayDist > 1400 || totalDistance > 2800) ? CITY_CODES.DBN : CITY_CODES.JHB;
             }
@@ -1096,7 +1116,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             }
         } else {
             // Fallback for undefined routes
-            volumeRate = 25
+            const oneWay = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || (totalDistance / 2);
+            volumeRate = (oneWay >= 350 && oneWay <= 850) ? 15 : 25;
             volumeCost = totalVolumeCuFt * volumeRate
             routeMinCharge = 5000
             transportCost = moveProtectionCost
@@ -1562,7 +1583,10 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             isSharedLoad: sharedLoadPreference !== null ? sharedLoadPreference : (isNationalMove && totalVolumeCuFt < 850),
             payflexSurcharge,
             paymentMethod: moveDetails.paymentMethod || 'eft',
-            discount: exclVatDiscount
+            discount: exclVatDiscount,
+            pickupCityCode: pickupCityCode,
+            dropoffCityCode: isNationalMove ? nationalDestinationCityCode : dropoffCityCode,
+            isNational: isNationalMove
         }
     }
 }

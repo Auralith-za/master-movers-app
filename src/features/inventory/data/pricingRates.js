@@ -490,7 +490,10 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 val.includes("shaka") || val.includes("dolphin coast") || val.includes("kwadukuza") ||
                 val.includes("salt rock") || val.includes("zimbali") || val.includes("sheffield beach") ||
                 val.includes("tinley manor") || val.includes("westbrook") || val.includes("tongaat") ||
-                val.includes("umdloti") || val.includes("stanger")
+                val.includes("umdloti") || val.includes("stanger") ||
+                val === "inanda" || val.includes("inanda glebe") || val === "ntuzuma" || val === "umlazi" ||
+                val === "musgrave" || val === "bluff" || val === "isipingo" || val === "durban north" ||
+                val === "yellowwood park" || val === "new germany" || val === "point waterfront"
             ) {
                 return CITY_CODES.DBN;
             }
@@ -601,7 +604,11 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('queensburgh') || name.includes('berea') || name.includes('windermere') || name.includes('glenwood') ||
             name.includes('chatsworth') || name.includes('phoenix') || name.includes('gillitts') ||
             name.includes('assagay') || name.includes('bothas hill') || name.includes('cowies hill') ||
-            name.includes('warner beach') || name.includes('winklespruit');
+            name.includes('warner beach') || name.includes('winklespruit') ||
+            name.includes('inanda') || name.includes('ntuzuma') || name.includes('umlazi') ||
+            name.includes('musgrave') || name.includes('bluff') || name.includes('isipingo') ||
+            name.includes('durban north') || name.includes('yellowwood park') || name.includes('new germany') ||
+            name.includes('point waterfront');
 
         // Garden Route Markers
         const isGardenRouteTown = GARDEN_ROUTE_TOWNS.some(t => {
@@ -631,6 +638,12 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         if (name.includes('morningside')) {
             if (hasDbnMarker) return CITY_CODES.DBN;
             return CITY_CODES.JHB;
+        }
+        // - Inanda (Sandton JHB vs Durban KZN)
+        if (name.includes('inanda')) {
+            if (name.includes('glebe')) return CITY_CODES.DBN;
+            if (hasGautengMarker) return CITY_CODES.JHB;
+            return CITY_CODES.DBN;
         }
         // - Wynberg (Sandton JHB vs Cape Town WC)
         if (name.includes('wynberg')) {
