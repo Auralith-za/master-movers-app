@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle } from 'lucide-react';
+import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle, FileText, Download } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
-import { calculateQuote } from '../features/inventory/store/moveStore';
+import { calculateQuote, getWrappingFlag, getPlasticSleevesCount } from '../features/inventory/store/moveStore';
 import TermsModal from '../components/TermsModal';
 import PayFastCheckout from '../features/payment/PayFastCheckout';
 import PayflexCheckout from '../features/payment/PayflexCheckout';
 import { emailService } from '../services/emailService';
+import { generateProfessionalQuote } from '../services/pdfService';
 import { normalizeInventory, parseInventoryKey } from '../utils/inventoryUtils';
 import { generateSignedTermsCertificatePng } from '../utils/termsCertificate';
 import { getBranchDetails } from '../utils/branchDetails';
@@ -316,6 +317,43 @@ export default function QuoteReviewPage() {
         quoteVolume += customVolSum;
     }
 
+    const handleDownloadPdf = async () => {
+        try {
+            await generateProfessionalQuote({
+                quoteId: quote.id,
+                clientName: quote.client_name,
+                clientEmail: quote.client_email,
+                clientPhone: quote.client_phone,
+                pickupAddress: quote.pickup_address,
+                dropoffAddress: quote.dropoff_address,
+                moveDate: quote.move_date,
+                packingDate: quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || '',
+                createdAt: quote.created_at,
+                inventory: inventory,
+                specialWrapping: quote.special_wrapping || quote.items_json?.special_wrapping || {},
+                special_wrapping: quote.special_wrapping || quote.items_json?.special_wrapping || {},
+                total: quote.total_price || 0,
+                vat: (quote.total_price || 0) * 0.15 / 1.15,
+                subTotal: (quote.total_price || 0) / 1.15,
+                discount: quote.items_json?.breakdown?.discount || 0,
+                inventoryItems: INVENTORY_ITEMS,
+                breakdown: quote.items_json?.breakdown || null,
+                totalVolume: quoteVolume,
+                is_manual_price: Boolean(quote.is_manual_price),
+                isManualPrice: Boolean(quote.is_manual_price),
+                accessDetails: quote.access_details || {},
+                generalNotes: quote.general_notes || quote.notes || quote.customer_comments || quote.items_json?.generalNotes || '',
+                customProducts: quote.custom_products || quote.items_json?.custom_products || [],
+                extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
+                extraDrops: quote.items_json?.extraDrops || quote.extra_drops || [],
+                shouldSave: true
+            });
+        } catch (err) {
+            console.error('Failed to download PDF:', err);
+            alert('Failed to generate PDF: ' + (err?.message || err));
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 pb-36 sm:pb-24">
             <div className="bg-slate-900 overflow-hidden relative">
@@ -325,8 +363,17 @@ export default function QuoteReviewPage() {
                             <span className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 inline-block">Official Quote</span>
                             <h1 className="text-4xl font-black tracking-tight">Review Your Move</h1>
                             <p className="text-slate-400 mt-2">Reference: <span className="text-white font-bold tracking-wider">#{quote.id.toString().substring(0, 8).toUpperCase()}</span></p>
-                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-red-600/20 border border-red-500/30 rounded-full text-xs font-black text-red-400 uppercase tracking-wider">
-                                📦 Total Volume / Cubes: {quoteVolume.toFixed(2)} ft³
+                            <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600/20 border border-red-500/30 rounded-full text-xs font-black text-red-400 uppercase tracking-wider">
+                                    📦 Total Volume / Cubes: {quoteVolume.toFixed(2)} ft³
+                                </div>
+                                <button
+                                    onClick={handleDownloadPdf}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                                    title="Download Official Quote PDF"
+                                >
+                                    <Download size={13} /> Download Official PDF
+                                </button>
                             </div>
                         </div>
                         {appSettings && appSettings.pricing_active === false ? (
@@ -634,6 +681,7 @@ export default function QuoteReviewPage() {
                             <div className="space-y-5">
                                 {(() => {
                                     const groupedRooms = {};
+                                    const specialWrapping = quote.special_wrapping || quote.items_json?.special_wrapping || {};
                                     Object.entries(inventory).forEach(([idKey, qty]) => {
                                         if (!qty || qty <= 0) return;
                                         const { itemId, variation, room } = parseInventoryKey(idKey);
@@ -641,10 +689,39 @@ export default function QuoteReviewPage() {
                                         const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                                         const roomName = room || item?.category || 'General Furniture';
                                         if (!groupedRooms[roomName]) groupedRooms[roomName] = [];
+
+                                        const wrapInfo = specialWrapping[idKey] || 
+                                                         (room ? specialWrapping[`${itemId}__room:${room}`] : null) || 
+                                                         (room && variation ? specialWrapping[`${itemId}_${variation}__room:${room}`] : null) ||
+                                                         specialWrapping[itemId] || 
+                                                         (variation ? specialWrapping[`${itemId}_${variation}`] : null) ||
+                                                         specialWrapping[itemId.toLowerCase()] || {};
+
+                                        const defaultWrapped = getWrappingFlag(item, variation);
+                                        const defaultSleeves = (getPlasticSleevesCount(item, idKey) || 0) * qty;
+
+                                        let isWrapped = defaultWrapped;
+                                        let sleevesCount = defaultSleeves;
+
+                                        if (wrapInfo.sleeves !== undefined) {
+                                            sleevesCount = Math.max(0, parseInt(wrapInfo.sleeves) || 0);
+                                        }
+                                        if (wrapInfo.wrap !== undefined) {
+                                            isWrapped = Boolean(wrapInfo.wrap);
+                                        } else if (sleevesCount > 0) {
+                                            isWrapped = false;
+                                        }
+
+                                        const cleanVariation = variation 
+                                            ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '').replace(/^Wood$/i, '').trim() 
+                                            : null;
+
                                         groupedRooms[roomName].push({
                                             key: idKey,
                                             name: itemName,
-                                            variation,
+                                            variation: cleanVariation,
+                                            isWrapped,
+                                            sleevesCount,
                                             qty,
                                             image: item?.image,
                                             isCustom: false
@@ -660,6 +737,8 @@ export default function QuoteReviewPage() {
                                             key: prod.id || `custom_${idx}`,
                                             name: prod.name,
                                             variation: vol > 0 ? `${vol.toFixed(2)} ft³` : null,
+                                            isWrapped: Boolean(prod.wrap),
+                                            sleevesCount: parseInt(prod.sleeves) || 0,
                                             qty,
                                             isCustom: true
                                         };
@@ -689,15 +768,29 @@ export default function QuoteReviewPage() {
                                                 {items.map(entry => (
                                                     <div key={entry.key} className="flex justify-between items-center py-2 hover:bg-slate-50/50 px-2 rounded transition-colors">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+                                                            <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                                                                 {entry.image
                                                                     ? <img src={entry.image} alt={entry.name} className="w-6 h-6 object-contain" onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='📦'; }} />
                                                                     : <span className="text-lg">📦</span>
                                                                 }
                                                             </div>
-                                                            <span className="text-sm font-bold text-slate-700">
-                                                                {entry.name} {entry.variation ? <span className="text-slate-400 font-normal">({entry.variation})</span> : ''}
-                                                            </span>
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="text-sm font-bold text-slate-700">
+                                                                        {entry.name} {entry.variation ? <span className="text-slate-400 font-normal">({entry.variation})</span> : ''}
+                                                                    </span>
+                                                                    {entry.isWrapped && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                                                            🛡 [Wrapped]
+                                                                        </span>
+                                                                    )}
+                                                                    {entry.sleevesCount > 0 && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                                            🛡 [{entry.sleevesCount} Plastic Sleeve{entry.sleevesCount > 1 ? 's' : ''}]
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                         <span className="text-slate-900 font-black">x{entry.qty}</span>
                                                     </div>

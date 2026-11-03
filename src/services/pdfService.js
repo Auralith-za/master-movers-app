@@ -4,6 +4,8 @@ import { PACKAGING_RATES, PRICING_CONSTANTS } from '../features/inventory/data/p
 import { getSimpleQuoteNumber } from '../utils/quoteHelpers.js';
 import { normalizeInventory } from '../utils/inventoryUtils.js';
 import { getBranchDetails } from '../utils/branchDetails.js';
+import { getWrappingFlag, getPlasticSleevesCount } from '../features/inventory/store/moveStore.js';
+import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems.js';
 
 /**
  * Service to generate professional PDF quotes for MasterMovers
@@ -37,6 +39,8 @@ export const generateProfessionalQuote = (data) => {
         const inventory = normalizeInventory(rawInventory);
         const packingDate = rawPackingDate || data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '';
         const branch = getBranchDetails(data);
+        const specialWrapping = data.specialWrapping || data.special_wrapping || data.specialWrappingOverrides || data.items_json?.special_wrapping || data.items_json?.specialWrapping || {};
+        const allCatalogItems = (inventoryItems && inventoryItems.length > 0) ? inventoryItems : INVENTORY_ITEMS;
 
         const jsPDFDoc = typeof jsPDF === 'function' ? jsPDF : (jsPDF.jsPDF || jsPDF);
         const doc = new jsPDFDoc({ compress: true });
@@ -324,12 +328,48 @@ export const generateProfessionalQuote = (data) => {
             Object.entries(inventory).forEach(([idKey, qty]) => {
                 if (!qty || qty <= 0) return
                 const { itemId, variation, room } = parseKey(idKey)
-                const item = inventoryItems.find(i => i.id === itemId)
+                const item = allCatalogItems.find(i => i.id === itemId)
                 const itemName = item ? item.name : itemId.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
                 const categoryName = (room || item?.category || 'General Furniture').toUpperCase()
                 if (!groupedPdfItems[categoryName]) groupedPdfItems[categoryName] = []
-                const varLabel = variation ? ` (${variation})` : ''
-                groupedPdfItems[categoryName].push([`${itemName}${varLabel}`, qty])
+
+                // Resolve wrapping & plastic sleeves
+                const wrapInfo = specialWrapping[idKey] || 
+                                 (room ? specialWrapping[`${itemId}__room:${room}`] : null) || 
+                                 (room && variation ? specialWrapping[`${itemId}_${variation}__room:${room}`] : null) ||
+                                 specialWrapping[itemId] || 
+                                 (variation ? specialWrapping[`${itemId}_${variation}`] : null) ||
+                                 specialWrapping[itemId.toLowerCase()] || {};
+
+                const defaultWrapped = getWrappingFlag(item, variation);
+                const defaultSleeves = (getPlasticSleevesCount(item, idKey) || 0) * qty;
+
+                let isWrapped = defaultWrapped;
+                let sleevesCount = defaultSleeves;
+
+                if (wrapInfo.sleeves !== undefined) {
+                    sleevesCount = Math.max(0, parseInt(wrapInfo.sleeves) || 0);
+                }
+                if (wrapInfo.wrap !== undefined) {
+                    isWrapped = Boolean(wrapInfo.wrap);
+                } else if (sleevesCount > 0) {
+                    isWrapped = false;
+                }
+
+                const cleanVariation = variation 
+                    ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '').replace(/^Wood$/i, '').trim() 
+                    : '';
+                const varLabel = cleanVariation ? ` (${cleanVariation})` : '';
+
+                let protLabel = '';
+                if (isWrapped) {
+                    protLabel += ' [Wrapped]';
+                }
+                if (sleevesCount > 0) {
+                    protLabel += ` [${sleevesCount} Plastic Sleeve${sleevesCount > 1 ? 's' : ''}]`;
+                }
+
+                groupedPdfItems[categoryName].push([`${itemName}${varLabel}${protLabel}`, qty])
             })
 
             if (Array.isArray(customProductsList) && customProductsList.length > 0) {
@@ -346,9 +386,10 @@ export const generateProfessionalQuote = (data) => {
                     const volLabel = totalVol > 0 ? (qty > 1 ? ` (${cVol.toFixed(2)} ft³ ea · Total: ${totalVol.toFixed(2)} ft³)` : ` (${cVol.toFixed(2)} ft³)`) : '';
                     let protLabel = '';
                     if (p.wrap) {
-                        protLabel = ' [Wrapped]';
-                    } else if (p.sleeves > 0) {
-                        protLabel = ` [${p.sleeves} Plastic Sleeve${p.sleeves > 1 ? 's' : ''}]`;
+                        protLabel += ' [Wrapped]';
+                    }
+                    if (p.sleeves > 0) {
+                        protLabel += ` [${p.sleeves} Plastic Sleeve${p.sleeves > 1 ? 's' : ''}]`;
                     }
                     const rowEntry = [`${p.name}${volLabel}${protLabel}`, qty];
                     if (p.room && p.room !== 'Custom Products & Manual Items') {

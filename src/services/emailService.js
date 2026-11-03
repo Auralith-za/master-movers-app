@@ -8,7 +8,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, packingDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume, packagingOption = 'none', packagingDetails = null, st7Boxes = 0, linenBoxes = 0, includeBoxVolume = undefined, discount = 0 }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, packingDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume, packagingOption = 'none', packagingDetails = null, st7Boxes = 0, linenBoxes = 0, includeBoxVolume = undefined, discount = 0, specialWrapping, special_wrapping }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -53,6 +53,8 @@ export const emailService = {
                 accessDetails,
                 moveDetails,
                 companyDetails: resolvedCompanyDetails,
+                specialWrapping: specialWrapping || special_wrapping || moveDetails?.special_wrapping || moveDetails?.items_json?.special_wrapping || {},
+                special_wrapping: specialWrapping || special_wrapping || moveDetails?.special_wrapping || moveDetails?.items_json?.special_wrapping || {},
                 generalNotes,
                 extraCollections,
                 extraDrops,

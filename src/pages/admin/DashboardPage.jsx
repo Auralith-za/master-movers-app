@@ -230,6 +230,8 @@ export default function DashboardPage() {
                 moveDate: quote.move_date,
                 createdAt: quote.created_at,
                 inventory: inventoryForPdf,
+                specialWrapping: quote.special_wrapping || quote.items_json?.special_wrapping || {},
+                special_wrapping: quote.special_wrapping || quote.items_json?.special_wrapping || {},
                 total: quote.total_price || 0,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
                 subTotal: (quote.total_price || 0) / 1.15,

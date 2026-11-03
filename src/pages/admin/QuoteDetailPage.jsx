@@ -1328,6 +1328,8 @@ export default function QuoteDetailPage() {
                 packingDate: isEditing ? editForm.packing_date : (quote.packing_date || quote.items_json?.packing_date || quote.items_json?.packingDate || ''),
                 createdAt: quote.created_at || new Date().toISOString(),
                 inventory: inventoryForPdf,
+                specialWrapping: isEditing ? editForm.special_wrapping : (quote.special_wrapping || quote.items_json?.special_wrapping || {}),
+                special_wrapping: isEditing ? editForm.special_wrapping : (quote.special_wrapping || quote.items_json?.special_wrapping || {}),
                 // Always prefer live recalculated values so PDF matches sidebar
                 total: finalPrice,
                 vat: finalVat,

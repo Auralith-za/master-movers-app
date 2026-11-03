@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { useMoveStore, calculateQuote, parseInventoryKey } from '../inventory/store/moveStore'
+import { useMoveStore, calculateQuote, parseInventoryKey, getWrappingFlag, getPlasticSleevesCount } from '../inventory/store/moveStore'
 import { INVENTORY_ITEMS } from '../inventory/data/mockItems'
 import { Button } from '../../components/ui/Button'
 import { FileText, CreditCard, Send, CheckCircle, Truck, MapPin, Sparkles, Phone, ChevronDown, ChevronUp, Plus, Minus, RotateCcw, Clock, XCircle } from 'lucide-react'
@@ -1468,18 +1468,27 @@ function Step4SummaryContent({ submissionType = 'standard' }) {
                                                 </div>
                                                 <ul className="divide-y divide-gray-50 px-4 py-1">
                                                     {itemsList.map(({ idKey, item, qty, variation }) => {
-                                                        const hasShield = item?.autoPackagingType || (variation === 'Glass' || variation === 'Marble')
+                                                        const isWrapped = getWrappingFlag(item, variation) || Boolean(variation?.includes('Wrapped'))
+                                                        const sleevesCount = (getPlasticSleevesCount(item, idKey) || 0) * qty
+                                                        const cleanVariation = variation 
+                                                            ? variation.replace(/_?Plastic Sleeve/g, '').replace(/_?Wrapped/g, '').replace(/^Wood$/i, '').trim() 
+                                                            : ''
                                                         return (
                                                             <li key={idKey} className="py-2 text-xs">
                                                                 <div className="flex justify-between items-center">
                                                                     <span className="text-slate-700 font-bold">
-                                                                        {qty}× {item?.name || idKey} {variation ? <span className="text-slate-400 text-[10px] font-normal uppercase">({variation})</span> : ''}
+                                                                        {qty}× {item?.name || idKey} {cleanVariation ? <span className="text-slate-400 text-[10px] font-normal uppercase">({cleanVariation})</span> : ''}
                                                                     </span>
                                                                     <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-50 px-1.5 py-0.5 rounded">Included</span>
                                                                 </div>
-                                                                {hasShield && (
-                                                                    <div className="text-[10px] text-emerald-600 font-semibold italic mt-0.5">
-                                                                        🛡 Protective wrapping included
+                                                                {isWrapped && (
+                                                                    <div className="text-[10px] text-blue-600 font-semibold italic mt-0.5">
+                                                                        🛡 Protective wrapping included [Wrapped]
+                                                                    </div>
+                                                                )}
+                                                                {sleevesCount > 0 && (
+                                                                    <div className="text-[10px] text-amber-600 font-semibold italic mt-0.5">
+                                                                        🛡 Plastic sleeves included [{sleevesCount} Plastic Sleeve{sleevesCount > 1 ? 's' : ''}]
                                                                     </div>
                                                                 )}
                                                                 {item?.requiresPhoto && (
