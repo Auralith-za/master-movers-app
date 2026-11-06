@@ -104,7 +104,9 @@ export const getBranchCode = (quoteOrData) => {
                        quoteOrData.pickupCityCode || 
                        quoteOrData.pickup_city_code || 
                        quoteOrData.pickup_city ||
+                       quoteOrData.breakdown?.pickupCityCode ||
                        quoteOrData.items_json?.pickupCityCode ||
+                       quoteOrData.items_json?.breakdown?.pickupCityCode ||
                        quoteOrData.moveDetails?.pickupCityCode;
 
     if (directCode === 'DBN') return 'DBN';
@@ -148,10 +150,20 @@ export const getBranchCode = (quoteOrData) => {
             lower.includes('cape town') || lower.includes('capetown') || lower.includes('cpt') ||
             lower.includes('epping') || lower.includes('bellville') || lower.includes('stellenbosch') ||
             lower.includes('somerset west') || lower.includes('paarl') || lower.includes('blouberg') ||
-            lower.includes('milnerton') || lower.includes('western cape')
+            lower.includes('milnerton') || lower.includes('western cape') ||
+            lower.includes('val de vie') || lower.includes('valdevie') || lower.includes('winelands') ||
+            lower.includes('pearl valley') || lower.includes('boschenmeer') || lower.includes('wellington') ||
+            lower.includes('franschhoek') || lower.includes('helderberg')
         ) {
             return 'CPT';
         }
+    }
+
+    // Distance-based fallback: if destination is in KZN/Durban and distance > 950km, origin is Cape Town
+    const dropoffAddress = (quoteOrData.dropoffAddress || quoteOrData.dropoff_address || quoteOrData.moveDetails?.dropoffAddress || '').toLowerCase();
+    const oneWayDist = quoteOrData.trip_breakdown?.pickupToDropoff || quoteOrData.moveDetails?.tripBreakdown?.pickupToDropoff || parseFloat(quoteOrData.distance_km || quoteOrData.moveDetails?.distanceKm || 0);
+    if ((dropoffAddress.includes('durban') || dropoffAddress.includes('ballito') || dropoffAddress.includes('umhlanga') || dropoffAddress.includes('kzn')) && (oneWayDist > 950 || oneWayDist > 1800)) {
+        return 'CPT';
     }
 
     // Default to Johannesburg (Head Office)

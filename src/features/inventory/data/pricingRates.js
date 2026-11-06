@@ -476,7 +476,10 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
                 val === "somerset west" || val === "paarl" || val === "durbanville" || val === "parow" ||
                 val === "goodwood" || val === "milnerton" || val === "bloubergstrand" || val === "blouberg sands" ||
                 val === "blouberg rise" || val === "bloubergrant" || val === "table view" ||
-                val === "strand" || val === "franschhoek" || val === "gordons bay" || val === "gordon's bay"
+                val === "strand" || val === "franschhoek" || val === "gordons bay" || val === "gordon's bay" ||
+                val === "val de vie" || val.includes("val de vie") || val.includes("valdevie") ||
+                val.includes("winelands") || val.includes("pearl valley") || val === "boschenmeer" ||
+                val === "wellington" || val.includes("helderberg")
             ) {
                 return CITY_CODES.CPT;
             }
@@ -569,7 +572,9 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
         const hasCptMarker = 
             name.includes('cape town') || name.includes('capetown') || name.includes('cpt') ||
             name.includes('city of cape town') || name.includes('western cape') ||
-            name.includes('malmesbury') || name.includes('swartland') || name.includes('hermanus') ||
+            name.includes('val de vie') || name.includes('valdevie') || name.includes('winelands') ||
+            name.includes('pearl valley') || name.includes('boschenmeer') || name.includes('wellington') ||
+            name.includes('helderberg') || name.includes('malmesbury') || name.includes('swartland') || name.includes('hermanus') ||
             name.includes('worcester') || name.includes('langebaan') || name.includes('saldanha') ||
             name.includes('vredenburg') || name.includes('caledon') || name.includes('ceres') ||
             name.includes('robertson') || name.includes('moorreesburg') || name.includes('piketberg') ||

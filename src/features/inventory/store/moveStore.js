@@ -854,6 +854,8 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         // 2. Keyword check
         if (
             a.includes('cape town') || a.includes('capetown') || a.includes('cpt') || a.includes('western cape') ||
+            a.includes('val de vie') || a.includes('valdevie') || a.includes('winelands') || a.includes('pearl valley') ||
+            a.includes('boschenmeer') || a.includes('wellington') || a.includes('helderberg') || a.includes('franschhoek') ||
             a.includes('malmesbury') || a.includes('swartland') || a.includes('hermanus') || a.includes('worcester') ||
             a.includes('langebaan') || a.includes('saldanha') || a.includes('vredenburg') || a.includes('caledon') ||
             a.includes('ceres') || a.includes('robertson') || a.includes('moorreesburg') || a.includes('piketberg') ||
@@ -892,20 +894,42 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
 
     // If still unresolved, default intelligently based on distance
     const estDistance = parseFloat(moveDetails.totalBillableDistance) || parseFloat(moveDetails.distanceKm) || 0;
+    const oneWayDistance = moveDetails.tripBreakdown?.pickupToDropoff || (estDistance > 0 ? (estDistance > 1000 ? estDistance / 2 : estDistance) : 0);
+
+    // If pickupCityCode is unresolved, deduce it from dropoffCityCode + distance before defaulting
+    if (!pickupCityCode && dropoffCityCode) {
+        if (dropoffCityCode === CITY_CODES.DBN) {
+            // From DBN: >900km one-way / >1800km circuit is Western Cape (CPT). ~350-850km is Gauteng (JHB).
+            pickupCityCode = (oneWayDistance > 900 || estDistance > 1100) ? CITY_CODES.CPT : CITY_CODES.JHB;
+        } else if (dropoffCityCode === CITY_CODES.CPT) {
+            // From CPT: >1400km one-way is DBN, ~900-1400km is JHB
+            pickupCityCode = (oneWayDistance > 1400 || estDistance > 2000) ? CITY_CODES.DBN : CITY_CODES.JHB;
+        } else if (dropoffCityCode === CITY_CODES.JHB) {
+            if (oneWayDistance > 900 || estDistance > 1800) {
+                pickupCityCode = CITY_CODES.CPT;
+            } else if (oneWayDistance >= 350 || estDistance >= 700) {
+                pickupCityCode = CITY_CODES.DBN;
+            } else {
+                pickupCityCode = CITY_CODES.JHB;
+            }
+        }
+    }
+
     if (!pickupCityCode) pickupCityCode = CITY_CODES.JHB;
+
     if (!dropoffCityCode) {
         if (pickupCityCode === CITY_CODES.DBN) {
             // From DBN, >1100km one-way / >2200km circuit is Western Cape (CPT), ~500-700km is Gauteng (JHB)
-            dropoffCityCode = (estDistance > 1100) ? CITY_CODES.CPT : CITY_CODES.JHB;
+            dropoffCityCode = (estDistance > 1100 || oneWayDistance > 900) ? CITY_CODES.CPT : CITY_CODES.JHB;
         } else if (pickupCityCode === CITY_CODES.CPT) {
-            dropoffCityCode = (estDistance > 1500) ? CITY_CODES.DBN : CITY_CODES.JHB;
+            dropoffCityCode = (estDistance > 1500 || oneWayDistance > 1400) ? CITY_CODES.DBN : CITY_CODES.JHB;
         } else if (pickupCityCode === CITY_CODES.JHB) {
             // From JHB:
             // Cape Town is ~1,400km one-way (>900km one-way / >1800km round-trip)
             // Durban is ~570km one-way (~350km - 850km one-way / 700km - 1700km round-trip)
-            if (estDistance > 900) {
+            if (estDistance > 900 || oneWayDistance > 900) {
                 dropoffCityCode = CITY_CODES.CPT;
-            } else if (estDistance >= 350) {
+            } else if (estDistance >= 350 || oneWayDistance >= 350) {
                 dropoffCityCode = CITY_CODES.DBN;
             } else {
                 dropoffCityCode = CITY_CODES.JHB;
@@ -1018,10 +1042,21 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             if (pickupCityCode !== CITY_CODES.DBN) {
                 nationalDestinationCityCode = CITY_CODES.DBN;
             }
+        }
+
+        // Distance-based linehaul sanity check:
+        // JHB to DBN is ~570km one way (~1140km circuit).
+        // JHB to CPT is ~1400km one way (~2800km circuit).
+        // CPT to DBN is ~1650km one way (~3300km circuit).
+        const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || (totalDistance / 2);
+
+        // If route is flagged between JHB and DBN, but distance is > 950km one-way (> 1800km circuit):
+        // It CANNOT be JHB! The long-distance leg must be CPT (Cape Town)!
+        if (pickupCityCode === CITY_CODES.JHB && nationalDestinationCityCode === CITY_CODES.DBN && (oneWayDist > 950 || totalDistance > 1800)) {
+            pickupCityCode = CITY_CODES.CPT;
+        } else if (pickupCityCode === CITY_CODES.DBN && nationalDestinationCityCode === CITY_CODES.JHB && (oneWayDist > 950 || totalDistance > 1800)) {
+            nationalDestinationCityCode = CITY_CODES.CPT;
         } else if (pickupCityCode === nationalDestinationCityCode || (pickupCityCode === CITY_CODES.JHB && (!nationalDestinationCityCode || nationalDestinationCityCode === CITY_CODES.JHB)) || (pickupCityCode === CITY_CODES.DBN && nationalDestinationCityCode === CITY_CODES.JHB)) {
-            // Fallback for long-distance routes: Durban to Cape Town is ~1,650km one way (circuit > 2,200km or one-way > 1,100km).
-            // JHB to DBN is ~570km one way (~350km - 850km), JHB to CPT is ~1400km (>950km).
-            const oneWayDist = moveDetails.tripBreakdown?.pickupToDropoff || parseFloat(moveDetails.distanceKm) || (totalDistance / 2);
             if (pickupCityCode === CITY_CODES.DBN && (oneWayDist > 1100 || totalDistance > 2200)) {
                 nationalDestinationCityCode = CITY_CODES.CPT;
             } else if (pickupCityCode === CITY_CODES.JHB && (oneWayDist > 950 || totalDistance > 1800)) {

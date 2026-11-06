@@ -268,7 +268,17 @@ export const generateProfessionalQuote = (data) => {
                 currentY += Math.max(6, h + 2);
             });
 
-            const notes = data.generalNotes || data.notes || data.customer_comments || data.moveDetails?.generalNotes || data.moveDetails?.notes || data.quote?.general_notes || data.quote?.notes || data.quote?.customer_comments || '';
+            let rawNotes = data.generalNotes || data.notes || data.customer_comments || data.moveDetails?.generalNotes || data.moveDetails?.notes || data.quote?.general_notes || data.quote?.notes || data.quote?.customer_comments || '';
+            let notes = rawNotes
+                ? rawNotes
+                    .replace(/\[LOCATION SEARCH FAILED\]\s*User could not find their address\.\s*Please contact them\.\s*/gi, '')
+                    .replace(/\[OUTLYING AREA \/ CUSTOM QUOTE REQUEST\]\s*[^.]*\.\s*User requested a custom quote callback\.\s*/gi, '')
+                    .replace(/\[CALLBACK_NOTIFICATION\]\s*/gi, '')
+                    .trim()
+                : '';
+            if (notes.startsWith('"') && notes.endsWith('"')) {
+                notes = notes.slice(1, -1).trim();
+            }
             if (notes) {
                 doc.setFont('helvetica', 'bold');
                 doc.text('Special Notes / Instructions:', 20, currentY);
