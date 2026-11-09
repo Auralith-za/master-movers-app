@@ -12,7 +12,7 @@ serve(async (req) => {
     }
 
     try {
-        const { quoteId, signatureName, idNumber, signatureIdNumber, signatureDate } = await req.json()
+        const { quoteId, signatureName, idNumber, signatureIdNumber, signatureDate, consultantName } = await req.json()
         const cleanIdNumber = (idNumber || signatureIdNumber || '').trim()
 
         if (!quoteId || !signatureName) {
@@ -47,11 +47,13 @@ serve(async (req) => {
 
         if (error) throw error
 
+        const allocatedConsultant = (consultantName || data?.[0]?.consultant_name || data?.[0]?.items_json?.consultant_name || data?.[0]?.items_json?.consultant || '').toString().trim()
+
         // Log the activity
         await supabase.from('quote_activities').insert([{
             quote_id: quoteId,
             activity_type: 'system',
-            content: `Client accepted and signed terms. Signature: ${signatureName}${cleanIdNumber ? ` (ID: ${cleanIdNumber})` : ''}`
+            content: `Client accepted and signed terms. Signature: ${signatureName}${cleanIdNumber ? ` (ID: ${cleanIdNumber})` : ''}${allocatedConsultant ? ` | Consultant: ${allocatedConsultant}` : ''}`
         }])
 
         return new Response(

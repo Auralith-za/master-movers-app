@@ -8,7 +8,7 @@ export const emailService = {
     /**
      * Generate PDF and send quote email (quote_proposal or booking_confirmation)
      */
-    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, packingDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume, packagingOption = 'none', packagingDetails = null, st7Boxes = 0, linenBoxes = 0, includeBoxVolume = undefined, discount = 0, specialWrapping, special_wrapping }) => {
+    sendQuoteEmail: async ({ type, quoteId, clientName, clientEmail, clientPhone, moveDate, packingDate, createdAt, created_at, pickupAddress, dropoffAddress, total, vat, subTotal, inventory, breakdown, inventoryItems, accessDetails = {}, moveDetails = {}, generalNotes = '', extraCollections = [], extraDrops = [], paymentMethod = 'paid', customProducts = [], companyDetails = null, totalVolume, packagingOption = 'none', packagingDetails = null, st7Boxes = 0, linenBoxes = 0, includeBoxVolume = undefined, discount = 0, specialWrapping, special_wrapping, consultantName, consultant_name }) => {
         try {
             if (!clientEmail) {
                 console.warn("Skipping email: No client email provided.")
@@ -23,6 +23,8 @@ export const emailService = {
                 companyVat: moveDetails.companyVat || '',
                 companyDetails: moveDetails.companyDetails || ''
             } : {});
+
+            const resolvedConsultant = consultantName || consultant_name || moveDetails?.consultant_name || moveDetails?.consultantName || moveDetails?.items_json?.consultant_name || '';
 
             const computedVol = totalVolume || breakdown?.totalVolume || breakdown?.totalVolumeCuFt || breakdown?.cubicFeet || moveDetails?.totalVolume || moveDetails?.totalVolumeCuFt || 0
 
@@ -53,6 +55,7 @@ export const emailService = {
                 accessDetails,
                 moveDetails,
                 companyDetails: resolvedCompanyDetails,
+                consultantName: resolvedConsultant,
                 specialWrapping: specialWrapping || special_wrapping || moveDetails?.special_wrapping || moveDetails?.items_json?.special_wrapping || {},
                 special_wrapping: specialWrapping || special_wrapping || moveDetails?.special_wrapping || moveDetails?.items_json?.special_wrapping || {},
                 generalNotes,
@@ -73,6 +76,7 @@ export const emailService = {
                 client_name: clientName,
                 client_email: clientEmail,
                 client_phone: clientPhone,
+                consultant_name: resolvedConsultant,
                 move_date: moveDate,
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
@@ -677,6 +681,8 @@ export const emailService = {
         dropoffAddress,
         moveDate,
         total,
+        consultantName,
+        consultant_name,
         signatureName,
         signatureIdNumber,
         signatureDate,
@@ -685,6 +691,7 @@ export const emailService = {
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
             const url = `${supabaseUrl}/functions/v1/send-email`
+            const resolvedConsultant = (consultantName || consultant_name || '').toString().trim()
 
             const quoteData = {
                 id: quoteId,
@@ -694,7 +701,8 @@ export const emailService = {
                 pickup_address: pickupAddress,
                 dropoff_address: dropoffAddress,
                 move_date: moveDate,
-                total_price: total || 0
+                total_price: total || 0,
+                consultant_name: resolvedConsultant
             }
 
             const response = await fetch(url, {
@@ -706,6 +714,8 @@ export const emailService = {
                 body: JSON.stringify({
                     type: 'terms_accepted_alert',
                     quoteData,
+                    consultantName: resolvedConsultant,
+                    consultant_name: resolvedConsultant,
                     signatureName,
                     signatureIdNumber: signatureIdNumber || null,
                     idNumber: signatureIdNumber || null,

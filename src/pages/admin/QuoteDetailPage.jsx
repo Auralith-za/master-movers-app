@@ -21,6 +21,7 @@ import { getBranchDetails } from '../../utils/branchDetails'
 import CouponInput from '../../features/payment/CouponInput'
 import { normalizeInventory } from '../../utils/inventoryUtils'
 import { generateSignedTermsCertificatePng, downloadCertificatePng } from '../../utils/termsCertificate'
+import { DEFAULT_CONSULTANTS, getQuoteConsultant } from '../../utils/consultants'
 import clsx from 'clsx'
 
 const orderedCategories = (() => {
@@ -83,6 +84,7 @@ export default function QuoteDetailPage() {
                 id: 'new', 
                 status: 'lead', 
                 client_name: '', 
+                consultant_name: '',
                 items_json: {},
                 send_me_boxes: { enabled: false, st7: 0, linen: 0, delivery_fee: 500 },
                 boxes_and_packing: { enabled: false, st7: 0, linen: 0 }
@@ -91,6 +93,7 @@ export default function QuoteDetailPage() {
                 client_name: '',
                 client_email: '',
                 client_phone: '',
+                consultant_name: '',
                 company_name: '',
                 company_vat: '',
                 company_details: '',
@@ -254,8 +257,11 @@ export default function QuoteDetailPage() {
                 }
             }
 
+            const initialConsultant = getQuoteConsultant(data)
+
             setQuote({
                 ...data,
+                consultant_name: initialConsultant,
                 packing_date: data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '',
                 send_me_boxes: initialSendMeBoxes,
                 boxes_and_packing: initialBoxesAndPacking
@@ -297,6 +303,7 @@ export default function QuoteDetailPage() {
 
             setEditForm({
                 ...data,
+                consultant_name: initialConsultant,
                 packing_date: data.packing_date || data.items_json?.packing_date || data.items_json?.packingDate || '',
                 distance_km: initialDistance,
                 items_json: rawItems,
@@ -370,6 +377,47 @@ export default function QuoteDetailPage() {
         if (!newNote.trim()) return
         const success = await logActivity('note', newNote)
         if (success) setNewNote('')
+    }
+
+    const handleQuickAssignConsultant = async (newConsultant) => {
+        const cleanName = (newConsultant || '').trim()
+        try {
+            const nextItemsJson = {
+                ...(quote?.items_json || {}),
+                consultant_name: cleanName || null
+            }
+            const { error } = await supabase
+                .from('quotes')
+                .update({
+                    consultant_name: cleanName || null,
+                    items_json: nextItemsJson
+                })
+                .eq('id', quote.id)
+
+            if (error) {
+                // Fallback retry with items_json only if column fails
+                await supabase
+                    .from('quotes')
+                    .update({ items_json: nextItemsJson })
+                    .eq('id', quote.id)
+            }
+
+            setQuote(prev => ({
+                ...prev,
+                consultant_name: cleanName,
+                items_json: nextItemsJson
+            }))
+            setEditForm(prev => ({
+                ...prev,
+                consultant_name: cleanName,
+                items_json: nextItemsJson
+            }))
+
+            await logActivity('system', `Consultant allocated: ${cleanName || 'Unassigned'}`)
+        } catch (err) {
+            console.error('Error assigning consultant:', err)
+            alert('Could not update consultant: ' + (err?.message || err))
+        }
     }
 
     // Calculate live price — runs always so PDF always has a full breakdown
@@ -890,10 +938,13 @@ export default function QuoteDetailPage() {
             }
             const customRoomsPayload = Array.isArray(editForm.custom_rooms) ? editForm.custom_rooms : []
 
+            const consultantPayload = (editForm.consultant_name || '').trim() || null
+
             const payload = {
                 client_name: editForm.client_name,
                 client_phone: editForm.client_phone,
                 client_email: editForm.client_email,
+                consultant_name: consultantPayload,
                 pickup_address: editForm.pickup_address,
                 dropoff_address: editForm.dropoff_address,
                 extra_collections: editForm.extraCollections || editForm.extra_collections || [],
@@ -907,6 +958,7 @@ export default function QuoteDetailPage() {
                 items_json: {
                     items: editForm.items_json,
                     special_wrapping: editForm.special_wrapping || {},
+                    consultant_name: consultantPayload,
                     extraCollections: editForm.extraCollections || editForm.extra_collections || [],
                     extraDrops: editForm.extraDrops || editForm.extra_drops || [],
                     packaging_details: {
@@ -952,13 +1004,14 @@ export default function QuoteDetailPage() {
                 error = err
             }
 
-            // Fallback: If DB table is missing extra_collections, extra_drops, or packing_date columns, retry without top-level keys (data is preserved in items_json)
-            if (error && (error.code === 'PGRST204' || error.message?.includes('extra_collections') || error.message?.includes('extra_drops') || error.message?.includes('packing_date'))) {
-                console.warn('Supabase DB missing extra_collections/extra_drops/packing_date columns. Retrying with fallback payload...')
+            // Fallback: If DB table is missing extra_collections, extra_drops, packing_date, or consultant_name columns, retry without top-level keys (data is preserved in items_json)
+            if (error && (error.code === 'PGRST204' || error.message?.includes('extra_collections') || error.message?.includes('extra_drops') || error.message?.includes('packing_date') || error.message?.includes('consultant_name'))) {
+                console.warn('Supabase DB missing extra_collections/extra_drops/packing_date/consultant_name columns. Retrying with fallback payload...')
                 const safePayload = { ...payload }
                 delete safePayload.extra_collections
                 delete safePayload.extra_drops
                 delete safePayload.packing_date
+                delete safePayload.consultant_name
                 if (id === 'new') {
                     const { data, error: err } = await supabase
                         .from('quotes')
@@ -981,6 +1034,7 @@ export default function QuoteDetailPage() {
                 setQuote({
                     ...editForm,
                     id: newId,
+                    consultant_name: consultantPayload,
                     created_at: new Date().toISOString(),
                     packaging_option: resolvedPackagingOption,
                     st7_boxes: totalSt7,
@@ -1000,6 +1054,7 @@ export default function QuoteDetailPage() {
             } else {
                 setQuote({ 
                     ...editForm, 
+                    consultant_name: consultantPayload,
                     packaging_option: resolvedPackagingOption,
                     st7_boxes: totalSt7,
                     linen_boxes: totalLinen,
@@ -1118,6 +1173,7 @@ export default function QuoteDetailPage() {
                 clientName: quote.client_name || editForm.client_name,
                 clientEmail: emailTo,
                 clientPhone: quote.client_phone || editForm.client_phone,
+                consultantName: isEditing ? editForm.consultant_name : (quote.consultant_name || quote.items_json?.consultant_name || ''),
                 pickupAddress: quote.pickup_address || editForm.pickup_address,
                 dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
                 moveDate: quote.move_date || editForm.move_date,
@@ -1183,6 +1239,7 @@ export default function QuoteDetailPage() {
                 clientName: quote.client_name || editForm.client_name,
                 clientEmail: quote.client_email || emailTo,
                 clientPhone: quote.client_phone || editForm.client_phone,
+                consultantName: isEditing ? editForm.consultant_name : (quote.consultant_name || quote.items_json?.consultant_name || ''),
                 pickupAddress: quote.pickup_address || editForm.pickup_address,
                 dropoffAddress: quote.dropoff_address || editForm.dropoff_address,
                 moveDate: quote.move_date || editForm.move_date,
@@ -1322,6 +1379,7 @@ export default function QuoteDetailPage() {
                 clientName: isEditing ? editForm.client_name : (quote.client_name || editForm.client_name),
                 clientEmail: isEditing ? editForm.client_email : (quote.client_email || editForm.client_email),
                 clientPhone: isEditing ? editForm.client_phone : (quote.client_phone || editForm.client_phone),
+                consultantName: isEditing ? editForm.consultant_name : (quote.consultant_name || quote.items_json?.consultant_name || ''),
                 pickupAddress: isEditing ? editForm.pickup_address : (quote.pickup_address || editForm.pickup_address),
                 dropoffAddress: isEditing ? editForm.dropoff_address : (quote.dropoff_address || editForm.dropoff_address),
                 moveDate: isEditing ? editForm.move_date : (quote.move_date || editForm.move_date),
@@ -1442,6 +1500,40 @@ export default function QuoteDetailPage() {
                                 <Clock size={12} /> Terms Pending
                             </span>
                         )}
+                        {/* Consultant Badge & Quick Assign */}
+                        {(() => {
+                            const currentConsultant = (isEditing ? editForm.consultant_name : (quote.consultant_name || quote.items_json?.consultant_name)) || '';
+                            return (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    <User size={12} className="text-red-400 shrink-0" />
+                                    <span>Consultant: <strong>{currentConsultant || 'Unassigned'}</strong></span>
+                                    {!isEditing && id !== 'new' && (
+                                        <select
+                                            value={currentConsultant && DEFAULT_CONSULTANTS.includes(currentConsultant) ? currentConsultant : (currentConsultant ? '__custom__' : '')}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === '__custom__') {
+                                                    const customName = prompt('Enter consultant name:', currentConsultant || '');
+                                                    if (customName !== null) {
+                                                        handleQuickAssignConsultant(customName);
+                                                    }
+                                                } else {
+                                                    handleQuickAssignConsultant(val);
+                                                }
+                                            }}
+                                            className="ml-1 bg-slate-800 text-white text-[10px] font-bold rounded px-1.5 py-0.5 border border-slate-700 cursor-pointer focus:outline-none"
+                                            title="Quick Allocate Consultant"
+                                        >
+                                            <option value="">Quick Assign...</option>
+                                            {DEFAULT_CONSULTANTS.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                            <option value="__custom__">Custom Name...</option>
+                                        </select>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                     {isEditing && (
                         <div className="flex items-center gap-4 mt-2">
@@ -1619,6 +1711,65 @@ export default function QuoteDetailPage() {
                                         ) : (
                                             <p className="text-xs text-slate-400 italic">No company details specified (Residential / Personal Move)</p>
                                         )
+                                    )}
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+                                            Allocated Move Consultant
+                                        </label>
+                                        {!isEditing && (quote?.consultant_name || quote?.items_json?.consultant_name) && (
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase">Assigned Staff</span>
+                                        )}
+                                    </div>
+                                    {isEditing ? (
+                                        <div className="space-y-1.5">
+                                            <select 
+                                                className="w-full text-xs border border-gray-200 rounded p-2 bg-white font-medium text-slate-800 focus:border-indigo-500 outline-none"
+                                                value={
+                                                    editForm.consultant_name && DEFAULT_CONSULTANTS.includes(editForm.consultant_name)
+                                                        ? editForm.consultant_name
+                                                        : (editForm.consultant_name ? '__custom__' : '')
+                                                }
+                                                onChange={e => {
+                                                    const val = e.target.value
+                                                    if (val === '__custom__') {
+                                                        if (DEFAULT_CONSULTANTS.includes(editForm.consultant_name)) {
+                                                            setEditForm(prev => ({ ...prev, consultant_name: '' }))
+                                                        }
+                                                    } else {
+                                                        setEditForm(prev => ({ ...prev, consultant_name: val }))
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">— Select Consultant —</option>
+                                                {DEFAULT_CONSULTANTS.map(c => (
+                                                    <option key={c} value={c}>{c}</option>
+                                                ))}
+                                                <option value="__custom__">Custom / Enter Name...</option>
+                                            </select>
+                                            {(!DEFAULT_CONSULTANTS.includes(editForm.consultant_name) || editForm.consultant_name === '') && (
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Type consultant name..."
+                                                    className="w-full text-xs border border-gray-200 rounded p-2 bg-white font-medium text-slate-800 focus:border-indigo-500 outline-none"
+                                                    value={editForm.consultant_name || ''}
+                                                    onChange={e => setEditForm({ ...editForm, consultant_name: e.target.value })}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            {(quote?.consultant_name || quote?.items_json?.consultant_name) ? (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                                    <User size={13} className="text-red-600" />
+                                                    {quote?.consultant_name || quote?.items_json?.consultant_name}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">Unassigned (Self-service online / No consultant allocated)</span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
 

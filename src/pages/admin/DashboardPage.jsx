@@ -175,6 +175,7 @@ export default function DashboardPage() {
         const clientName = (quote.client_name || quote.items_json?.contactName || quote.items_json?.client_name || '').toLowerCase()
         const clientEmail = (quote.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email || '').toLowerCase()
         const clientPhone = (quote.client_phone || quote.items_json?.contactPhone || quote.items_json?.client_phone || '').toLowerCase()
+        const consultant = (quote.consultant_name || quote.items_json?.consultant_name || quote.items_json?.consultant || '').toLowerCase()
         const quoteId = (quote.id || '').toString().toLowerCase()
         const pickup = (quote.pickup_address || quote.items_json?.pickupAddress || '').toLowerCase()
         const dropoff = (quote.dropoff_address || quote.items_json?.dropoffAddress || '').toLowerCase()
@@ -185,6 +186,7 @@ export default function DashboardPage() {
             clientName.includes(q) ||
             clientEmail.includes(q) ||
             clientPhone.includes(q) ||
+            consultant.includes(q) ||
             quoteId.includes(q) ||
             pickup.includes(q) ||
             dropoff.includes(q) ||

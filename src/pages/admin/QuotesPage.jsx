@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck, Package, CheckCircle, XCircle, Clock, ShieldCheck } from 'lucide-react'
+import { Search, Eye, Mail, Plus, CreditCard, Copy, CheckCheck, Package, CheckCircle, XCircle, Clock, ShieldCheck, User } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMoveStore } from '../../features/inventory/store/moveStore'
 import { emailService } from '../../services/emailService'
 import { INVENTORY_ITEMS } from '../../features/inventory/data/mockItems'
 import { getSimpleQuoteNumber } from '../../utils/quoteHelpers'
 import { normalizeInventory } from '../../utils/inventoryUtils'
+import { getQuoteConsultant } from '../../utils/consultants'
 
 export default function QuotesPage() {
     const navigate = useNavigate()
@@ -68,7 +69,7 @@ export default function QuotesPage() {
                 const { data } = await supabase
                     .from('quotes')
                     .select('*')
-                    .or(`client_name.ilike.%${q}%,client_phone.ilike.%${q}%,client_email.ilike.%${q}%,pickup_address.ilike.%${q}%,dropoff_address.ilike.%${q}%`)
+                    .or(`client_name.ilike.%${q}%,client_phone.ilike.%${q}%,client_email.ilike.%${q}%,pickup_address.ilike.%${q}%,dropoff_address.ilike.%${q}%,consultant_name.ilike.%${q}%`)
                     .limit(50)
                 if (data && data.length > 0) {
                     setQuotes(prev => {
@@ -116,6 +117,7 @@ export default function QuotesPage() {
         const clientName = (quote.client_name || quote.items_json?.contactName || quote.items_json?.client_name || '').toLowerCase()
         const clientEmail = (quote.client_email || quote.items_json?.contactEmail || quote.items_json?.client_email || '').toLowerCase()
         const clientPhone = (quote.client_phone || quote.items_json?.contactPhone || quote.items_json?.client_phone || '').toLowerCase()
+        const consultant = getQuoteConsultant(quote).toLowerCase()
         const quoteId = (quote.id || '').toString().toLowerCase()
         const simpleRef = getSimpleQuoteNumber(quote.id).toLowerCase()
         const pickup = (quote.pickup_address || quote.items_json?.pickupAddress || '').toLowerCase()
@@ -128,6 +130,7 @@ export default function QuotesPage() {
             clientName.includes(q) ||
             clientEmail.includes(q) ||
             clientPhone.includes(q) ||
+            consultant.includes(q) ||
             quoteId.includes(q) ||
             simpleRef.includes(q) ||
             pickup.includes(q) ||
@@ -302,6 +305,7 @@ export default function QuotesPage() {
                         <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-gray-100">
                             <th className="px-6 py-4 font-semibold">Ref #</th>
                             <th className="px-6 py-4 font-semibold">Client</th>
+                            <th className="px-6 py-4 font-semibold">Consultant</th>
                             <th className="px-6 py-4 font-semibold">Route</th>
                             <th className="px-6 py-4 font-semibold">Volume & Items</th>
                             <th className="px-6 py-4 font-semibold">Date</th>
@@ -313,9 +317,9 @@ export default function QuotesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
-                            <tr><td colSpan={filter === 'rejected' ? 9 : 8} className="text-center py-8 text-slate-400">Loading quotes...</td></tr>
+                            <tr><td colSpan={filter === 'rejected' ? 10 : 9} className="text-center py-8 text-slate-400">Loading quotes...</td></tr>
                         ) : filteredQuotes.length === 0 ? (
-                            <tr><td colSpan={filter === 'rejected' ? 9 : 8} className="text-center py-8 text-slate-400">No quotes found for this filter.</td></tr>
+                            <tr><td colSpan={filter === 'rejected' ? 10 : 9} className="text-center py-8 text-slate-400">No quotes found for this filter.</td></tr>
                         ) : (
                             filteredQuotes.map((quote) => (
                                 <tr key={quote.id} className="hover:bg-slate-50 transition-colors group">
@@ -332,6 +336,22 @@ export default function QuotesPage() {
                                             </div>
                                         )}
                                         <div className="text-xs text-slate-500">{quote.client_phone}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {(() => {
+                                            const consultant = getQuoteConsultant(quote);
+                                            if (consultant) {
+                                                return (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                                        <User size={12} className="text-red-600 shrink-0" />
+                                                        {consultant}
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <span className="text-xs text-slate-400 italic">—</span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-6 py-4 text-sm">
                                         <div className="text-slate-900">{quote.pickup_address?.split(',')[0]}</div>

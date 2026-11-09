@@ -538,6 +538,13 @@ function buildStandardDetailsTable({
         <tr><td class="label">Quote / Booking Ref:</td><td class="value" style="font-family:monospace;font-weight:900;">${cleanRef}</td></tr>
         <tr><td class="label">Customer Name:</td><td class="value"><strong>${name || '—'}</strong></td></tr>
         ${companyRows}
+        ${(() => {
+            const consultantVal = (quoteData?.consultant_name || quoteData?.items_json?.consultant_name || quoteData?.items_json?.consultant || quoteData?.consultant || '').toString().trim();
+            if (consultantVal) {
+                return `<tr><td class="label">Allocated Consultant:</td><td class="value"><strong style="color:#0f172a;background:#f1f5f9;padding:2px 8px;border-radius:4px;border:1px solid #cbd5e1;">👤 ${consultantVal}</strong></td></tr>`;
+            }
+            return '';
+        })()}
         <tr><td class="label">Phone Number:</td><td class="value">${phoneDisplay}</td></tr>
         <tr><td class="label">Email Address:</td><td class="value">${emailDisplay}</td></tr>
         ${propertyRouteRow}
@@ -564,7 +571,7 @@ serve(async (req) => {
     }
 
     try {
-        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, pngBase64, pngFilename, signatureName, signatureIdNumber, idNumber, signatureDate, paymentLink } = await req.json()
+        const { type, to, quoteData, contactData, pdfBase64, pdfFilename, pngBase64, pngFilename, signatureName, signatureIdNumber, idNumber, signatureDate, paymentLink, consultantName } = await req.json()
 
         // Lead Validation: For abandoned leads, require at least email or phone. For callback/contact requests, require both.
         if (type === 'abandoned_lead_alert') {
@@ -787,7 +794,8 @@ serve(async (req) => {
         } else if (type === 'booking_confirmed_alert') {
             // Admin-only booking alert — with PDF, instant, always fires
             const ref = quoteData?.id ? quoteData.id.toString().substring(0, 8).toUpperCase() : 'NEW'
-            subject = `✅ BOOKING CONFIRMED — ${quoteData?.client_name || 'Customer'} [MM-${ref}] — R ${Number(quoteData?.total_price || 0).toFixed(2)}`
+            const bookingConsultant = (consultantName || quoteData?.consultant_name || quoteData?.items_json?.consultant_name || quoteData?.items_json?.consultant || quoteData?.consultant || '').toString().trim()
+            subject = `✅ BOOKING CONFIRMED — ${quoteData?.client_name || 'Customer'} [MM-${ref}]${bookingConsultant ? ` [Consultant: ${bookingConsultant}]` : ''} — R ${Number(quoteData?.total_price || 0).toFixed(2)}`
             recipients = adminEmails
 
             let inventoryData = quoteData?.items_json || quoteData?.inventory || quoteData?.items
@@ -1315,7 +1323,29 @@ serve(async (req) => {
             const sigId = (signatureIdNumber || idNumber || quoteData?.signature_json?.idNumber || quoteData?.signature_json?.id_number || quoteData?.id_number || '').toString().trim()
             const sigDate = signatureDate ? new Date(signatureDate).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('en-ZA')
 
-            subject = `✅ TERMS ACCEPTED & SIGNED — ${clientName} [MM-${ref}]`
+            let consultant = (consultantName || quoteData?.consultant_name || quoteData?.items_json?.consultant_name || quoteData?.items_json?.consultant || quoteData?.consultant || '').toString().trim()
+
+            if (!consultant && quoteData?.id) {
+                try {
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+                    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+                    if (supabaseUrl && serviceKey) {
+                        const supabaseAdmin = createClient(supabaseUrl, serviceKey)
+                        const { data: qData } = await supabaseAdmin
+                            .from('quotes')
+                            .select('consultant_name, items_json')
+                            .eq('id', quoteData.id)
+                            .maybeSingle()
+                        if (qData) {
+                            consultant = (qData.consultant_name || qData.items_json?.consultant_name || qData.items_json?.consultant || '').toString().trim()
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch quote consultant fallback:', e)
+                }
+            }
+
+            subject = `✅ TERMS ACCEPTED & SIGNED — ${clientName} [MM-${ref}]${consultant ? ` [Consultant: ${consultant}]` : ''}`
             recipients = adminEmails
 
             innerHtml = `
@@ -1325,6 +1355,15 @@ serve(async (req) => {
                     </span>
                     <h1 style="color:#0f172a;margin:12px 0 6px 0;font-size:24px;">Terms &amp; Conditions Accepted</h1>
                     <p style="color:#64748b;font-size:14px;margin:0;">The client has accepted and electronically signed their moving agreement.</p>
+                    ${consultant ? `
+                    <div style="margin-top:12px;display:inline-block;padding:6px 16px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:20px;font-size:13px;font-weight:bold;color:#0f172a;">
+                        👤 Allocated Consultant: <strong style="color:#e31837;">${consultant}</strong>
+                    </div>
+                    ` : `
+                    <div style="margin-top:12px;display:inline-block;padding:5px 14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:20px;font-size:11px;font-weight:600;color:#64748b;">
+                        👤 Consultant: <em>Unassigned (Self-service online)</em>
+                    </div>
+                    `}
                 </div>
 
                 <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:16px;padding:24px;text-align:center;margin:24px 0;">

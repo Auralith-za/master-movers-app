@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { Phone, Mail, CheckCircle, Clock, ExternalLink } from 'lucide-react'
+import { Phone, Mail, CheckCircle, Clock, ExternalLink, User } from 'lucide-react'
 
 export default function LeadsPage() {
     const [leads, setLeads] = useState([])
@@ -142,6 +142,12 @@ export default function LeadsPage() {
                             </div>
 
                             <div className="space-y-2 mb-5">
+                                {(lead.consultant_name || lead.items_json?.consultant_name) && (
+                                    <div className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 inline-flex items-center gap-1.5">
+                                        <User size={12} className="text-red-600" />
+                                        <span>Consultant: <strong>{lead.consultant_name || lead.items_json?.consultant_name}</strong></span>
+                                    </div>
+                                )}
                                 <div className="text-sm text-slate-600 flex items-center gap-2">
                                     <Phone size={14} className="text-slate-400" />
                                     {lead.client_phone}

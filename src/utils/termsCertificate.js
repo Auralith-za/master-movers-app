@@ -155,11 +155,20 @@ export async function generateSignedTermsCertificatePng({ quote, signatureName, 
     ctx.fillStyle = '#64748b'
     ctx.font = '800 10px system-ui, -apple-system, sans-serif'
     ctx.fillText('MOVE ROUTE', infoX + 20, infoY + 74)
+    const certConsultant = (quote?.consultant_name || quote?.items_json?.consultant_name || quote?.items_json?.consultant || '').trim()
+    if (certConsultant) {
+        ctx.fillText('ALLOCATED CONSULTANT', infoX + 470, infoY + 74)
+    }
+
     ctx.fillStyle = '#334155'
     ctx.font = '600 12px system-ui, -apple-system, sans-serif'
     const pickupShort = (quote?.pickup_address || 'Pickup Address').split(',')[0]
     const dropoffShort = (quote?.dropoff_address || 'Dropoff Address').split(',')[0]
     ctx.fillText(`${pickupShort}  ➔  ${dropoffShort}`, infoX + 20, infoY + 92)
+    if (certConsultant) {
+        ctx.font = '700 12px system-ui, -apple-system, sans-serif'
+        ctx.fillText(certConsultant, infoX + 470, infoY + 92)
+    }
 
     // 5. Agreed Terms Clauses Section
     let textY = infoY + 135

@@ -85,6 +85,14 @@ export const generateProfessionalQuote = (data) => {
             doc.text(`Email: ${clientEmail || 'N/A'}`, 20, clientY);
             clientY += 6;
 
+            const consultantName = (data.consultantName || data.consultant_name || data.items_json?.consultant_name || data.quote?.consultant_name || data.quote?.items_json?.consultant_name || '').toString().trim();
+            if (consultantName) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Consultant: ${consultantName}`, 20, clientY);
+                doc.setFont('helvetica', 'normal');
+                clientY += 6;
+            }
+
             const compObj = (typeof data.companyDetails === 'object' && data.companyDetails !== null ? data.companyDetails : null) ||
                 data.company_details ||
                 data.items_json?.company_details ||

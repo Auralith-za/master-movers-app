@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle, FileText, Download } from 'lucide-react';
+import { MapPin, Calendar, Truck, Package, ShieldCheck, CheckCircle, CreditCard, Phone, XCircle, FileText, Download, User } from 'lucide-react';
 import { INVENTORY_ITEMS } from '../features/inventory/data/mockItems';
 import { calculateQuote, getWrappingFlag, getPlasticSleevesCount } from '../features/inventory/store/moveStore';
 import TermsModal from '../components/TermsModal';
@@ -185,6 +185,7 @@ export default function QuoteReviewPage() {
 
             // 2. Call edge function
             let edgeSucceeded = false
+            const allocatedConsultant = (quote.consultant_name || quote.items_json?.consultant_name || quote.items_json?.consultant || '').toString().trim()
             try {
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-terms`, {
                     method: 'POST',
@@ -197,7 +198,8 @@ export default function QuoteReviewPage() {
                         signatureName: sig.name,
                         idNumber: sig.idNumber,
                         signatureIdNumber: sig.idNumber,
-                        signatureDate: sig.date
+                        signatureDate: sig.date,
+                        consultantName: allocatedConsultant
                     })
                 })
                 if (response.ok) edgeSucceeded = true
@@ -232,7 +234,7 @@ export default function QuoteReviewPage() {
                 await supabase.from('quote_activities').insert([{
                     quote_id: id,
                     activity_type: 'system',
-                    content: `Client accepted and signed terms. Signature: ${sig.name} (ID: ${sig.idNumber})`
+                    content: `Client accepted and signed terms. Signature: ${sig.name} (ID: ${sig.idNumber})${allocatedConsultant ? ` • Consultant: ${allocatedConsultant}` : ''}`
                 }])
             } catch (actErr) {
                 console.warn('Could not record activity:', actErr)
@@ -249,6 +251,7 @@ export default function QuoteReviewPage() {
                     dropoffAddress: quote.dropoff_address,
                     moveDate: quote.move_date,
                     total: quote.total_price || 0,
+                    consultantName: allocatedConsultant,
                     signatureName: sig.name,
                     signatureIdNumber: sig.idNumber,
                     signatureDate: sig.date,
@@ -346,6 +349,7 @@ export default function QuoteReviewPage() {
                 customProducts: quote.custom_products || quote.items_json?.custom_products || [],
                 extraCollections: quote.items_json?.extraCollections || quote.extra_collections || [],
                 extraDrops: quote.items_json?.extraDrops || quote.extra_drops || [],
+                consultantName: quote.consultant_name || quote.items_json?.consultant_name || quote.items_json?.consultant || '',
                 shouldSave: true
             });
         } catch (err) {
@@ -353,6 +357,8 @@ export default function QuoteReviewPage() {
             alert('Failed to generate PDF: ' + (err?.message || err));
         }
     };
+
+    const assignedConsultant = (quote?.consultant_name || quote?.items_json?.consultant_name || quote?.items_json?.consultant || '').toString().trim();
 
     return (
         <div className="min-h-screen bg-slate-50 pb-36 sm:pb-24">
@@ -364,6 +370,11 @@ export default function QuoteReviewPage() {
                             <h1 className="text-4xl font-black tracking-tight">Review Your Move</h1>
                             <p className="text-slate-400 mt-2">Reference: <span className="text-white font-bold tracking-wider">#{quote.id.toString().substring(0, 8).toUpperCase()}</span></p>
                             <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                {assignedConsultant && (
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 border border-white/20 rounded-full text-xs font-bold text-slate-200">
+                                        <User size={13} className="text-red-400" /> Move Consultant: <strong className="text-white">{assignedConsultant}</strong>
+                                    </div>
+                                )}
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600/20 border border-red-500/30 rounded-full text-xs font-black text-red-400 uppercase tracking-wider">
                                     📦 Total Volume / Cubes: {quoteVolume.toFixed(2)} ft³
                                 </div>
