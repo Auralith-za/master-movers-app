@@ -870,7 +870,19 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             a.includes('berea') || a.includes('windermere') || a.includes('umhlanga') || a.includes('ballito') ||
             a.includes('pinetown') || a.includes('hillcrest') || a.includes('westville') || a.includes('kloof') ||
             a.includes('inanda') || a.includes('ntuzuma') || a.includes('umlazi') || a.includes('musgrave') ||
-            a.includes('bluff') || a.includes('isipingo') || a.includes('durban north') || a.includes('yellowwood park')
+            a.includes('bluff') || a.includes('isipingo') || a.includes('durban north') || a.includes('yellowwood park') ||
+            a.includes('pietermaritzburg') || a.includes('pmb') || a.includes('hilton') || a.includes('howick') ||
+            a.includes('midlands') || a.includes('kzn midlands') || a.includes('richards bay') || a.includes('richardsbay') ||
+            a.includes('empangeni') || a.includes('amanzimtoti') || a.includes('scottburgh') || a.includes('port shepstone') ||
+            a.includes('portshepstone') || a.includes('shelly beach') || a.includes('shellybeach') || a.includes('uvongo') ||
+            a.includes('margate') || a.includes('ramsgate') || a.includes('southbroom') || a.includes('port edward') ||
+            a.includes('portedward') || a.includes('kokstad') || a.includes('underberg') || a.includes('ixopo') ||
+            a.includes('newcastle') || a.includes('ladysmith') || a.includes('dundee') || a.includes('vryheid') ||
+            a.includes('estcourt') || a.includes('mooi river') || a.includes('mooiriver') || a.includes('wartburg') ||
+            a.includes('st lucia') || a.includes('mtubatuba') || a.includes('hluhluwe') || a.includes('pongola') ||
+            a.includes('mkuze') || a.includes('kwadukuza') || a.includes('stanger') || a.includes('salt rock') ||
+            a.includes('shakas rock') || a.includes('umdloti') || a.includes('la mercy') || a.includes('mount edgecombe') ||
+            a.includes('queensburgh') || a.includes('kingsburgh') || a.includes('umkomaas')
         ) {
             if (a.includes('inanda') && (a.includes('sandton') || a.includes('gauteng') || a.includes('joburg') || a.includes('johannesburg'))) {
                 return CITY_CODES.JHB;
@@ -927,9 +939,9 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
             // From JHB:
             // Cape Town is ~1,400km one-way (>900km one-way / >1800km round-trip)
             // Durban is ~570km one-way (~350km - 850km one-way / 700km - 1700km round-trip)
-            if (estDistance > 900 || oneWayDistance > 900) {
+            if (oneWayDistance > 900 || estDistance > 1800) {
                 dropoffCityCode = CITY_CODES.CPT;
-            } else if (estDistance >= 350 || oneWayDistance >= 350) {
+            } else if (oneWayDistance >= 350 || estDistance >= 700) {
                 dropoffCityCode = CITY_CODES.DBN;
             } else {
                 dropoffCityCode = CITY_CODES.JHB;
@@ -1012,11 +1024,16 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
         const dropoffLower = (dropoffAddress || '').toLowerCase();
         const dropoffPostalMatch = dropoffLower.match(/\b(\d{4})\b/g);
         let hasCptPostal = false;
+        let hasDbnPostal = false;
         if (dropoffPostalMatch) {
             for (const p of dropoffPostalMatch) {
                 const code = parseInt(p, 10);
                 if (code >= 6700 && code <= 8099) {
                     hasCptPostal = true;
+                    break;
+                }
+                if (code >= 2900 && code <= 4799) {
+                    hasDbnPostal = true;
                     break;
                 }
             }
@@ -1034,10 +1051,23 @@ export const calculateQuote = (inventory = {}, moveDetails = {}, accessDetails =
                 nationalDestinationCityCode = CITY_CODES.CPT;
             }
         } else if (
+            hasDbnPostal ||
             dropoffLower.includes('durban') || dropoffLower.includes('dbn') || dropoffLower.includes('kzn') || dropoffLower.includes('kwazulu') ||
             dropoffLower.includes('ethekwini') || dropoffLower.includes('berea') || dropoffLower.includes('umhlanga') || dropoffLower.includes('ballito') ||
             dropoffLower.includes('inanda') || dropoffLower.includes('ntuzuma') || dropoffLower.includes('umlazi') ||
-            dropoffLower.includes('pinetown') || dropoffLower.includes('hillcrest') || dropoffLower.includes('westville') || dropoffLower.includes('amanzimtoti')
+            dropoffLower.includes('pinetown') || dropoffLower.includes('hillcrest') || dropoffLower.includes('westville') || dropoffLower.includes('amanzimtoti') ||
+            dropoffLower.includes('pietermaritzburg') || dropoffLower.includes('pmb') || dropoffLower.includes('hilton') || dropoffLower.includes('howick') ||
+            dropoffLower.includes('midlands') || dropoffLower.includes('kzn midlands') || dropoffLower.includes('richards bay') || dropoffLower.includes('richardsbay') ||
+            dropoffLower.includes('empangeni') || dropoffLower.includes('scottburgh') || dropoffLower.includes('port shepstone') || dropoffLower.includes('portshepstone') ||
+            dropoffLower.includes('shelly beach') || dropoffLower.includes('shellybeach') || dropoffLower.includes('uvongo') || dropoffLower.includes('margate') ||
+            dropoffLower.includes('ramsgate') || dropoffLower.includes('southbroom') || dropoffLower.includes('port edward') || dropoffLower.includes('portedward') ||
+            dropoffLower.includes('kokstad') || dropoffLower.includes('underberg') || dropoffLower.includes('ixopo') || dropoffLower.includes('newcastle') ||
+            dropoffLower.includes('ladysmith') || dropoffLower.includes('dundee') || dropoffLower.includes('vryheid') || dropoffLower.includes('estcourt') ||
+            dropoffLower.includes('mooi river') || dropoffLower.includes('mooiriver') || dropoffLower.includes('wartburg') || dropoffLower.includes('st lucia') ||
+            dropoffLower.includes('mtubatuba') || dropoffLower.includes('hluhluwe') || dropoffLower.includes('pongola') || dropoffLower.includes('mkuze') ||
+            dropoffLower.includes('kwadukuza') || dropoffLower.includes('stanger') || dropoffLower.includes('salt rock') || dropoffLower.includes('shakas rock') ||
+            dropoffLower.includes('umdloti') || dropoffLower.includes('la mercy') || dropoffLower.includes('mount edgecombe') || dropoffLower.includes('queensburgh') ||
+            dropoffLower.includes('kingsburgh') || dropoffLower.includes('umkomaas')
         ) {
             if (pickupCityCode !== CITY_CODES.DBN) {
                 nationalDestinationCityCode = CITY_CODES.DBN;

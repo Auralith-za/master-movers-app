@@ -30,6 +30,7 @@ export default function QuoteReviewPage() {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [liveBreakdown, setLiveBreakdown] = useState(null);
     const branch = quote ? getBranchDetails(quote) : null;
 
     const handleRejectQuote = async () => {
@@ -131,15 +132,22 @@ export default function QuoteReviewPage() {
                         true
                     );
                     if (calc && !calc.error && calc.total > 0) {
+                        setLiveBreakdown(calc.breakdown);
                         const dbTotal = Number(data.total_price || 0);
                         const calcTotal = Number(calc.total);
                         if (Math.abs(dbTotal - calcTotal) > 1.0) {
                             console.warn(`[QuoteReview] Reconciling stale quote total: DB had R${dbTotal.toFixed(2)}, recalculated is R${calcTotal.toFixed(2)}`);
                             data.total_price = calcTotal;
                             data.total_volume = Number(calc.totalVolume || data.total_volume || 0);
+                            const updatedItemsJson = {
+                                ...(data.items_json || {}),
+                                breakdown: calc.breakdown
+                            };
+                            data.items_json = updatedItemsJson;
                             supabase.from('quotes').update({
                                 total_price: calcTotal,
-                                total_volume: data.total_volume
+                                total_volume: data.total_volume,
+                                items_json: updatedItemsJson
                             }).eq('id', data.id).then(({ error: syncErr }) => {
                                 if (syncErr) console.error('[QuoteReview] Error syncing price to DB:', syncErr);
                             });
@@ -338,9 +346,9 @@ export default function QuoteReviewPage() {
                 total: quote.total_price || 0,
                 vat: (quote.total_price || 0) * 0.15 / 1.15,
                 subTotal: (quote.total_price || 0) / 1.15,
-                discount: quote.items_json?.breakdown?.discount || 0,
+                discount: liveBreakdown?.discount || quote.items_json?.breakdown?.discount || 0,
                 inventoryItems: INVENTORY_ITEMS,
-                breakdown: quote.items_json?.breakdown || null,
+                breakdown: liveBreakdown || quote.items_json?.breakdown || null,
                 totalVolume: quoteVolume,
                 is_manual_price: Boolean(quote.is_manual_price),
                 isManualPrice: Boolean(quote.is_manual_price),

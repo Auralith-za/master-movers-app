@@ -957,6 +957,7 @@ export default function QuoteDetailPage() {
                 team_notes: editForm.team_notes,
                 items_json: {
                     items: editForm.items_json,
+                    breakdown: recalculatedData?.breakdown || quote?.items_json?.breakdown || null,
                     special_wrapping: editForm.special_wrapping || {},
                     consultant_name: consultantPayload,
                     extraCollections: editForm.extraCollections || editForm.extra_collections || [],

@@ -142,7 +142,11 @@ export const getBranchCode = (quoteOrData) => {
         if (
             lower.includes('durban') || lower.includes('dbn') || lower.includes('ballito') ||
             lower.includes('umhlanga') || lower.includes('kzn') || lower.includes('kwazulu') ||
-            lower.includes('pinetown') || lower.includes('hillcrest') || lower.includes('amanzimtoti')
+            lower.includes('pinetown') || lower.includes('hillcrest') || lower.includes('amanzimtoti') ||
+            lower.includes('pietermaritzburg') || lower.includes('pmb') || lower.includes('hilton') ||
+            lower.includes('howick') || lower.includes('midlands') || lower.includes('richards bay') ||
+            lower.includes('empangeni') || lower.includes('scottburgh') || lower.includes('port shepstone') ||
+            lower.includes('margate') || lower.includes('newcastle') || lower.includes('ladysmith')
         ) {
             return 'DBN';
         }

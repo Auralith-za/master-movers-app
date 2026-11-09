@@ -613,7 +613,19 @@ export const detectCityCode = (addressStr, components = null, latLng = null) => 
             name.includes('inanda') || name.includes('ntuzuma') || name.includes('umlazi') ||
             name.includes('musgrave') || name.includes('bluff') || name.includes('isipingo') ||
             name.includes('durban north') || name.includes('yellowwood park') || name.includes('new germany') ||
-            name.includes('point waterfront');
+            name.includes('point waterfront') ||
+            name.includes('pietermaritzburg') || name.includes('pmb') || name.includes('hilton') || name.includes('howick') ||
+            name.includes('midlands') || name.includes('richards bay') || name.includes('richardsbay') ||
+            name.includes('empangeni') || name.includes('scottburgh') || name.includes('port shepstone') ||
+            name.includes('portshepstone') || name.includes('shelly beach') || name.includes('shellybeach') ||
+            name.includes('uvongo') || name.includes('margate') || name.includes('ramsgate') ||
+            name.includes('southbroom') || name.includes('port edward') || name.includes('portedward') ||
+            name.includes('kokstad') || name.includes('underberg') || name.includes('ixopo') ||
+            name.includes('newcastle') || name.includes('ladysmith') || name.includes('dundee') ||
+            name.includes('vryheid') || name.includes('estcourt') || name.includes('mooi river') ||
+            name.includes('mooiriver') || name.includes('wartburg') || name.includes('st lucia') ||
+            name.includes('mtubatuba') || name.includes('hluhluwe') || name.includes('pongola') ||
+            name.includes('mkuze') || name.includes('umkomaas');
 
         // Garden Route Markers
         const isGardenRouteTown = GARDEN_ROUTE_TOWNS.some(t => {
